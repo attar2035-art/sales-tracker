@@ -4,7 +4,6 @@ import {
   MONTHS_AR, formatCurrency, formatNumber,
   getAchievementStatus, getStatusColor, getStatusLabel,
   getMonthProgress, getRemainingWorkingDays, getTotalWorkingDaysInMonth,
-  getPassedWorkingDays
 } from '../lib/helpers';
 
 export default function Dashboard() {
@@ -18,6 +17,7 @@ export default function Dashboard() {
   const [supervisors, setSupervisors] = useState([]);
   const [regions, setRegions] = useState([]);
   const [activeMetric, setActiveMetric] = useState('sales');
+  const [activeView, setActiveView] = useState('reps');
 
   useEffect(() => { fetchMeta(); }, []);
   useEffect(() => { fetchData(); }, [year, month]);
@@ -100,11 +100,38 @@ export default function Dashboard() {
   };
 
   const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
+
   const filtered = data.filter(d => {
     if (filterSup && d.supervisors?.id !== filterSup) return false;
     if (filterRegion && d.regions?.id !== filterRegion) return false;
     return true;
   });
+
+  // إجماليات المشرفين
+  const supervisorStats = supervisors.map(sup => {
+    const supReps = data.filter(d => d.supervisors?.id === sup.id);
+    const totalTargetSales = supReps.reduce((a, d) => a + (d.target.target_sales || 0), 0);
+    const totalTargetCollection = supReps.reduce((a, d) => a + (d.target.target_collection || 0), 0);
+    const totalSales = supReps.reduce((a, d) => a + d.achieved.sales, 0);
+    const totalCollection = supReps.reduce((a, d) => a + d.achieved.collection, 0);
+    const totalVisits = supReps.reduce((a, d) => a + d.achieved.total_visits, 0);
+    const totalTargetVisits = supReps.reduce((a, d) => a + (d.target.target_total_visits || 0), 0);
+    const totalNewCustomers = supReps.reduce((a, d) => a + d.achieved.new_customers, 0);
+    const totalExpenses = supReps.reduce((a, d) => a + d.achieved.expenses, 0);
+    const salesPct = totalTargetSales > 0 ? Math.round((totalSales / totalTargetSales) * 100) : 0;
+    const colPct = totalTargetCollection > 0 ? Math.round((totalCollection / totalTargetCollection) * 100) : 0;
+    const monthProg = getMonthProgress(year, month);
+    const status = getAchievementStatus(totalSales, totalTargetSales, monthProg);
+    return {
+      ...sup, supReps: supReps.length,
+      totalTargetSales, totalTargetCollection,
+      totalSales, totalCollection, totalVisits, totalTargetVisits,
+      totalNewCustomers, totalExpenses,
+      salesPct, colPct, status,
+      regions: [...new Set(supReps.map(d => d.regions?.name).filter(Boolean))].join('، '),
+    };
+  });
+
   const totalSales = filtered.reduce((a, d) => a + d.achieved.sales, 0);
   const totalCollection = filtered.reduce((a, d) => a + d.achieved.collection, 0);
   const totalVisits = filtered.reduce((a, d) => a + d.achieved.total_visits, 0);
@@ -112,6 +139,7 @@ export default function Dashboard() {
   const monthProg = getMonthProgress(year, month);
   const remainingDays = getRemainingWorkingDays(year, month);
   const totalDays = getTotalWorkingDaysInMonth(year, month);
+
   const metrics = [
     { key: 'sales', label: 'المبيعات' },
     { key: 'collection', label: 'التحصيل' },
@@ -125,7 +153,7 @@ export default function Dashboard() {
       <div className="page-header">
         <h1 className="page-title">📊 لوحة المتابعة</h1>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <select className="form-select" style={{ width: 'auto' }} value={filterSup} onChange={e => setFilterSup(e.target.value)}>
+          <select className="form-select" style={{ width: 'auto' }} value={filterSup} onChange={e => { setFilterSup(e.target.value); setActiveView('reps'); }}>
             <option value="">كل المشرفين</option>
             {supervisors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
@@ -143,6 +171,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* إجماليات */}
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-label">إجمالي المبيعات</div>
@@ -169,87 +199,151 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* تبويب العرض */}
       <div className="tabs">
-        {metrics.map(m => (
-          <button key={m.key} className={`tab ${activeMetric === m.key ? 'active' : ''}`}
-            onClick={() => setActiveMetric(m.key)}>{m.label}</button>
-        ))}
+        <button className={`tab ${activeView === 'supervisors' ? 'active' : ''}`} onClick={() => setActiveView('supervisors')}>👔 المشرفون</button>
+        <button className={`tab ${activeView === 'reps' ? 'active' : ''}`} onClick={() => setActiveView('reps')}>👤 المندوبون</button>
       </div>
-      {loading ? (
-        <div className="loading"><div className="spinner" />جاري التحميل...</div>
-      ) : filtered.length === 0 ? (
-        <div className="empty-state"><div className="empty-state-icon">📊</div><div className="empty-state-text">لا توجد بيانات</div></div>
-      ) : (
+
+      {/* عرض المشرفين */}
+      {activeView === 'supervisors' && (
         <div className="table-wrapper">
           <table>
             <thead>
               <tr>
-                <th>المندوب</th><th>المشرف</th><th>المنطقة</th>
-                {activeMetric === 'sales' && <><th>هدف البيع</th><th>المنجز</th><th>المتبقي</th><th>يومي مطلوب</th><th>%</th><th>الحالة</th></>}
-                {activeMetric === 'collection' && <><th>هدف التحصيل</th><th>المحصل</th><th>المتبقي</th><th>يومي مطلوب</th><th>%</th></>}
-                {activeMetric === 'visits' && <><th>هدف الزيارات</th><th>إجمالي</th><th>ناجحة</th><th>صور الرف</th><th>متبقي</th><th>يومي مطلوب</th></>}
-                {activeMetric === 'products' && <><th>هدف الأصناف</th><th>أصناف منجزة</th><th>هدف القطع</th><th>قطع منجزة</th><th>نسبة التوفر</th></>}
-                {activeMetric === 'overdue' && <><th>إجمالي المتأخرات</th><th>المحصل</th><th>المتبقي</th><th>مصروفات الشهر</th><th>الكم</th></>}
+                <th>المشرف</th>
+                <th>المناطق</th>
+                <th>عدد المندوبين</th>
+                <th>هدف المبيعات</th>
+                <th>المبيعات</th>
+                <th>%</th>
+                <th>هدف التحصيل</th>
+                <th>التحصيل</th>
+                <th>%</th>
+                <th>الزيارات</th>
+                <th>عملاء جدد</th>
+                <th>مصروفات</th>
+                <th>الحالة</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(d => {
-                const salesPct = d.target.target_sales > 0 ? Math.round((d.achieved.sales / d.target.target_sales) * 100) : 0;
-                const colPct = d.target.target_collection > 0 ? Math.round((d.achieved.collection / d.target.target_collection) * 100) : 0;
-                const status = d.salesStatus;
-                return (
-                  <tr key={d.id}>
-                    <td><strong>{d.name}</strong></td>
-                    <td style={{ color: 'var(--text-secondary)' }}>{d.supervisors?.name || '-'}</td>
-                    <td style={{ color: 'var(--text-secondary)' }}>{d.regions?.name || '-'}</td>
-                    {activeMetric === 'sales' && <>
-                      <td>{formatCurrency(d.target.target_sales)}</td>
-                      <td style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(d.achieved.sales)}</td>
-                      <td style={{ color: '#ef4444' }}>{formatCurrency(d.remaining.sales)}</td>
-                      <td style={{ color: '#f59e0b' }}>{formatCurrency(d.dailyRequired.sales)}</td>
-                      <td>
-                        <div style={{ minWidth: 80 }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: getStatusColor(status) }}>{salesPct}%</div>
-                          <div className="progress-bar"><div className="progress-fill" style={{ width: `${Math.min(100, salesPct)}%`, background: getStatusColor(status) }} /></div>
-                        </div>
-                      </td>
-                      <td><span className="badge" style={{ background: status === 'ahead' ? '#064e3b' : status === 'on-track' ? '#451a03' : '#450a0a', color: getStatusColor(status) }}>{getStatusLabel(status)}</span></td>
-                    </>}
-                    {activeMetric === 'collection' && <>
-                      <td>{formatCurrency(d.target.target_collection)}</td>
-                      <td style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(d.achieved.collection)}</td>
-                      <td style={{ color: '#ef4444' }}>{formatCurrency(d.remaining.collection)}</td>
-                      <td style={{ color: '#f59e0b' }}>{formatCurrency(d.dailyRequired.collection)}</td>
-                      <td><div style={{ fontSize: '0.8rem', fontWeight: 700 }}>{colPct}%</div><div className="progress-bar"><div className="progress-fill" style={{ width: `${Math.min(100, colPct)}%`, background: '#10b981' }} /></div></td>
-                    </>}
-                    {activeMetric === 'visits' && <>
-                      <td>{formatNumber(d.target.target_total_visits)}</td>
-                      <td style={{ color: '#60a5fa', fontWeight: 700 }}>{formatNumber(d.achieved.total_visits)}</td>
-                      <td style={{ color: '#10b981' }}>{formatNumber(d.achieved.successful_visits)}</td>
-                      <td style={{ color: '#a78bfa' }}>{formatNumber(d.achieved.total_visits)}</td>
-                      <td style={{ color: '#ef4444' }}>{formatNumber(d.remaining.total_visits)}</td>
-                      <td style={{ color: '#f59e0b' }}>{formatNumber(d.dailyRequired.total_visits).split('.')[0]}</td>
-                    </>}
-                    {activeMetric === 'products' && <>
-                      <td>{formatNumber(d.target.target_new_products_skus)}</td>
-                      <td style={{ color: '#10b981', fontWeight: 700 }}>{formatNumber(d.achieved.new_products_skus)}</td>
-                      <td>{formatNumber(d.target.target_new_products_qty)}</td>
-                      <td style={{ color: '#10b981', fontWeight: 700 }}>{formatNumber(d.achieved.new_products_qty)}</td>
-                      <td style={{ color: '#f59e0b', fontWeight: 700 }}>{Math.round(d.achieved.new_products_availability)}%</td>
-                    </>}
-                    {activeMetric === 'overdue' && <>
-                      <td style={{ color: '#ef4444' }}>{formatCurrency(d.target.overdue_total)}</td>
-                      <td style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(d.achieved.overdue_collected)}</td>
-                      <td style={{ color: '#ef4444', fontWeight: 700 }}>{formatCurrency(d.overdue_remaining)}</td>
-                      <td>{formatCurrency(d.achieved.expenses)}</td>
-                      <td>{formatNumber(d.achieved.km)} كم</td>
-                    </>}
-                  </tr>
-                );
-              })}
+              {supervisorStats.map(sup => (
+                <tr key={sup.id}>
+                  <td><strong>{sup.name}</strong></td>
+                  <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{sup.regions}</td>
+                  <td style={{ textAlign: 'center' }}>{sup.supReps}</td>
+                  <td>{formatCurrency(sup.totalTargetSales)}</td>
+                  <td style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(sup.totalSales)}</td>
+                  <td>
+                    <div style={{ minWidth: 70 }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: getStatusColor(sup.status) }}>{sup.salesPct}%</div>
+                      <div className="progress-bar"><div className="progress-fill" style={{ width: `${Math.min(100, sup.salesPct)}%`, background: getStatusColor(sup.status) }} /></div>
+                    </div>
+                  </td>
+                  <td>{formatCurrency(sup.totalTargetCollection)}</td>
+                  <td style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(sup.totalCollection)}</td>
+                  <td>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>{sup.colPct}%</div>
+                    <div className="progress-bar"><div className="progress-fill" style={{ width: `${Math.min(100, sup.colPct)}%`, background: '#10b981' }} /></div>
+                  </td>
+                  <td>{formatNumber(sup.totalVisits)}</td>
+                  <td>{formatNumber(sup.totalNewCustomers)}</td>
+                  <td>{formatCurrency(sup.totalExpenses)}</td>
+                  <td><span className="badge" style={{ background: sup.status === 'ahead' ? '#064e3b' : sup.status === 'on-track' ? '#451a03' : '#450a0a', color: getStatusColor(sup.status) }}>{getStatusLabel(sup.status)}</span></td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* عرض المندوبين */}
+      {activeView === 'reps' && (
+        <>
+          <div className="tabs">
+            {metrics.map(m => (
+              <button key={m.key} className={`tab ${activeMetric === m.key ? 'active' : ''}`}
+                onClick={() => setActiveMetric(m.key)}>{m.label}</button>
+            ))}
+          </div>
+          {loading ? (
+            <div className="loading"><div className="spinner" />جاري التحميل...</div>
+          ) : filtered.length === 0 ? (
+            <div className="empty-state"><div className="empty-state-icon">📊</div><div className="empty-state-text">لا توجد بيانات</div></div>
+          ) : (
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>المندوب</th><th>المشرف</th><th>المنطقة</th>
+                    {activeMetric === 'sales' && <><th>هدف البيع</th><th>المنجز</th><th>المتبقي</th><th>يومي مطلوب</th><th>%</th><th>الحالة</th></>}
+                    {activeMetric === 'collection' && <><th>هدف التحصيل</th><th>المحصل</th><th>المتبقي</th><th>يومي مطلوب</th><th>%</th></>}
+                    {activeMetric === 'visits' && <><th>هدف الزيارات</th><th>إجمالي</th><th>ناجحة</th><th>صور الرف</th><th>متبقي</th><th>يومي مطلوب</th></>}
+                    {activeMetric === 'products' && <><th>هدف الأصناف</th><th>أصناف منجزة</th><th>هدف القطع</th><th>قطع منجزة</th><th>نسبة التوفر</th></>}
+                    {activeMetric === 'overdue' && <><th>إجمالي المتأخرات</th><th>المحصل</th><th>المتبقي</th><th>مصروفات الشهر</th><th>الكم</th></>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(d => {
+                    const salesPct = d.target.target_sales > 0 ? Math.round((d.achieved.sales / d.target.target_sales) * 100) : 0;
+                    const colPct = d.target.target_collection > 0 ? Math.round((d.achieved.collection / d.target.target_collection) * 100) : 0;
+                    const status = d.salesStatus;
+                    return (
+                      <tr key={d.id}>
+                        <td><strong>{d.name}</strong></td>
+                        <td style={{ color: 'var(--text-secondary)' }}>{d.supervisors?.name || '-'}</td>
+                        <td style={{ color: 'var(--text-secondary)' }}>{d.regions?.name || '-'}</td>
+                        {activeMetric === 'sales' && <>
+                          <td>{formatCurrency(d.target.target_sales)}</td>
+                          <td style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(d.achieved.sales)}</td>
+                          <td style={{ color: '#ef4444' }}>{formatCurrency(d.remaining.sales)}</td>
+                          <td style={{ color: '#f59e0b' }}>{formatCurrency(d.dailyRequired.sales)}</td>
+                          <td>
+                            <div style={{ minWidth: 80 }}>
+                              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: getStatusColor(status) }}>{salesPct}%</div>
+                              <div className="progress-bar"><div className="progress-fill" style={{ width: `${Math.min(100, salesPct)}%`, background: getStatusColor(status) }} /></div>
+                            </div>
+                          </td>
+                          <td><span className="badge" style={{ background: status === 'ahead' ? '#064e3b' : status === 'on-track' ? '#451a03' : '#450a0a', color: getStatusColor(status) }}>{getStatusLabel(status)}</span></td>
+                        </>}
+                        {activeMetric === 'collection' && <>
+                          <td>{formatCurrency(d.target.target_collection)}</td>
+                          <td style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(d.achieved.collection)}</td>
+                          <td style={{ color: '#ef4444' }}>{formatCurrency(d.remaining.collection)}</td>
+                          <td style={{ color: '#f59e0b' }}>{formatCurrency(d.dailyRequired.collection)}</td>
+                          <td><div style={{ fontSize: '0.8rem', fontWeight: 700 }}>{colPct}%</div><div className="progress-bar"><div className="progress-fill" style={{ width: `${Math.min(100, colPct)}%`, background: '#10b981' }} /></div></td>
+                        </>}
+                        {activeMetric === 'visits' && <>
+                          <td>{formatNumber(d.target.target_total_visits)}</td>
+                          <td style={{ color: '#60a5fa', fontWeight: 700 }}>{formatNumber(d.achieved.total_visits)}</td>
+                          <td style={{ color: '#10b981' }}>{formatNumber(d.achieved.successful_visits)}</td>
+                          <td style={{ color: '#a78bfa' }}>{formatNumber(d.achieved.total_visits)}</td>
+                          <td style={{ color: '#ef4444' }}>{formatNumber(d.remaining.total_visits)}</td>
+                          <td style={{ color: '#f59e0b' }}>{formatNumber(d.dailyRequired.total_visits).split('.')[0]}</td>
+                        </>}
+                        {activeMetric === 'products' && <>
+                          <td>{formatNumber(d.target.target_new_products_skus)}</td>
+                          <td style={{ color: '#10b981', fontWeight: 700 }}>{formatNumber(d.achieved.new_products_skus)}</td>
+                          <td>{formatNumber(d.target.target_new_products_qty)}</td>
+                          <td style={{ color: '#10b981', fontWeight: 700 }}>{formatNumber(d.achieved.new_products_qty)}</td>
+                          <td style={{ color: '#f59e0b', fontWeight: 700 }}>{Math.round(d.achieved.new_products_availability)}%</td>
+                        </>}
+                        {activeMetric === 'overdue' && <>
+                          <td style={{ color: '#ef4444' }}>{formatCurrency(d.target.overdue_total)}</td>
+                          <td style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(d.achieved.overdue_collected)}</td>
+                          <td style={{ color: '#ef4444', fontWeight: 700 }}>{formatCurrency(d.overdue_remaining)}</td>
+                          <td>{formatCurrency(d.achieved.expenses)}</td>
+                          <td>{formatNumber(d.achieved.km)} كم</td>
+                        </>}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
