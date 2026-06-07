@@ -9,7 +9,8 @@ const EMPTY_ENTRY = {
   new_products_skus: '', new_products_qty: '',
   new_products_availability: '',
   working_hours: '', km: '',
-  daily_expenses: '', overdue_collected: '',
+  daily_expenses: '',
+  overdue_total_input: '', overdue_collected: '',
   notes: '',
 };
 
@@ -54,6 +55,7 @@ export default function DailyEntry() {
         working_hours: data.working_hours || '',
         km: data.km || '',
         daily_expenses: data.daily_expenses || '',
+        overdue_total_input: data.overdue_total_input || '',
         overdue_collected: data.overdue_collected || '',
         notes: data.notes || '',
       });
@@ -71,6 +73,8 @@ export default function DailyEntry() {
   const handleSave = async () => {
     if (!selectedRep || !selectedDate) { showMsg('اختر المندوب والتاريخ', 'error'); return; }
     setLoading(true);
+    const overdueTotal = parseFloat(form.overdue_total_input) || 0;
+    const overdueCollected = parseFloat(form.overdue_collected) || 0;
     const payload = {
       rep_id: selectedRep,
       entry_date: selectedDate,
@@ -86,7 +90,8 @@ export default function DailyEntry() {
       working_hours: parseFloat(form.working_hours) || 0,
       km: parseFloat(form.km) || 0,
       daily_expenses: parseFloat(form.daily_expenses) || 0,
-      overdue_collected: parseFloat(form.overdue_collected) || 0,
+      overdue_total_input: overdueTotal,
+      overdue_collected: overdueCollected,
       notes: form.notes || '',
       updated_at: new Date().toISOString(),
     };
@@ -106,6 +111,10 @@ export default function DailyEntry() {
   };
 
   const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
+
+  const overdueRemaining = Math.max(0,
+    (parseFloat(form.overdue_total_input) || 0) - (parseFloat(form.overdue_collected) || 0)
+  );
 
   const sections = [
     { title: '💰 البيع والتحصيل', fields: [
@@ -129,9 +138,6 @@ export default function DailyEntry() {
       { key: 'working_hours', label: 'ساعات العمل', placeholder: 'ساعات' },
       { key: 'km', label: 'الكيلومترات', placeholder: 'كم' },
       { key: 'daily_expenses', label: 'المصروفات اليومية', placeholder: 'المبلغ' },
-    ]},
-    { title: '⚠️ المتأخرات', fields: [
-      { key: 'overdue_collected', label: 'المحصل من المتأخرات اليوم', placeholder: 'المبلغ' },
     ]},
   ];
 
@@ -191,6 +197,33 @@ export default function DailyEntry() {
               </div>
             </div>
           ))}
+
+          <div className="card">
+            <div className="card-title">⚠️ المتأخرات</div>
+            <div className="form-grid">
+              <div className="form-group">
+                <label className="form-label">إجمالي المتأخرات فوق 60 يوم</label>
+                <input className="form-input" type="number" min="0"
+                  value={form.overdue_total_input}
+                  onChange={e => setForm(prev => ({ ...prev, overdue_total_input: e.target.value }))}
+                  placeholder="المبلغ" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">المحصل من المتأخرات اليوم</label>
+                <input className="form-input" type="number" min="0"
+                  value={form.overdue_collected}
+                  onChange={e => setForm(prev => ({ ...prev, overdue_collected: e.target.value }))}
+                  placeholder="المبلغ" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">المتبقي من المتأخرات</label>
+                <div className="form-input" style={{ color: overdueRemaining > 0 ? '#ef4444' : '#10b981', fontWeight: 700 }}>
+                  {overdueRemaining.toLocaleString('ar-SA')}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="card">
             <div className="card-title">📝 ملاحظات</div>
             <textarea className="form-input" rows={3} value={form.notes}
