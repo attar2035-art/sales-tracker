@@ -6,6 +6,43 @@ import {
   getMonthProgress, getRemainingWorkingDays, getTotalWorkingDaysInMonth,
 } from '../lib/helpers';
 
+function KPICard({ icon, title, achieved, target, unit = '', color = '#3b82f6', priority }) {
+  const pct = target > 0 ? Math.min(100, Math.round((achieved / target) * 100)) : 0;
+  const remaining = Math.max(0, target - achieved);
+  const monthProg = Math.round(getMonthProgress(new Date().getFullYear(), new Date().getMonth() + 1));
+  const status = getAchievementStatus(achieved, target, getMonthProgress(new Date().getFullYear(), new Date().getMonth() + 1));
+
+  return (
+    <div className="stat-card" style={{ borderRight: `4px solid ${color}` }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+        <div>
+          <div className="stat-label">{icon} {title}</div>
+          <div className="stat-value" style={{ color }}>{formatCurrency(achieved)}{unit}</div>
+        </div>
+        {target > 0 && (
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: getStatusColor(status) }}>{pct}%</div>
+            <span className="badge" style={{ background: status === 'ahead' ? '#064e3b' : status === 'on-track' ? '#451a03' : '#450a0a', color: getStatusColor(status) }}>
+              {getStatusLabel(status)}
+            </span>
+          </div>
+        )}
+      </div>
+      {target > 0 && (
+        <>
+          <div className="progress-bar" style={{ height: 8, marginBottom: '0.5rem' }}>
+            <div className="progress-fill" style={{ width: `${pct}%`, background: color }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            <span>الهدف: {formatCurrency(target)}{unit}</span>
+            <span style={{ color: '#ef4444' }}>متبقي: {formatCurrency(remaining)}{unit}</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -55,20 +92,14 @@ export default function Dashboard() {
       const repEntries = entriesMap[rep.id] || [];
       const sum = (field) => repEntries.reduce((acc, e) => acc + (parseFloat(e[field]) || 0), 0);
       const achieved = {
-        sales: sum('daily_sales'),
-        collection: sum('daily_collection'),
-        new_customers: sum('new_customers'),
-        new_customers_value: sum('new_customers_value'),
-        total_visits: sum('total_visits'),
-        successful_visits: sum('successful_visits'),
-        new_products_skus: sum('new_products_skus'),
-        new_products_qty: sum('new_products_qty'),
+        sales: sum('daily_sales'), collection: sum('daily_collection'),
+        new_customers: sum('new_customers'), new_customers_value: sum('new_customers_value'),
+        total_visits: sum('total_visits'), successful_visits: sum('successful_visits'),
+        new_products_skus: sum('new_products_skus'), new_products_qty: sum('new_products_qty'),
         new_products_availability: repEntries.length > 0
           ? repEntries.reduce((a, e) => a + (parseFloat(e.new_products_availability) || 0), 0) / repEntries.length : 0,
-        working_hours: sum('working_hours'),
-        km: sum('km'),
-        expenses: sum('daily_expenses'),
-        overdue_collected: sum('overdue_collected'),
+        working_hours: sum('working_hours'), km: sum('km'),
+        expenses: sum('daily_expenses'), overdue_collected: sum('overdue_collected'),
       };
       const remaining = {
         sales: Math.max(0, (t.target_sales || 0) - achieved.sales),
@@ -100,12 +131,38 @@ export default function Dashboard() {
   };
 
   const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
-
   const filtered = data.filter(d => {
     if (filterSup && d.supervisors?.id !== filterSup) return false;
     if (filterRegion && d.regions?.id !== filterRegion) return false;
     return true;
   });
+
+  // KPI Totals
+  const kpi = {
+    sales: filtered.reduce((a, d) => a + d.achieved.sales, 0),
+    targetSales: filtered.reduce((a, d) => a + (d.target.target_sales || 0), 0),
+    collection: filtered.reduce((a, d) => a + d.achieved.collection, 0),
+    targetCollection: filtered.reduce((a, d) => a + (d.target.target_collection || 0), 0),
+    newProductsSkus: filtered.reduce((a, d) => a + d.achieved.new_products_skus, 0),
+    targetNewProductsSkus: filtered.reduce((a, d) => a + (d.target.target_new_products_skus || 0), 0),
+    newProductsQty: filtered.reduce((a, d) => a + d.achieved.new_products_qty, 0),
+    targetNewProductsQty: filtered.reduce((a, d) => a + (d.target.target_new_products_qty || 0), 0),
+    newCustomers: filtered.reduce((a, d) => a + d.achieved.new_customers, 0),
+    targetNewCustomers: filtered.reduce((a, d) => a + (d.target.target_new_customers || 0), 0),
+    newCustomersValue: filtered.reduce((a, d) => a + d.achieved.new_customers_value, 0),
+    totalVisits: filtered.reduce((a, d) => a + d.achieved.total_visits, 0),
+    targetVisits: filtered.reduce((a, d) => a + (d.target.target_total_visits || 0), 0),
+    successfulVisits: filtered.reduce((a, d) => a + d.achieved.successful_visits, 0),
+    targetSuccessfulVisits: filtered.reduce((a, d) => a + (d.target.target_successful_visits || 0), 0),
+    km: filtered.reduce((a, d) => a + d.achieved.km, 0),
+    expenses: filtered.reduce((a, d) => a + d.achieved.expenses, 0),
+    overdueCollected: filtered.reduce((a, d) => a + d.achieved.overdue_collected, 0),
+    overdueTotal: filtered.reduce((a, d) => a + (d.target.overdue_total || 0), 0),
+  };
+
+  const monthProg = getMonthProgress(year, month);
+  const remainingDays = getRemainingWorkingDays(year, month);
+  const totalDays = getTotalWorkingDaysInMonth(year, month);
 
   // إجماليات المشرفين
   const supervisorStats = supervisors.map(sup => {
@@ -115,30 +172,20 @@ export default function Dashboard() {
     const totalSales = supReps.reduce((a, d) => a + d.achieved.sales, 0);
     const totalCollection = supReps.reduce((a, d) => a + d.achieved.collection, 0);
     const totalVisits = supReps.reduce((a, d) => a + d.achieved.total_visits, 0);
-    const totalTargetVisits = supReps.reduce((a, d) => a + (d.target.target_total_visits || 0), 0);
     const totalNewCustomers = supReps.reduce((a, d) => a + d.achieved.new_customers, 0);
     const totalExpenses = supReps.reduce((a, d) => a + d.achieved.expenses, 0);
     const salesPct = totalTargetSales > 0 ? Math.round((totalSales / totalTargetSales) * 100) : 0;
     const colPct = totalTargetCollection > 0 ? Math.round((totalCollection / totalTargetCollection) * 100) : 0;
-    const monthProg = getMonthProgress(year, month);
     const status = getAchievementStatus(totalSales, totalTargetSales, monthProg);
     return {
       ...sup, supReps: supReps.length,
       totalTargetSales, totalTargetCollection,
-      totalSales, totalCollection, totalVisits, totalTargetVisits,
+      totalSales, totalCollection, totalVisits,
       totalNewCustomers, totalExpenses,
       salesPct, colPct, status,
       regions: [...new Set(supReps.map(d => d.regions?.name).filter(Boolean))].join('، '),
     };
   });
-
-  const totalSales = filtered.reduce((a, d) => a + d.achieved.sales, 0);
-  const totalCollection = filtered.reduce((a, d) => a + d.achieved.collection, 0);
-  const totalVisits = filtered.reduce((a, d) => a + d.achieved.total_visits, 0);
-  const totalTargetSales = filtered.reduce((a, d) => a + (d.target.target_sales || 0), 0);
-  const monthProg = getMonthProgress(year, month);
-  const remainingDays = getRemainingWorkingDays(year, month);
-  const totalDays = getTotalWorkingDaysInMonth(year, month);
 
   const metrics = [
     { key: 'sales', label: 'المبيعات' },
@@ -172,32 +219,46 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* إجماليات */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-label">إجمالي المبيعات</div>
-          <div className="stat-value" style={{ color: '#3b82f6' }}>{formatCurrency(totalSales)}</div>
-          <div className="stat-sub">من {formatCurrency(totalTargetSales)}</div>
-          <div className="progress-bar" style={{ marginTop: '8px' }}>
-            <div className="progress-fill" style={{ width: `${Math.min(100, totalTargetSales > 0 ? (totalSales / totalTargetSales) * 100 : 0)}%`, background: '#3b82f6' }} />
-          </div>
+      {/* شريط تقدم الشهر */}
+      <div className="card" style={{ marginBottom: '1rem', padding: '1rem 1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+          <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>📅 تقدم الشهر — {MONTHS_AR[month-1]} {year}</span>
+          <span style={{ color: '#8b5cf6', fontWeight: 700 }}>{Math.round(monthProg)}% — متبقي {remainingDays} يوم من {totalDays}</span>
         </div>
-        <div className="stat-card">
-          <div className="stat-label">إجمالي التحصيل</div>
-          <div className="stat-value" style={{ color: '#10b981' }}>{formatCurrency(totalCollection)}</div>
+        <div className="progress-bar" style={{ height: 10 }}>
+          <div className="progress-fill" style={{ width: `${monthProg}%`, background: '#8b5cf6' }} />
         </div>
-        <div className="stat-card">
-          <div className="stat-label">إجمالي الزيارات</div>
-          <div className="stat-value" style={{ color: '#f59e0b' }}>{formatNumber(totalVisits)}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">تقدم الشهر</div>
-          <div className="stat-value">{Math.round(monthProg)}%</div>
-          <div className="stat-sub">متبقي {remainingDays} يوم عمل من {totalDays}</div>
-          <div className="progress-bar" style={{ marginTop: '8px' }}>
-            <div className="progress-fill" style={{ width: `${monthProg}%`, background: '#8b5cf6' }} />
-          </div>
-        </div>
+      </div>
+
+      {/* KPI Cards - الأولوية الأولى: المبيعات والتحصيل */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+        <KPICard icon="🎯" title="المبيعات" achieved={kpi.sales} target={kpi.targetSales} color="#3b82f6" />
+        <KPICard icon="💰" title="التحصيل" achieved={kpi.collection} target={kpi.targetCollection} color="#10b981" />
+      </div>
+
+      {/* KPI Cards - الأولوية الثانية: الأصناف الجديدة */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+        <KPICard icon="📦" title="الأصناف الجديدة" achieved={kpi.newProductsSkus} target={kpi.targetNewProductsSkus} color="#f59e0b" unit=" صنف" />
+        <KPICard icon="📦" title="قطع المنتجات الجديدة" achieved={kpi.newProductsQty} target={kpi.targetNewProductsQty} color="#f59e0b" unit=" قطعة" />
+      </div>
+
+      {/* KPI Cards - الأولوية الثالثة: العملاء الجدد */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+        <KPICard icon="👥" title="العملاء الجدد" achieved={kpi.newCustomers} target={kpi.targetNewCustomers} color="#8b5cf6" unit=" عميل" />
+        <KPICard icon="🧾" title="قيمة فواتير العملاء الجدد" achieved={kpi.newCustomersValue} target={0} color="#8b5cf6" />
+      </div>
+
+      {/* KPI Cards - الأولوية الرابعة: الزيارات */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+        <KPICard icon="📍" title="الزيارات الإجمالي" achieved={kpi.totalVisits} target={kpi.targetVisits} color="#06b6d4" unit=" زيارة" />
+        <KPICard icon="✅" title="الزيارات الناجحة" achieved={kpi.successfulVisits} target={kpi.targetSuccessfulVisits} color="#06b6d4" unit=" زيارة" />
+      </div>
+
+      {/* KPI Cards - الأولوية الخامسة: الكيلومترات والمصروفات والمتأخرات */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+        <KPICard icon="🚗" title="الكيلومترات" achieved={kpi.km} target={0} color="#64748b" unit=" كم" />
+        <KPICard icon="💸" title="المصروفات" achieved={kpi.expenses} target={0} color="#64748b" />
+        <KPICard icon="⚠️" title="المحصل من المتأخرات" achieved={kpi.overdueCollected} target={kpi.overdueTotal} color="#ef4444" />
       </div>
 
       {/* تبويب العرض */}
@@ -212,19 +273,10 @@ export default function Dashboard() {
           <table>
             <thead>
               <tr>
-                <th>المشرف</th>
-                <th>المناطق</th>
-                <th>عدد المندوبين</th>
-                <th>هدف المبيعات</th>
-                <th>المبيعات</th>
-                <th>%</th>
-                <th>هدف التحصيل</th>
-                <th>التحصيل</th>
-                <th>%</th>
-                <th>الزيارات</th>
-                <th>عملاء جدد</th>
-                <th>مصروفات</th>
-                <th>الحالة</th>
+                <th>المشرف</th><th>المناطق</th><th>المندوبين</th>
+                <th>هدف المبيعات</th><th>المبيعات</th><th>%</th>
+                <th>هدف التحصيل</th><th>التحصيل</th><th>%</th>
+                <th>الزيارات</th><th>عملاء جدد</th><th>مصروفات</th><th>الحالة</th>
               </tr>
             </thead>
             <tbody>
