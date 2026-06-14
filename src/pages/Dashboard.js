@@ -79,15 +79,15 @@ export default function Dashboard({ supervisorId }) {
   const [activeView, setActiveView] = useState('points');
 
   useEffect(() => { fetchMeta(); }, []);
-  useEffect(() => { fetchData(); }, [year, month]);
+  useEffect(() => { fetchData(); }, [year, month, filterSup]);
 
   const fetchMeta = async () => {
-    const [s, r] = await Promise.all([
-      supabase.from('supervisors').select('*').order('name'),
-      supabase.from('regions').select('*').order('name'),
-    ]);
-    if (s.data) setSupervisors(s.data);
-    if (!supervisorId && r.data) setRegions(r.data);
+    const { data: s } = await supabase.from('supervisors').select('*').order('name');
+    if (s) setSupervisors(s);
+    if (!supervisorId) {
+      const { data: r } = await supabase.from('regions').select('*').order('name');
+      if (r) setRegions(r);
+    }
   };
 
   const fetchData = async () => {
@@ -96,6 +96,7 @@ export default function Dashboard({ supervisorId }) {
       .select('*, supervisors(name,id), regions(name,id)')
       .eq('is_active', true).order('name');
     if (supervisorId) query = query.eq('supervisor_id', supervisorId);
+    else if (filterSup) query = query.eq('supervisor_id', filterSup);
     const { data: reps } = await query;
     if (!reps) { setLoading(false); return; }
     const { data: targets } = await supabase.from('monthly_targets')
@@ -152,13 +153,15 @@ export default function Dashboard({ supervisorId }) {
       };
     });
     setData(combined);
-    // لو مشرف — استخرج مناطقه بس
-    if (supervisorId) {
+    if (supervisorId || filterSup) {
       const supRegions = [...new Map(combined
         .filter(r => r.regions)
         .map(r => [r.regions.id, r.regions])
       ).values()];
       setRegions(supRegions);
+    } else {
+      const { data: r } = await supabase.from('regions').select('*').order('name');
+      if (r) setRegions(r);
     }
     setLoading(false);
   };
@@ -234,7 +237,8 @@ export default function Dashboard({ supervisorId }) {
         <h1 className="page-title">📊 لوحة المتابعة</h1>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
           {!supervisorId && (
-            <select className="form-select" style={{ width: 'auto' }} value={filterSup} onChange={e => setFilterSup(e.target.value)}>
+            <select className="form-select" style={{ width: 'auto' }} value={filterSup}
+              onChange={e => { setFilterSup(e.target.value); setFilterRegion(''); }}>
               <option value="">كل المشرفين</option>
               {supervisors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
