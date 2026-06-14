@@ -1,31 +1,103 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getCurrentUser, signOut } from './lib/auth';
+import { supabase } from './lib/supabase';
 import Dashboard from './pages/Dashboard';
 import DailyEntry from './pages/DailyEntry';
 import Targets from './pages/Targets';
 import Setup from './pages/Setup';
 import RepDetails from './pages/RepDetails';
+import Login from './pages/Login';
+import ChangePassword from './pages/ChangePassword';
 
-const NAV = [
+const NAV_ADMIN = [
   { key: 'dashboard', label: 'لوحة المتابعة', icon: '📊' },
   { key: 'daily', label: 'الإدخال اليومي', icon: '📝' },
   { key: 'targets', label: 'الأهداف الشهرية', icon: '🎯' },
   { key: 'repdetails', label: 'تفاصيل المندوب', icon: '👤' },
   { key: 'setup', label: 'الإعدادات', icon: '⚙️' },
+  { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
+];
+
+const NAV_SUPERVISOR = [
+  { key: 'dashboard', label: 'لوحة المتابعة', icon: '📊' },
+  { key: 'repdetails', label: 'تفاصيل المندوب', icon: '👤' },
+  { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
+];
+
+const NAV_DATA_ENTRY = [
+  { key: 'daily', label: 'الإدخال اليومي', icon: '📝' },
+  { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
 ];
 
 export default function App() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState('dashboard');
 
+  useEffect(() => {
+    checkUser();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      checkUser();
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const checkUser = async () => {
+    setLoading(true);
+    const u = await getCurrentUser();
+    setUser(u);
+    if (u) {
+      if (u.role === 'data_entry') setPage('daily');
+      else setPage('dashboard');
+    }
+    setLoading(false);
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    setUser(null);
+  };
+
+  if (loading) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a' }}>
+      <div className="loading"><div className="spinner" />جاري التحميل...</div>
+    </div>
+  );
+
+  if (!user) return <Login onLogin={checkUser} />;
+
+  const getNav = () => {
+    if (user.role === 'admin') return NAV_ADMIN;
+    if (user.role === 'supervisor') return NAV_SUPERVISOR;
+    if (user.role === 'data_entry') return NAV_DATA_ENTRY;
+    return NAV_ADMIN;
+  };
+
   const renderPage = () => {
+    // مدخل البيانات — فقط الإدخال اليومي
+    if (user.role === 'data_entry') {
+      if (page === 'password') return <ChangePassword />;
+      return <DailyEntry />;
+    }
+    // المشرف — يشوف مندوبيه بس
+    if (user.role === 'supervisor') {
+      if (page === 'password') return <ChangePassword />;
+      if (page === 'repdetails') return <RepDetails supervisorId={user.supervisor_id} />;
+      return <Dashboard supervisorId={user.supervisor_id} />;
+    }
+    // Admin — كل حاجة
     switch (page) {
       case 'dashboard': return <Dashboard />;
       case 'daily': return <DailyEntry />;
       case 'targets': return <Targets />;
       case 'repdetails': return <RepDetails />;
       case 'setup': return <Setup />;
+      case 'password': return <ChangePassword />;
       default: return <Dashboard />;
     }
   };
+
+  const nav = getNav();
 
   return (
     <div className="app-container">
@@ -33,7 +105,15 @@ export default function App() {
         <div className="sidebar-logo">
           🏭 نظام متابعة<br />المبيعات
         </div>
-        {NAV.map(item => (
+        <div style={{ fontSize: '0.75rem', color: '#64748b', padding: '0 0.5rem 1rem', borderBottom: '1px solid #334155', marginBottom: '1rem' }}>
+          <div style={{ color: '#94a3b8', fontWeight: 600 }}>{user.email}</div>
+          <div style={{ marginTop: '0.25rem' }}>
+            {user.role === 'admin' && <span className="badge badge-info">مدير</span>}
+            {user.role === 'supervisor' && <span className="badge badge-success">مشرف — {user.supervisor?.name}</span>}
+            {user.role === 'data_entry' && <span className="badge badge-warning">مدخل بيانات</span>}
+          </div>
+        </div>
+        {nav.map(item => (
           <button key={item.key}
             className={`nav-item ${page === item.key ? 'active' : ''}`}
             onClick={() => setPage(item.key)}>
@@ -41,19 +121,20 @@ export default function App() {
             {item.label}
           </button>
         ))}
+        <button className="nav-item" onClick={handleLogout}
+          style={{ marginTop: 'auto', color: '#ef4444' }}>
+          <span className="nav-icon">🚪</span>
+          تسجيل الخروج
+        </button>
       </nav>
+
       <div style={{
-        display: 'none',
-        position: 'fixed',
-        bottom: 0, left: 0, right: 0,
-        background: '#1e293b',
-        borderTop: '1px solid #334155',
-        zIndex: 200,
-        padding: '0.5rem 0',
+        display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0,
+        background: '#1e293b', borderTop: '1px solid #334155',
+        zIndex: 200, padding: '0.5rem 0',
       }} className="mobile-nav">
-        {NAV.map(item => (
-          <button key={item.key}
-            onClick={() => setPage(item.key)}
+        {nav.map(item => (
+          <button key={item.key} onClick={() => setPage(item.key)}
             style={{
               flex: 1, background: 'none', border: 'none',
               color: page === item.key ? '#3b82f6' : '#64748b',
@@ -66,10 +147,21 @@ export default function App() {
             {item.label.split(' ')[0]}
           </button>
         ))}
+        <button onClick={handleLogout}
+          style={{
+            flex: 1, background: 'none', border: 'none', color: '#ef4444',
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            gap: '2px', fontSize: '0.65rem', cursor: 'pointer', fontFamily: 'Cairo, sans-serif',
+          }}>
+          <span style={{ fontSize: '1.2rem' }}>🚪</span>
+          خروج
+        </button>
       </div>
+
       <main className="main-content">
         {renderPage()}
       </main>
+
       <style>{`
         @media (max-width: 600px) {
           .mobile-nav { display: flex !important; }
