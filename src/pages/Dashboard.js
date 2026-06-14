@@ -65,13 +65,13 @@ function getPointsColor(points) {
   return '#ef4444';
 }
 
-export default function Dashboard() {
+export default function Dashboard({ supervisorId }) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filterSup, setFilterSup] = useState('');
+  const [filterSup, setFilterSup] = useState(supervisorId || '');
   const [filterRegion, setFilterRegion] = useState('');
   const [supervisors, setSupervisors] = useState([]);
   const [regions, setRegions] = useState([]);
@@ -92,9 +92,11 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data: reps } = await supabase.from('representatives')
+    let query = supabase.from('representatives')
       .select('*, supervisors(name,id), regions(name,id)')
       .eq('is_active', true).order('name');
+    if (supervisorId) query = query.eq('supervisor_id', supervisorId);
+    const { data: reps } = await query;
     if (!reps) { setLoading(false); return; }
     const { data: targets } = await supabase.from('monthly_targets')
       .select('*').eq('year', year).eq('month', month);
@@ -155,7 +157,6 @@ export default function Dashboard() {
 
   const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
   const filtered = data.filter(d => {
-    if (filterSup && d.supervisors?.id !== filterSup) return false;
     if (filterRegion && d.regions?.id !== filterRegion) return false;
     return true;
   });
@@ -224,10 +225,12 @@ export default function Dashboard() {
       <div className="page-header">
         <h1 className="page-title">📊 لوحة المتابعة</h1>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <select className="form-select" style={{ width: 'auto' }} value={filterSup} onChange={e => { setFilterSup(e.target.value); }}>
-            <option value="">كل المشرفين</option>
-            {supervisors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
+          {!supervisorId && (
+            <select className="form-select" style={{ width: 'auto' }} value={filterSup} onChange={e => setFilterSup(e.target.value)}>
+              <option value="">كل المشرفين</option>
+              {supervisors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          )}
           <select className="form-select" style={{ width: 'auto' }} value={filterRegion} onChange={e => setFilterRegion(e.target.value)}>
             <option value="">كل المناطق</option>
             {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
@@ -243,7 +246,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* شريط تقدم الشهر */}
       <div className="card" style={{ marginBottom: '1rem', padding: '1rem 1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
           <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>📅 تقدم الشهر — {MONTHS_AR[month-1]} {year}</span>
@@ -254,7 +256,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
         <KPICard icon="🎯" title="المبيعات" achieved={kpi.sales} target={kpi.targetSales} color="#3b82f6" />
         <KPICard icon="💰" title="التحصيل" achieved={kpi.collection} target={kpi.targetCollection} color="#10b981" />
@@ -277,29 +278,19 @@ export default function Dashboard() {
         <KPICard icon="⚠️" title="المحصل من المتأخرات" achieved={kpi.overdueCollected} target={kpi.overdueTotal} color="#ef4444" />
       </div>
 
-      {/* تبويب العرض */}
       <div className="tabs">
         <button className={`tab ${activeView === 'points' ? 'active' : ''}`} onClick={() => setActiveView('points')}>🏆 ترتيب النقاط</button>
-        <button className={`tab ${activeView === 'supervisors' ? 'active' : ''}`} onClick={() => setActiveView('supervisors')}>👔 المشرفون</button>
+        {!supervisorId && <button className={`tab ${activeView === 'supervisors' ? 'active' : ''}`} onClick={() => setActiveView('supervisors')}>👔 المشرفون</button>}
         <button className={`tab ${activeView === 'reps' ? 'active' : ''}`} onClick={() => setActiveView('reps')}>👤 المندوبون</button>
       </div>
 
-      {/* ترتيب النقاط */}
       {activeView === 'points' && (
         <div className="table-wrapper">
           <table>
             <thead>
               <tr>
-                <th>الترتيب</th>
-                <th>المندوب</th>
-                <th>المشرف</th>
-                <th>المنطقة</th>
-                <th>النقاط</th>
-                <th>المبيعات %</th>
-                <th>التحصيل %</th>
-                <th>الأصناف %</th>
-                <th>العملاء %</th>
-                <th>الزيارات %</th>
+                <th>الترتيب</th><th>المندوب</th><th>المشرف</th><th>المنطقة</th><th>النقاط</th>
+                <th>المبيعات %</th><th>التحصيل %</th><th>الأصناف %</th><th>العملاء %</th><th>الزيارات %</th>
               </tr>
             </thead>
             <tbody>
@@ -338,15 +329,13 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* عرض المشرفين */}
-      {activeView === 'supervisors' && (
+      {activeView === 'supervisors' && !supervisorId && (
         <div className="table-wrapper">
           <table>
             <thead>
               <tr>
                 <th>الترتيب</th><th>المشرف</th><th>المناطق</th><th>المندوبين</th>
-                <th>متوسط النقاط</th>
-                <th>هدف المبيعات</th><th>المبيعات</th><th>%</th>
+                <th>متوسط النقاط</th><th>هدف المبيعات</th><th>المبيعات</th><th>%</th>
                 <th>هدف التحصيل</th><th>التحصيل</th><th>%</th>
                 <th>الزيارات</th><th>عملاء جدد</th><th>الحالة</th>
               </tr>
@@ -358,9 +347,7 @@ export default function Dashboard() {
                   <td><strong>{sup.name}</strong></td>
                   <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{sup.regions}</td>
                   <td style={{ textAlign: 'center' }}>{sup.supReps}</td>
-                  <td>
-                    <span style={{ fontSize: '1.1rem', fontWeight: 800, color: getPointsColor(sup.totalPoints) }}>{sup.totalPoints}</span>
-                  </td>
+                  <td><span style={{ fontSize: '1.1rem', fontWeight: 800, color: getPointsColor(sup.totalPoints) }}>{sup.totalPoints}</span></td>
                   <td>{formatCurrency(sup.totalTargetSales)}</td>
                   <td style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(sup.totalSales)}</td>
                   <td>
@@ -385,7 +372,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* عرض المندوبين */}
       {activeView === 'reps' && (
         <>
           <div className="tabs">
