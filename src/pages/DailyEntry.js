@@ -5,7 +5,7 @@ import { MONTHS_AR, isWorkingDay } from '../lib/helpers';
 const EMPTY_ENTRY = {
   daily_sales: '', daily_collection: '',
   new_customers: '', new_customers_value: '',
-  total_visits: '', successful_visits: '',
+  total_visits: '', shelf_photos: '', successful_visits: '',
   new_products_skus: '', new_products_qty: '',
   new_products_availability: '',
   working_hours: '', km: '',
@@ -48,6 +48,7 @@ export default function DailyEntry() {
         new_customers: data.new_customers || '',
         new_customers_value: data.new_customers_value || '',
         total_visits: data.total_visits || '',
+        shelf_photos: data.shelf_photos || '',
         successful_visits: data.successful_visits || '',
         new_products_skus: data.new_products_skus || '',
         new_products_qty: data.new_products_qty || '',
@@ -73,8 +74,8 @@ export default function DailyEntry() {
   const handleSave = async () => {
     if (!selectedRep || !selectedDate) { showMsg('اختر المندوب والتاريخ', 'error'); return; }
     setLoading(true);
-    const overdueTotal = parseFloat(form.overdue_total_input) || 0;
-    const overdueCollected = parseFloat(form.overdue_collected) || 0;
+    const totalVisits = parseInt(form.total_visits) || 0;
+    const shelfPhotos = parseInt(form.shelf_photos) || 0;
     const payload = {
       rep_id: selectedRep,
       entry_date: selectedDate,
@@ -82,7 +83,8 @@ export default function DailyEntry() {
       daily_collection: parseFloat(form.daily_collection) || 0,
       new_customers: parseInt(form.new_customers) || 0,
       new_customers_value: parseFloat(form.new_customers_value) || 0,
-      total_visits: parseInt(form.total_visits) || 0,
+      total_visits: totalVisits,
+      shelf_photos: shelfPhotos,
       successful_visits: parseInt(form.successful_visits) || 0,
       new_products_skus: parseInt(form.new_products_skus) || 0,
       new_products_qty: parseInt(form.new_products_qty) || 0,
@@ -90,8 +92,8 @@ export default function DailyEntry() {
       working_hours: parseFloat(form.working_hours) || 0,
       km: parseFloat(form.km) || 0,
       daily_expenses: parseFloat(form.daily_expenses) || 0,
-      overdue_total_input: overdueTotal,
-      overdue_collected: overdueCollected,
+      overdue_total_input: parseFloat(form.overdue_total_input) || 0,
+      overdue_collected: parseFloat(form.overdue_collected) || 0,
       notes: form.notes || '',
       updated_at: new Date().toISOString(),
     };
@@ -116,6 +118,10 @@ export default function DailyEntry() {
     (parseFloat(form.overdue_total_input) || 0) - (parseFloat(form.overdue_collected) || 0)
   );
 
+  const shelfPhotosMissing = Math.max(0,
+    (parseInt(form.total_visits) || 0) - (parseInt(form.shelf_photos) || 0)
+  );
+
   const sections = [
     { title: '💰 البيع والتحصيل', fields: [
       { key: 'daily_sales', label: 'مبيعات اليوم', placeholder: 'المبلغ' },
@@ -124,10 +130,6 @@ export default function DailyEntry() {
     { title: '👥 العملاء الجدد', fields: [
       { key: 'new_customers', label: 'عدد العملاء الجدد', placeholder: 'عدد' },
       { key: 'new_customers_value', label: 'قيمة فواتير العملاء الجدد', placeholder: 'المبلغ' },
-    ]},
-    { title: '📍 الزيارات', fields: [
-      { key: 'total_visits', label: 'زيارات إجمالي (= صور الرف)', placeholder: 'عدد' },
-      { key: 'successful_visits', label: 'زيارات ناجحة', placeholder: 'عدد' },
     ]},
     { title: '📦 المنتجات الجديدة', fields: [
       { key: 'new_products_skus', label: 'عدد الأصناف الموزعة', placeholder: 'عدد الأصناف' },
@@ -179,6 +181,7 @@ export default function DailyEntry() {
           </div>
         )}
       </div>
+
       {selectedRep && (
         <>
           {sections.map(section => (
@@ -198,6 +201,44 @@ export default function DailyEntry() {
             </div>
           ))}
 
+          {/* الزيارات وصور الرف */}
+          <div className="card">
+            <div className="card-title">📍 الزيارات وصور الرف</div>
+            <div className="form-grid">
+              <div className="form-group">
+                <label className="form-label">زيارات إجمالي</label>
+                <input className="form-input" type="number" min="0"
+                  value={form.total_visits}
+                  onChange={e => setForm(prev => ({ ...prev, total_visits: e.target.value }))}
+                  placeholder="عدد" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">صور الرف</label>
+                <input className="form-input" type="number" min="0"
+                  value={form.shelf_photos}
+                  onChange={e => setForm(prev => ({ ...prev, shelf_photos: e.target.value }))}
+                  placeholder="عدد الصور" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">فاقد الصور</label>
+                <div className="form-input" style={{
+                  color: shelfPhotosMissing > 0 ? '#ef4444' : '#10b981',
+                  fontWeight: 700
+                }}>
+                  {shelfPhotosMissing} {shelfPhotosMissing > 0 ? '❌' : '✅'}
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">زيارات ناجحة</label>
+                <input className="form-input" type="number" min="0"
+                  value={form.successful_visits}
+                  onChange={e => setForm(prev => ({ ...prev, successful_visits: e.target.value }))}
+                  placeholder="عدد" />
+              </div>
+            </div>
+          </div>
+
+          {/* المتأخرات */}
           <div className="card">
             <div className="card-title">⚠️ المتأخرات</div>
             <div className="form-grid">
@@ -230,6 +271,7 @@ export default function DailyEntry() {
               onChange={e => setForm(prev => ({ ...prev, notes: e.target.value }))}
               placeholder="ملاحظات اليوم..." style={{ resize: 'vertical' }} />
           </div>
+
           <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
             <button className="btn btn-success" onClick={handleSave} disabled={loading}
               style={{ fontSize: '1rem', padding: '0.75rem 2rem' }}>
