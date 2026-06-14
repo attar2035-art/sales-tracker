@@ -87,7 +87,7 @@ export default function Dashboard({ supervisorId }) {
       supabase.from('regions').select('*').order('name'),
     ]);
     if (s.data) setSupervisors(s.data);
-    if (r.data) setRegions(r.data);
+    if (!supervisorId && r.data) setRegions(r.data);
   };
 
   const fetchData = async () => {
@@ -152,6 +152,14 @@ export default function Dashboard({ supervisorId }) {
       };
     });
     setData(combined);
+    // لو مشرف — استخرج مناطقه بس
+    if (supervisorId) {
+      const supRegions = [...new Map(combined
+        .filter(r => r.regions)
+        .map(r => [r.regions.id, r.regions])
+      ).values()];
+      setRegions(supRegions);
+    }
     setLoading(false);
   };
 
