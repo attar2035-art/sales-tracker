@@ -8,6 +8,7 @@ import Setup from './pages/Setup';
 import RepDetails from './pages/RepDetails';
 import Login from './pages/Login';
 import ChangePassword from './pages/ChangePassword';
+import RepDashboard from './pages/RepDashboard';
 
 const NAV_ADMIN = [
   { key: 'dashboard', label: 'لوحة المتابعة', icon: '📊' },
@@ -26,6 +27,11 @@ const NAV_SUPERVISOR = [
 
 const NAV_DATA_ENTRY = [
   { key: 'daily', label: 'الإدخال اليومي', icon: '📝' },
+  { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
+];
+
+const NAV_REP = [
+  { key: 'repdashboard', label: 'تقريري', icon: '📊' },
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
 ];
 
@@ -48,6 +54,7 @@ export default function App() {
     setUser(u);
     if (u) {
       if (u.role === 'data_entry') setPage('daily');
+      else if (u.role === 'rep') setPage('repdashboard');
       else setPage('dashboard');
     }
     setLoading(false);
@@ -70,22 +77,24 @@ export default function App() {
     if (user.role === 'admin') return NAV_ADMIN;
     if (user.role === 'supervisor') return NAV_SUPERVISOR;
     if (user.role === 'data_entry') return NAV_DATA_ENTRY;
+    if (user.role === 'rep') return NAV_REP;
     return NAV_ADMIN;
   };
 
   const renderPage = () => {
-    // مدخل البيانات — فقط الإدخال اليومي
+    if (user.role === 'rep') {
+      if (page === 'password') return <ChangePassword />;
+      return <RepDashboard repId={user.rep_id} />;
+    }
     if (user.role === 'data_entry') {
       if (page === 'password') return <ChangePassword />;
       return <DailyEntry />;
     }
-    // المشرف — يشوف مندوبيه بس
     if (user.role === 'supervisor') {
       if (page === 'password') return <ChangePassword />;
       if (page === 'repdetails') return <RepDetails supervisorId={user.supervisor_id} />;
       return <Dashboard supervisorId={user.supervisor_id} />;
     }
-    // Admin — كل حاجة
     switch (page) {
       case 'dashboard': return <Dashboard />;
       case 'daily': return <DailyEntry />;
@@ -111,6 +120,7 @@ export default function App() {
             {user.role === 'admin' && <span className="badge badge-info">مدير</span>}
             {user.role === 'supervisor' && <span className="badge badge-success">مشرف — {user.supervisor?.name}</span>}
             {user.role === 'data_entry' && <span className="badge badge-warning">مدخل بيانات</span>}
+            {user.role === 'rep' && <span className="badge badge-info">مندوب</span>}
           </div>
         </div>
         {nav.map(item => (
