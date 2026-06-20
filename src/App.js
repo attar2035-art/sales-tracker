@@ -9,12 +9,14 @@ import RepDetails from './pages/RepDetails';
 import Login from './pages/Login';
 import ChangePassword from './pages/ChangePassword';
 import RepDashboard from './pages/RepDashboard';
+import Customers from './pages/Customers';
 
 const NAV_ADMIN = [
   { key: 'dashboard', label: 'لوحة المتابعة', icon: '📊' },
   { key: 'daily', label: 'الإدخال اليومي', icon: '📝' },
   { key: 'targets', label: 'الأهداف الشهرية', icon: '🎯' },
   { key: 'repdetails', label: 'تفاصيل المندوب', icon: '👤' },
+  { key: 'customers', label: 'العملاء', icon: '👥' },
   { key: 'setup', label: 'الإعدادات', icon: '⚙️' },
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
 ];
@@ -22,6 +24,7 @@ const NAV_ADMIN = [
 const NAV_SUPERVISOR = [
   { key: 'dashboard', label: 'لوحة المتابعة', icon: '📊' },
   { key: 'repdetails', label: 'تفاصيل المندوب', icon: '👤' },
+  { key: 'customers', label: 'العملاء', icon: '👥' },
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
 ];
 
@@ -32,6 +35,7 @@ const NAV_DATA_ENTRY = [
 
 const NAV_REP = [
   { key: 'repdashboard', label: 'تقريري', icon: '📊' },
+  { key: 'customers', label: 'العملاء', icon: '👥' },
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
 ];
 
@@ -84,6 +88,7 @@ export default function App() {
   const renderPage = () => {
     if (user.role === 'rep') {
       if (page === 'password') return <ChangePassword />;
+      if (page === 'customers') return <Customers user={user} />;
       return <RepDashboard repId={user.rep_id} />;
     }
     if (user.role === 'data_entry') {
@@ -93,6 +98,7 @@ export default function App() {
     if (user.role === 'supervisor') {
       if (page === 'password') return <ChangePassword />;
       if (page === 'repdetails') return <RepDetails supervisorId={user.supervisor_id} />;
+      if (page === 'customers') return <Customers user={user} />;
       return <Dashboard supervisorId={user.supervisor_id} />;
     }
     switch (page) {
@@ -100,6 +106,7 @@ export default function App() {
       case 'daily': return <DailyEntry />;
       case 'targets': return <Targets />;
       case 'repdetails': return <RepDetails />;
+      case 'customers': return <Customers user={user} />;
       case 'setup': return <Setup />;
       case 'password': return <ChangePassword />;
       default: return <Dashboard />;
