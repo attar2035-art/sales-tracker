@@ -62,19 +62,18 @@ export default function Customers({ user }) {
       return;
     }
 
-    const customerIds = (customersData || []).map(c => c.id);
+    const customerIdsSet = new Set((customersData || []).map(c => c.id));
 
-    // 4. تحميل إجمالي المبيعات لكل عميل (يناير - مايو 2026) عبر صفحات لتجاوز حد الصفوف
-    const salesTotals = {}; // customer_id -> { amount, quantity, skuCount }
+    // 4. تحميل كل سجلات المبيعات عبر صفحات (بدون فلتر .in() لأن عدد العملاء قد يكون كبير جداً لرابط الطلب)
+    const salesTotals = {}; // customer_id -> { amount, quantity, products }
     const pageSize = 1000;
     let from = 0;
-    let keepGoing = customerIds.length > 0;
+    let keepGoing = true;
 
     while (keepGoing) {
       const { data: salesPage, error: salesError } = await supabase
         .from('customer_product_sales')
         .select('customer_id, amount, quantity, product_id')
-        .in('customer_id', customerIds)
         .range(from, from + pageSize - 1);
 
       if (salesError) {
@@ -83,6 +82,7 @@ export default function Customers({ user }) {
       }
 
       (salesPage || []).forEach(row => {
+        if (!customerIdsSet.has(row.customer_id)) return; // فقط العملاء المسموح بهم
         if (!salesTotals[row.customer_id]) {
           salesTotals[row.customer_id] = { amount: 0, quantity: 0, products: new Set() };
         }
