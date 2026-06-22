@@ -10,6 +10,7 @@ import Login from './pages/Login';
 import ChangePassword from './pages/ChangePassword';
 import RepDashboard from './pages/RepDashboard';
 import Customers from './pages/Customers';
+import CustomerAnalytics from './components/CustomerAnalytics';
 
 const NAV_ADMIN = [
   { key: 'dashboard', label: 'لوحة المتابعة', icon: '📊' },
@@ -17,6 +18,7 @@ const NAV_ADMIN = [
   { key: 'targets', label: 'الأهداف الشهرية', icon: '🎯' },
   { key: 'repdetails', label: 'تفاصيل المندوب', icon: '👤' },
   { key: 'customers', label: 'العملاء', icon: '👥' },
+  { key: 'analytics', label: 'تحليل العملاء', icon: '📈' },
   { key: 'setup', label: 'الإعدادات', icon: '⚙️' },
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
 ];
@@ -25,6 +27,7 @@ const NAV_SUPERVISOR = [
   { key: 'dashboard', label: 'لوحة المتابعة', icon: '📊' },
   { key: 'repdetails', label: 'تفاصيل المندوب', icon: '👤' },
   { key: 'customers', label: 'العملاء', icon: '👥' },
+  { key: 'analytics', label: 'تحليل العملاء', icon: '📈' },
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
 ];
 
@@ -36,6 +39,7 @@ const NAV_DATA_ENTRY = [
 const NAV_REP = [
   { key: 'repdashboard', label: 'تقريري', icon: '📊' },
   { key: 'customers', label: 'العملاء', icon: '👥' },
+  { key: 'analytics', label: 'تحليل العملاء', icon: '📈' },
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
 ];
 
@@ -89,6 +93,7 @@ export default function App() {
     if (user.role === 'rep') {
       if (page === 'password') return <ChangePassword />;
       if (page === 'customers') return <Customers user={user} />;
+      if (page === 'analytics') return <CustomerAnalytics />;
       return <RepDashboard repId={user.rep_id} />;
     }
     if (user.role === 'data_entry') {
@@ -99,6 +104,7 @@ export default function App() {
       if (page === 'password') return <ChangePassword />;
       if (page === 'repdetails') return <RepDetails supervisorId={user.supervisor_id} />;
       if (page === 'customers') return <Customers user={user} />;
+      if (page === 'analytics') return <CustomerAnalytics />;
       return <Dashboard supervisorId={user.supervisor_id} />;
     }
     switch (page) {
@@ -107,6 +113,7 @@ export default function App() {
       case 'targets': return <Targets />;
       case 'repdetails': return <RepDetails />;
       case 'customers': return <Customers user={user} />;
+      case 'analytics': return <CustomerAnalytics />;
       case 'setup': return <Setup />;
       case 'password': return <ChangePassword />;
       default: return <Dashboard />;
