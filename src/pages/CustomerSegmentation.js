@@ -70,7 +70,7 @@ export default function CustomerSegmentation() {
       for (let i = 0; i < jsonData.length; i += batch) {
         const chunk = jsonData.slice(i, i + batch);
         const { error } = await supabase.from('customer_yearly_sales')
-          .upsert(chunk, { onConflict: 'customer_code,year' });
+          .upsert(chunk, { onConflict: 'customer_code,year,region_name' });
         if (error) { console.error(error); }
         else { imported += chunk.length; }
       }
@@ -129,7 +129,7 @@ export default function CustomerSegmentation() {
     for (let i = 0; i < importPreview.rows.length; i += batch) {
       const chunk = importPreview.rows.slice(i, i + batch);
       const { error } = await supabase.from('customer_yearly_sales')
-        .upsert(chunk, { onConflict: 'customer_code,year' });
+        .upsert(chunk, { onConflict: 'customer_code,year,region_name' });
       if (error) {
         setImportMsg('خطأ: ' + error.message);
         setImporting(false);
