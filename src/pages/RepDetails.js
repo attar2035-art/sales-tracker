@@ -147,7 +147,7 @@ export default function RepDetails() {
                   <tbody>
                     {entries.map(e => (
                       <tr key={e.id}>
-                        <td>{new Date(e.entry_date).toLocaleDateString('ar-SA')}</td>
+                        <td>{new Date(e.entry_date).toLocaleDateString('ar-SA-u-ca-gregory')}</td>
                         <td>{formatCurrency(e.daily_sales)}</td>
                         <td>{formatCurrency(e.daily_collection)}</td>
                         <td>{e.new_customers}</td>
