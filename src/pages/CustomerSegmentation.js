@@ -47,9 +47,39 @@ export default function CustomerSegmentation() {
       console.error(error);
       setTableError(true);
       setData([]);
-    } else {
+      setLoading(false);
+      return;
+    }
+    if (rows && rows.length > 0) {
+      setData(rows);
+      setTableError(false);
+      setLoading(false);
+      return;
+    }
+    await autoImport();
+  };
+
+  const autoImport = async () => {
+    setImportMsg('جاري الاستيراد التلقائي...');
+    try {
+      const res = await fetch('/customers_import.json');
+      if (!res.ok) { setLoading(false); return; }
+      const jsonData = await res.json();
+      const batch = 300;
+      let imported = 0;
+      for (let i = 0; i < jsonData.length; i += batch) {
+        const chunk = jsonData.slice(i, i + batch);
+        const { error } = await supabase.from('customer_yearly_sales')
+          .upsert(chunk, { onConflict: 'customer_code,year' });
+        if (error) { console.error(error); }
+        else { imported += chunk.length; }
+      }
+      setImportMsg('تم استيراد ' + imported + ' سجل تلقائياً');
+      const { data: rows } = await supabase.from('customer_yearly_sales').select('*').limit(50000);
       setData(rows || []);
       setTableError(false);
+    } catch (e) {
+      console.error(e);
     }
     setLoading(false);
   };
