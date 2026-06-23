@@ -157,7 +157,7 @@ export default function RepDashboard({ repId }) {
                   <tbody>
                     {entries.map(e => (
                       <tr key={e.id}>
-                        <td>{new Date(e.entry_date).toLocaleDateString('ar-SA')}</td>
+                        <td>{new Date(e.entry_date).toLocaleDateString('ar-SA-u-ca-gregory')}</td>
                         <td style={{ color: '#10b981' }}>{formatCurrency(e.daily_sales)}</td>
                         <td style={{ color: '#10b981' }}>{formatCurrency(e.daily_collection)}</td>
                         <td>{e.new_customers}</td>

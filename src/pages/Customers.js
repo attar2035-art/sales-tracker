@@ -12,6 +12,8 @@ export default function Customers({ user }) {
   const [regionFilter, setRegionFilter] = useState('all');
   const [sortBy, setSortBy] = useState('amount_desc');
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
   useEffect(() => {
     loadData();
@@ -62,38 +64,42 @@ export default function Customers({ user }) {
       return;
     }
 
-    const customerIdsSet = new Set((customersData || []).map(c => c.id));
+    const customerIds = (customersData || []).map(c => c.id);
 
-    // 4. تحميل كل سجلات المبيعات عبر صفحات (بدون فلتر .in() لأن عدد العملاء قد يكون كبير جداً لرابط الطلب)
-    const salesTotals = {}; // customer_id -> { amount, quantity, products }
-    const pageSize = 1000;
-    let from = 0;
-    let keepGoing = true;
-
-    while (keepGoing) {
-      const { data: salesPage, error: salesError } = await supabase
-        .from('customer_product_sales')
-        .select('customer_id, amount, quantity, product_id')
-        .range(from, from + pageSize - 1);
-
-      if (salesError) {
-        console.error(salesError);
-        break;
-      }
-
-      (salesPage || []).forEach(row => {
-        if (!customerIdsSet.has(row.customer_id)) return; // فقط العملاء المسموح بهم
-        if (!salesTotals[row.customer_id]) {
-          salesTotals[row.customer_id] = { amount: 0, quantity: 0, products: new Set() };
-        }
-        salesTotals[row.customer_id].amount += Number(row.amount) || 0;
-        salesTotals[row.customer_id].quantity += Number(row.quantity) || 0;
-        salesTotals[row.customer_id].products.add(row.product_id);
-      });
-
-      keepGoing = (salesPage || []).length === pageSize;
-      from += pageSize;
+    // 4. تحميل سجلات المبيعات على دفعات مع فلترة في السيرفر
+    const salesTotals = {};
+    const batchSize = 200;
+    const batches = [];
+    for (let i = 0; i < customerIds.length; i += batchSize) {
+      batches.push(customerIds.slice(i, i + batchSize));
     }
+
+    await Promise.all(batches.map(async (batch) => {
+      let from = 0;
+      const pageSize = 1000;
+      let keepGoing = true;
+      while (keepGoing) {
+        const { data: salesPage, error: salesError } = await supabase
+          .from('customer_product_sales')
+          .select('customer_id, amount, quantity, product_id')
+          .in('customer_id', batch)
+          .range(from, from + pageSize - 1);
+
+        if (salesError) { console.error(salesError); break; }
+
+        (salesPage || []).forEach(row => {
+          if (!salesTotals[row.customer_id]) {
+            salesTotals[row.customer_id] = { amount: 0, quantity: 0, products: new Set() };
+          }
+          salesTotals[row.customer_id].amount += Number(row.amount) || 0;
+          salesTotals[row.customer_id].quantity += Number(row.quantity) || 0;
+          salesTotals[row.customer_id].products.add(row.product_id);
+        });
+
+        keepGoing = (salesPage || []).length === pageSize;
+        from += pageSize;
+      }
+    }));
 
     const merged = (customersData || []).map(c => {
       const totals = salesTotals[c.id] || { amount: 0, quantity: 0, products: new Set() };
@@ -110,6 +116,7 @@ export default function Customers({ user }) {
   };
 
   const filtered = useMemo(() => {
+    setPage(1);
     let result = customers;
 
     if (regionFilter !== 'all') {
@@ -134,6 +141,9 @@ export default function Customers({ user }) {
     }
     return sorted;
   }, [customers, search, regionFilter, sortBy]);
+
+  const totalPages = Math.ceil(filtered.length / pageSize);
+  const paginatedCustomers = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const totals = useMemo(() => {
     return filtered.reduce((acc, c) => {
@@ -246,7 +256,7 @@ export default function Customers({ user }) {
                   </td>
                 </tr>
               ) : (
-                filtered.map(c => (
+                paginatedCustomers.map(c => (
                   <tr
                     key={c.id}
                     style={{ cursor: 'pointer' }}
@@ -264,6 +274,13 @@ export default function Customers({ user }) {
             </tbody>
           </table>
         </div>
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>السابق</button>
+            <span style={{ color: 'var(--text-secondary)' }}>صفحة {page} من {totalPages} — ({filtered.length} عميل)</span>
+            <button className="btn btn-secondary" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>التالي</button>
+          </div>
+        )}
       </div>
     </div>
   );

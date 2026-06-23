@@ -100,9 +100,9 @@ export default function Dashboard({ supervisorId }) {
     const { data: reps } = await query;
     if (!reps) { setLoading(false); return; }
     const { data: targets } = await supabase.from('monthly_targets')
-      .select('*').eq('year', year).eq('month', month);
+      .select('*').eq('year', year).eq('month', month).limit(10000);
     const { data: entries } = await supabase.from('daily_entries')
-      .select('*').eq('year', year).eq('month', month);
+      .select('*').eq('year', year).eq('month', month).limit(10000);
     const targetsMap = {};
     (targets || []).forEach(t => { targetsMap[t.rep_id] = t; });
     const entriesMap = {};
