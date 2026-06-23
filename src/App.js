@@ -11,6 +11,7 @@ import ChangePassword from './pages/ChangePassword';
 import RepDashboard from './pages/RepDashboard';
 import Customers from './pages/Customers';
 import CustomerAnalytics from './components/CustomerAnalytics';
+import CustomerSegmentation from './pages/CustomerSegmentation';
 
 const NAV_ADMIN = [
   { key: 'dashboard', label: 'لوحة المتابعة', icon: '📊' },
@@ -19,6 +20,7 @@ const NAV_ADMIN = [
   { key: 'repdetails', label: 'تفاصيل المندوب', icon: '👤' },
   { key: 'customers', label: 'العملاء', icon: '👥' },
   { key: 'analytics', label: 'تحليل العملاء', icon: '📈' },
+  { key: 'segmentation', label: 'تقسيم العملاء', icon: '📊' },
   { key: 'setup', label: 'الإعدادات', icon: '⚙️' },
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
 ];
@@ -28,6 +30,7 @@ const NAV_SUPERVISOR = [
   { key: 'repdetails', label: 'تفاصيل المندوب', icon: '👤' },
   { key: 'customers', label: 'العملاء', icon: '👥' },
   { key: 'analytics', label: 'تحليل العملاء', icon: '📈' },
+  { key: 'segmentation', label: 'تقسيم العملاء', icon: '📊' },
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
 ];
 
@@ -105,6 +108,7 @@ export default function App() {
       if (page === 'repdetails') return <RepDetails supervisorId={user.supervisor_id} />;
       if (page === 'customers') return <Customers user={user} />;
       if (page === 'analytics') return <CustomerAnalytics />;
+      if (page === 'segmentation') return <CustomerSegmentation />;
       return <Dashboard supervisorId={user.supervisor_id} />;
     }
     switch (page) {
@@ -114,6 +118,7 @@ export default function App() {
       case 'repdetails': return <RepDetails />;
       case 'customers': return <Customers user={user} />;
       case 'analytics': return <CustomerAnalytics />;
+      case 'segmentation': return <CustomerSegmentation />;
       case 'setup': return <Setup />;
       case 'password': return <ChangePassword />;
       default: return <Dashboard />;
