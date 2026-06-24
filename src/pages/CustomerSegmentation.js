@@ -596,6 +596,25 @@ CREATE POLICY "Allow authenticated full access"
           {activeTab === 'import' && (
             <div className="card" style={{ padding: '2rem' }}>
               <div className="card-title">📥 استيراد بيانات العملاء</div>
+
+              <div style={{ marginBottom: '2rem', padding: '1.5rem', background: '#0f172a', borderRadius: 12, border: '2px solid #3b82f6', textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📂</div>
+                <div style={{ color: '#e2e8f0', fontWeight: 700, marginBottom: '0.75rem', fontSize: '1.1rem' }}>
+                  استيراد جميع البيانات المحضرة (10,348 عميل — 2022 إلى 2026)
+                </div>
+                <button className="btn btn-primary" style={{ fontSize: '1.1rem', padding: '0.75rem 2rem' }} onClick={runImport} disabled={importing}>
+                  {importing ? 'جاري الاستيراد...' : '📥 استيراد الكل الآن'}
+                </button>
+                {importProgress && (
+                  <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#1e293b', borderRadius: 8, color: importProgress.includes('خطأ') ? '#ef4444' : '#10b981', fontWeight: 700 }}>
+                    {importProgress}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ borderTop: '1px solid #334155', paddingTop: '1.5rem', marginBottom: '1rem' }}>
+                <div style={{ fontWeight: 700, color: '#94a3b8', marginBottom: '0.75rem' }}>أو ارفع ملف إكسل يدوياً:</div>
+              </div>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
                 ارفع ملف إكسل لكل سنة. الملف يجب أن يحتوي على شيتات بأسماء المناطق.
               </p>
