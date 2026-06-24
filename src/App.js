@@ -12,6 +12,7 @@ import RepDashboard from './pages/RepDashboard';
 import Customers from './pages/Customers';
 import CustomerAnalytics from './components/CustomerAnalytics';
 import CustomerSegmentation from './pages/CustomerSegmentation';
+import DateAvailabilityChecker from './components/DateAvailabilityChecker';
 
 const NAV_ADMIN = [
   { key: 'dashboard', label: 'لوحة المتابعة', icon: '📊' },
@@ -190,6 +191,8 @@ export default function App() {
       <main className="main-content">
         {renderPage()}
       </main>
+
+      <DateAvailabilityChecker />
 
       <style>{`
         @media (max-width: 600px) {
