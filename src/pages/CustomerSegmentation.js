@@ -60,17 +60,13 @@ export default function CustomerSegmentation() {
     setImporting(true);
     setImportProgress('جاري تحميل البيانات...');
     try {
-      const res = await fetch('/customers_import.json');
-      if (!res.ok) {
-        setImportProgress('خطأ في تحميل ملف البيانات: ' + res.status);
-        setImporting(false);
-        return;
-      }
-      const jsonData = await res.json();
+      const mod = await import('../data/customers_import.json');
+      const jsonData = mod.default || mod;
       setImportProgress('تم تحميل ' + jsonData.length + ' سجل. جاري الإدخال...');
       const batch = 200;
       let imported = 0;
       let errors = 0;
+      let lastError = '';
       for (let i = 0; i < jsonData.length; i += batch) {
         const chunk = jsonData.slice(i, i + batch);
         const { error } = await supabase.from('customer_yearly_sales')
@@ -78,12 +74,17 @@ export default function CustomerSegmentation() {
         if (error) {
           console.error('Batch error:', error);
           errors++;
+          lastError = error.message;
         } else {
           imported += chunk.length;
         }
-        setImportProgress('تم إدخال ' + imported + ' من ' + jsonData.length + (errors > 0 ? ' (' + errors + ' أخطاء)' : ''));
+        setImportProgress('تم إدخال ' + imported + ' من ' + jsonData.length + (errors > 0 ? ' (' + errors + ' أخطاء: ' + lastError + ')' : ''));
       }
-      setImportProgress('اكتمل! تم استيراد ' + imported + ' سجل');
+      if (errors > 0 && imported === 0) {
+        setImportProgress('خطأ في الإدخال: ' + lastError);
+      } else {
+        setImportProgress('اكتمل! تم استيراد ' + imported + ' سجل' + (errors > 0 ? ' (مع ' + errors + ' دفعات بها أخطاء: ' + lastError + ')' : ''));
+      }
       await fetchData();
     } catch (e) {
       setImportProgress('خطأ: ' + e.message);
