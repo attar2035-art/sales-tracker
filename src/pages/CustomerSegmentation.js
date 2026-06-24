@@ -201,22 +201,22 @@ export default function CustomerSegmentation() {
     data.forEach(d => {
       if (selectedRegion !== 'all' && d.region_name !== selectedRegion) return;
       if (!byCode[d.customer_code]) byCode[d.customer_code] = { name: d.customer_name, region: d.region_name, years: {} };
-      byCode[d.customer_code].years[d.year] = d.net_sales;
+      byCode[d.customer_code].years[d.year] = (byCode[d.customer_code].years[d.year] || 0) + (d.net_sales || 0);
     });
     return byCode;
   }, [data, selectedRegion]);
 
   const activityStats = useMemo(() => {
     const codes = Object.entries(yearComparison);
-    const maxYear = Math.max(...availableYears);
-    const prevYear = maxYear - 1;
-    const active = codes.filter(([, v]) => v.years[maxYear] > 0);
-    const churned = codes.filter(([, v]) => !v.years[maxYear] && Object.values(v.years).some(s => s > 0));
-    const growing = codes.filter(([, v]) => v.years[maxYear] > 0 && v.years[prevYear] > 0 && v.years[maxYear] > v.years[prevYear]);
-    const declining = codes.filter(([, v]) => v.years[maxYear] > 0 && v.years[prevYear] > 0 && v.years[maxYear] < v.years[prevYear]);
-    const newCustomers = codes.filter(([, v]) => v.years[maxYear] > 0 && !v.years[prevYear]);
+    const curYear = selectedYear;
+    const prevYear = curYear - 1;
+    const active = codes.filter(([, v]) => (v.years[curYear] || 0) > 0);
+    const churned = codes.filter(([, v]) => !(v.years[curYear] > 0) && Object.values(v.years).some(s => s > 0));
+    const growing = codes.filter(([, v]) => (v.years[curYear] || 0) > 0 && (v.years[prevYear] || 0) > 0 && v.years[curYear] > v.years[prevYear]);
+    const declining = codes.filter(([, v]) => (v.years[curYear] || 0) > 0 && (v.years[prevYear] || 0) > 0 && v.years[curYear] < v.years[prevYear]);
+    const newCustomers = codes.filter(([, v]) => (v.years[curYear] || 0) > 0 && !(v.years[prevYear] > 0));
     return { active: active.length, churned: churned.length, growing: growing.length, declining: declining.length, newCustomers: newCustomers.length, total: codes.length };
-  }, [yearComparison, availableYears]);
+  }, [yearComparison, selectedYear]);
 
   const regionStats = useMemo(() => {
     const byRegion = {};
@@ -260,30 +260,30 @@ export default function CustomerSegmentation() {
   }, [yearComparison, availableYears]);
 
   const topGrowing = useMemo(() => {
-    const maxYear = Math.max(...availableYears);
-    const prevYear = maxYear - 1;
+    const curYear = selectedYear;
+    const prevYear = curYear - 1;
     return Object.entries(yearComparison)
-      .filter(([, v]) => v.years[maxYear] > 0 && v.years[prevYear] > 0)
+      .filter(([, v]) => (v.years[curYear] || 0) > 0 && (v.years[prevYear] || 0) > 0)
       .map(([code, v]) => ({
         code, name: v.name, region: v.region,
-        current: v.years[maxYear], previous: v.years[prevYear],
-        growth: ((v.years[maxYear] - v.years[prevYear]) / v.years[prevYear]) * 100,
+        current: v.years[curYear], previous: v.years[prevYear],
+        growth: ((v.years[curYear] - v.years[prevYear]) / v.years[prevYear]) * 100,
       }))
       .sort((a, b) => b.growth - a.growth)
       .slice(0, 10);
-  }, [yearComparison, availableYears]);
+  }, [yearComparison, selectedYear]);
 
   const topChurned = useMemo(() => {
-    const maxYear = Math.max(...availableYears);
+    const curYear = selectedYear;
     return Object.entries(yearComparison)
-      .filter(([, v]) => !v.years[maxYear] && Object.values(v.years).some(s => s > 0))
+      .filter(([, v]) => !(v.years[curYear] > 0) && Object.values(v.years).some(s => s > 0))
       .map(([code, v]) => {
         const lastYear = Math.max(...Object.keys(v.years).filter(y => v.years[y] > 0).map(Number));
         return { code, name: v.name, region: v.region, lastSales: v.years[lastYear], lastYear };
       })
       .sort((a, b) => b.lastSales - a.lastSales)
       .slice(0, 10);
-  }, [yearComparison, availableYears]);
+  }, [yearComparison, selectedYear]);
 
   if (tableError) {
     return (
@@ -392,7 +392,7 @@ CREATE POLICY "Allow authenticated full access"
                   {availableYears.length > 1 && (
                     <>
                       <div className="card" style={{ marginBottom: '1rem' }}>
-                        <div className="card-title">📈 حالة العملاء</div>
+                        <div className="card-title">📈 حالة العملاء ({selectedYear} مقارنة بـ {selectedYear - 1})</div>
                         <div className="stats-grid">
                           <div className="stat-card" style={{ borderRight: '4px solid #10b981' }}>
                             <div className="stat-label">نشط</div>
