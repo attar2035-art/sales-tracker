@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { supabase } from '../lib/supabase';
-import { formatCurrency, formatNumber } from '../lib/helpers';
+import { supabase } from './lib/supabase';
+import { formatCurrency, formatNumber } from './lib/helpers';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 export default function CustomerLoyaltyAnalysis({ baseYear = 2022, comparisonYear = 2023 }) {

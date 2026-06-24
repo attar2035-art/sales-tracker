@@ -10,7 +10,7 @@ import Login from './pages/Login';
 import ChangePassword from './pages/ChangePassword';
 import RepDashboard from './pages/RepDashboard';
 import Customers from './pages/Customers';
-import CustomerAnalytics from './components/CustomerAnalytics';
+import CustomerAnalytics from './CustomerAnalytics';
 import CustomerSegmentation from './pages/CustomerSegmentation';
 
 const NAV_ADMIN = [
