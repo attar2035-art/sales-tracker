@@ -62,15 +62,28 @@ export default function CustomerSegmentation() {
     try {
       const mod = await import('../data/customers_import.json');
       const jsonData = mod.default || mod;
-      setImportProgress('تم تحميل ' + jsonData.length + ' سجل. جاري الإدخال...');
+
+      // 1) امسح أي بيانات قديمة/ناقصة أولاً لضمان نتيجة نظيفة
+      setImportProgress('جاري مسح البيانات القديمة...');
+      const { error: delErr } = await supabase
+        .from('customer_yearly_sales')
+        .delete()
+        .gte('id', 0);
+      if (delErr) {
+        setImportProgress('خطأ في مسح البيانات القديمة: ' + delErr.message);
+        setImporting(false);
+        return;
+      }
+
+      // 2) أدخل كل السجلات (إدخال مباشر لا يعتمد على قيد التفرد)
+      setImportProgress('تم المسح. جاري إدخال ' + jsonData.length + ' سجل...');
       const batch = 200;
       let imported = 0;
       let errors = 0;
       let lastError = '';
       for (let i = 0; i < jsonData.length; i += batch) {
         const chunk = jsonData.slice(i, i + batch);
-        const { error } = await supabase.from('customer_yearly_sales')
-          .upsert(chunk, { onConflict: 'customer_code,year,region_name' });
+        const { error } = await supabase.from('customer_yearly_sales').insert(chunk);
         if (error) {
           console.error('Batch error:', error);
           errors++;
