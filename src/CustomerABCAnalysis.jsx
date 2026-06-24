@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { supabase } from '../lib/supabase';
-import { formatCurrency, formatNumber } from '../lib/helpers';
+import { supabase } from './lib/supabase';
+import { formatCurrency, formatNumber } from './lib/helpers';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 export default function CustomerABCAnalysis({ year = 2022 }) {

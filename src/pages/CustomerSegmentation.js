@@ -34,6 +34,7 @@ export default function CustomerSegmentation() {
   const [selectedRegion, setSelectedRegion] = useState('all');
   const [activeTab, setActiveTab] = useState('overview');
   const [tableError, setTableError] = useState(false);
+  const [importProgress, setImportProgress] = useState('');
 
   useEffect(() => { fetchData(); }, []);
 
@@ -50,38 +51,44 @@ export default function CustomerSegmentation() {
       setLoading(false);
       return;
     }
-    if (rows && rows.length > 0) {
-      setData(rows);
-      setTableError(false);
-      setLoading(false);
-      return;
-    }
-    await autoImport();
+    setData(rows || []);
+    setTableError(false);
+    setLoading(false);
   };
 
-  const autoImport = async () => {
-    setImportMsg('جاري الاستيراد التلقائي...');
+  const runImport = async () => {
+    setImporting(true);
+    setImportProgress('جاري تحميل البيانات...');
     try {
       const res = await fetch('/customers_import.json');
-      if (!res.ok) { setLoading(false); return; }
+      if (!res.ok) {
+        setImportProgress('خطأ في تحميل ملف البيانات: ' + res.status);
+        setImporting(false);
+        return;
+      }
       const jsonData = await res.json();
-      const batch = 300;
+      setImportProgress('تم تحميل ' + jsonData.length + ' سجل. جاري الإدخال...');
+      const batch = 200;
       let imported = 0;
+      let errors = 0;
       for (let i = 0; i < jsonData.length; i += batch) {
         const chunk = jsonData.slice(i, i + batch);
         const { error } = await supabase.from('customer_yearly_sales')
-          .upsert(chunk, { onConflict: 'customer_code,year' });
-        if (error) { console.error(error); }
-        else { imported += chunk.length; }
+          .upsert(chunk, { onConflict: 'customer_code,year,region_name' });
+        if (error) {
+          console.error('Batch error:', error);
+          errors++;
+        } else {
+          imported += chunk.length;
+        }
+        setImportProgress('تم إدخال ' + imported + ' من ' + jsonData.length + (errors > 0 ? ' (' + errors + ' أخطاء)' : ''));
       }
-      setImportMsg('تم استيراد ' + imported + ' سجل تلقائياً');
-      const { data: rows } = await supabase.from('customer_yearly_sales').select('*').limit(50000);
-      setData(rows || []);
-      setTableError(false);
+      setImportProgress('اكتمل! تم استيراد ' + imported + ' سجل');
+      await fetchData();
     } catch (e) {
-      console.error(e);
+      setImportProgress('خطأ: ' + e.message);
     }
-    setLoading(false);
+    setImporting(false);
   };
 
   const handleFileUpload = (e) => {
@@ -339,9 +346,17 @@ CREATE POLICY "Allow authenticated full access"
           {activeTab === 'overview' && (
             <>
               {data.length === 0 ? (
-                <div className="empty-state">
-                  <div className="empty-state-icon">📂</div>
-                  <div className="empty-state-text">لا توجد بيانات بعد. اذهب لتبويب "استيراد البيانات" لرفع ملفات الإكسل.</div>
+                <div className="card" style={{ padding: '2rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📂</div>
+                  <div style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }}>لا توجد بيانات بعد</div>
+                  <button className="btn btn-primary" style={{ maxWidth: 300, margin: '0 auto', fontSize: '1.1rem', padding: '0.75rem 2rem' }} onClick={runImport} disabled={importing}>
+                    {importing ? 'جاري الاستيراد...' : '📥 استيراد البيانات (10,348 عميل)'}
+                  </button>
+                  {importProgress && (
+                    <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#1e293b', borderRadius: 8, color: importProgress.includes('خطأ') ? '#ef4444' : '#10b981', fontWeight: 700 }}>
+                      {importProgress}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>
