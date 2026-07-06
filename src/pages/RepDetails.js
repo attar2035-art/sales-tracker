@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { MONTHS_AR, formatCurrency, formatNumber, getRemainingWorkingDays, getTotalWorkingDaysInMonth } from '../lib/helpers';
 
-export default function RepDetails() {
+export default function RepDetails({ supervisorId }) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -12,12 +12,14 @@ export default function RepDetails() {
   const [target, setTarget] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { fetchReps(); }, []);
+  useEffect(() => { fetchReps(); }, [supervisorId]);
   useEffect(() => { if (selectedRep) fetchDetails(); }, [selectedRep, year, month]);
 
   const fetchReps = async () => {
-    const { data } = await supabase.from('representatives')
+    let query = supabase.from('representatives')
       .select('*, supervisors(name), regions(name)').eq('is_active', true).order('name');
+    if (supervisorId) query = query.eq('supervisor_id', supervisorId);
+    const { data } = await query;
     if (data) setReps(data);
   };
 

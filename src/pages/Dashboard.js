@@ -94,7 +94,7 @@ export default function Dashboard({ supervisorId }) {
     setLoading(true);
     let query = supabase.from('representatives')
       .select('*, supervisors(name,id), regions(name,id)')
-      .eq('is_active', true).order('name');
+      .order('name');
     if (supervisorId) query = query.eq('supervisor_id', supervisorId);
     else if (filterSup) query = query.eq('supervisor_id', filterSup);
     const { data: reps } = await query;
@@ -150,8 +150,9 @@ export default function Dashboard({ supervisorId }) {
         overdue_remaining: Math.max(0, (t.overdue_total || 0) - achieved.overdue_collected),
         monthProgress: monthProg, remainingDays,
         salesStatus: getAchievementStatus(achieved.sales, t.target_sales || 0, monthProg),
+        hasMonthlyData: repEntries.length > 0 || Boolean(targetsMap[rep.id]),
       };
-    });
+    }).filter(rep => rep.is_active || rep.hasMonthlyData);
     setData(combined);
     if (supervisorId || filterSup) {
       const supRegions = [...new Map(combined
