@@ -5,6 +5,7 @@ import {
   getAchievementStatus, getStatusColor, getStatusLabel,
   getMonthProgress, getRemainingWorkingDays, getTotalWorkingDaysInMonth,
 } from '../lib/helpers';
+import { buildEffectiveTargetsMap } from '../lib/targets';
 
 function calcPoints(achieved, target) {
   const sales = target.target_sales > 0 ? Math.min(1, achieved.sales / target.target_sales) * 40 : 0;
@@ -100,11 +101,10 @@ export default function Dashboard({ supervisorId }) {
     const { data: reps } = await query;
     if (!reps) { setLoading(false); return; }
     const { data: targets } = await supabase.from('monthly_targets')
-      .select('*').eq('year', year).eq('month', month).limit(10000);
+      .select('*').limit(10000);
     const { data: entries } = await supabase.from('daily_entries')
       .select('*').eq('year', year).eq('month', month).limit(10000);
-    const targetsMap = {};
-    (targets || []).forEach(t => { targetsMap[t.rep_id] = t; });
+    const targetsMap = buildEffectiveTargetsMap(targets || [], year, month);
     const entriesMap = {};
     (entries || []).forEach(e => {
       if (!entriesMap[e.rep_id]) entriesMap[e.rep_id] = [];
@@ -150,7 +150,7 @@ export default function Dashboard({ supervisorId }) {
         overdue_remaining: Math.max(0, (t.overdue_total || 0) - achieved.overdue_collected),
         monthProgress: monthProg, remainingDays,
         salesStatus: getAchievementStatus(achieved.sales, t.target_sales || 0, monthProg),
-        hasMonthlyData: repEntries.length > 0 || Boolean(targetsMap[rep.id]),
+        hasMonthlyData: repEntries.length > 0 || Boolean(targetsMap[rep.id] && !targetsMap[rep.id]._isInherited),
       };
     }).filter(rep => rep.is_active || rep.hasMonthlyData);
     setData(combined);

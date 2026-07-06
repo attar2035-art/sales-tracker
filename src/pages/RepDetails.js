@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { MONTHS_AR, formatCurrency, formatNumber, getRemainingWorkingDays, getTotalWorkingDaysInMonth } from '../lib/helpers';
+import { buildEffectiveTargetsMap } from '../lib/targets';
 
 export default function RepDetails({ supervisorId }) {
   const now = new Date();
@@ -29,10 +30,11 @@ export default function RepDetails({ supervisorId }) {
       supabase.from('daily_entries').select('*')
         .eq('rep_id', selectedRep).eq('year', year).eq('month', month).order('entry_date'),
       supabase.from('monthly_targets').select('*')
-        .eq('rep_id', selectedRep).eq('year', year).eq('month', month).single(),
+        .eq('rep_id', selectedRep).limit(10000),
     ]);
     if (e.data) setEntries(e.data);
-    if (t.data) setTarget(t.data);
+    const targetMap = buildEffectiveTargetsMap(t.data || [], year, month);
+    setTarget(targetMap[selectedRep] || null);
     setLoading(false);
   };
 

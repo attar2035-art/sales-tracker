@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { MONTHS_AR, formatCurrency, formatNumber, getRemainingWorkingDays, getTotalWorkingDaysInMonth, getMonthProgress } from '../lib/helpers';
+import { buildEffectiveTargetsMap } from '../lib/targets';
 
 export default function RepDashboard({ repId }) {
   const now = new Date();
@@ -26,10 +27,11 @@ export default function RepDashboard({ repId }) {
       supabase.from('daily_entries').select('*')
         .eq('rep_id', repId).eq('year', year).eq('month', month).order('entry_date'),
       supabase.from('monthly_targets').select('*')
-        .eq('rep_id', repId).eq('year', year).eq('month', month).single(),
+        .eq('rep_id', repId).limit(10000),
     ]);
     if (e.data) setEntries(e.data);
-    if (t.data) setTarget(t.data);
+    const targetMap = buildEffectiveTargetsMap(t.data || [], year, month);
+    setTarget(targetMap[repId] || null);
     setLoading(false);
   };
 
