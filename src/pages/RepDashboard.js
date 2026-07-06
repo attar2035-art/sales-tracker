@@ -66,6 +66,19 @@ function FocusItem({ title, value, tone = '#3b82f6' }) {
   );
 }
 
+const isMissingTableError = (error) => error?.code === 'PGRST205' || error?.code === '42P01';
+
+const fetchOptionalRows = async (query, fallback = []) => {
+  const { data, error } = await query;
+  if (error) {
+    if (!isMissingTableError(error)) console.warn('Optional insight query failed:', error.message);
+    return fallback;
+  }
+  return data || fallback;
+};
+
+const normalizeText = (value) => (value || '').toString().trim();
+
 export default function RepDashboard({ repId }) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -75,10 +88,15 @@ export default function RepDashboard({ repId }) {
   const [rep, setRep] = useState(null);
   const [topCustomers, setTopCustomers] = useState([]);
   const [riskCustomers, setRiskCustomers] = useState([]);
+  const [productFocus, setProductFocus] = useState([]);
+  const [opportunities, setOpportunities] = useState([]);
+  const [regionStrategy, setRegionStrategy] = useState(null);
+  const [regionProfile, setRegionProfile] = useState({ customers: 0, products: 0, source: 'computed' });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => { if (repId) fetchRep(); }, [repId]);
   useEffect(() => { if (repId) fetchDetails(); }, [repId, year, month]);
+  useEffect(() => { if (rep?.id) fetchRegionInsights(rep); }, [rep, year, month]);
 
   const fetchRep = async () => {
     const { data } = await supabase.from('representatives')
@@ -87,7 +105,6 @@ export default function RepDashboard({ repId }) {
       .single();
     if (data) {
       setRep(data);
-      fetchRegionInsights(data);
     }
   };
 
@@ -107,6 +124,117 @@ export default function RepDashboard({ repId }) {
 
   const fetchRegionInsights = async (repData) => {
     if (!repData?.region_id) return;
+    const regionName = repData.regions?.name;
+    setTopCustomers([]);
+    setRiskCustomers([]);
+    setProductFocus([]);
+    setOpportunities([]);
+    setRegionStrategy(null);
+    setRegionProfile({ customers: 0, products: 0, source: 'computed' });
+
+    const [
+      sheetTopCustomers,
+      sheetRisks,
+      sheetProducts,
+      sheetOpportunities,
+      sheetStrategies,
+    ] = await Promise.all([
+      regionName ? fetchOptionalRows(
+        supabase.from('top_customers_by_region')
+          .select('*')
+          .eq('region_name', regionName)
+          .order('total_sales_6m', { ascending: false })
+          .limit(8)
+      ) : [],
+      regionName ? fetchOptionalRows(
+        supabase.from('customer_risks')
+          .select('*')
+          .eq('region_name', regionName)
+          .order('total_debt', { ascending: false })
+          .limit(6)
+      ) : [],
+      regionName ? fetchOptionalRows(
+        supabase.from('product_analysis_by_region')
+          .select('*')
+          .eq('region_name', regionName)
+          .order('total_sales_6m', { ascending: false })
+          .limit(8)
+      ) : [],
+      regionName ? fetchOptionalRows(
+        supabase.from('opportunities_by_region')
+          .select('*')
+          .eq('region_name', regionName)
+          .order('estimated_value', { ascending: false })
+          .limit(8)
+      ) : [],
+      regionName ? fetchOptionalRows(
+        supabase.from('region_strategy')
+          .select('*')
+          .eq('region_name', regionName)
+          .eq('strategy_year', year)
+          .limit(12)
+      ) : [],
+    ]);
+
+    if (sheetTopCustomers.length) {
+      setTopCustomers(sheetTopCustomers.map((customer, index) => ({
+        id: `${customer.customer_code || index}-${index}`,
+        customer_code: customer.customer_code,
+        customer_name: customer.customer_name,
+        amount: Number(customer.total_sales_6m) || 0,
+        quantity: 0,
+        skuCount: Number(customer.sku_count) || 0,
+        className: customer.customer_class,
+        collectionRate: customer.collection_rate,
+        note: customer.notes,
+      })));
+    }
+
+    if (sheetRisks.length) {
+      setRiskCustomers(sheetRisks.map((customer, index) => ({
+        id: `${customer.customer_code || index}-${index}`,
+        customer_code: customer.customer_code,
+        customer_name: customer.customer_name,
+        riskAmount: Number(customer.total_debt) || 0,
+        debt_age: customer.risk_level,
+        risk_reason: customer.risk_reason,
+        recommended_action: customer.recommended_action,
+      })));
+    }
+
+    if (sheetProducts.length) {
+      setProductFocus(sheetProducts.map((product, index) => ({
+        id: `${product.product_code || index}-${index}`,
+        product_code: product.product_code,
+        product_name: product.product_name,
+        amount: Number(product.total_sales_6m) || 0,
+        quantity: Number(product.total_qty_6m) || 0,
+        customers: Number(product.active_customers_count) || 0,
+        status: product.status,
+        action: product.recommended_action,
+      })));
+    }
+
+    if (sheetOpportunities.length) {
+      setOpportunities(sheetOpportunities.map((opportunity, index) => ({
+        id: `${opportunity.customer_code || index}-${opportunity.product_code || index}`,
+        type: opportunity.opportunity_type,
+        customer_name: opportunity.customer_name,
+        product_name: opportunity.product_name,
+        description: opportunity.opportunity_description,
+        value: Number(opportunity.estimated_value) || 0,
+        priority: opportunity.priority,
+        action: opportunity.recommended_action,
+      })));
+    }
+
+    if (sheetStrategies.length) {
+      const currentMonthName = MONTHS_AR[month - 1];
+      setRegionStrategy(
+        sheetStrategies.find(row => normalizeText(row.strategy_month) === currentMonthName)
+        || sheetStrategies[0]
+      );
+    }
 
     const { data: customers } = await supabase
       .from('customers')
@@ -115,37 +243,64 @@ export default function RepDashboard({ repId }) {
       .limit(500);
 
     const customerIds = (customers || []).map(c => c.id);
+    setRegionProfile(profile => ({ ...profile, customers: customerIds.length }));
     if (customerIds.length) {
       const { data: salesRows } = await supabase
         .from('customer_product_sales')
-        .select('customer_id, amount, quantity, product_id')
+        .select('customer_id, amount, quantity, product_id, products(product_code, product_name)')
         .in('customer_id', customerIds)
         .limit(5000);
 
       const totals = {};
+      const products = {};
       (salesRows || []).forEach(row => {
         if (!totals[row.customer_id]) totals[row.customer_id] = { amount: 0, quantity: 0, products: new Set() };
         totals[row.customer_id].amount += Number(row.amount) || 0;
         totals[row.customer_id].quantity += Number(row.quantity) || 0;
         if (row.product_id) totals[row.customer_id].products.add(row.product_id);
+        if (row.product_id) {
+          if (!products[row.product_id]) {
+            products[row.product_id] = {
+              id: row.product_id,
+              product_code: row.products?.product_code,
+              product_name: row.products?.product_name || 'صنف غير محدد',
+              amount: 0,
+              quantity: 0,
+              customers: new Set(),
+            };
+          }
+          products[row.product_id].amount += Number(row.amount) || 0;
+          products[row.product_id].quantity += Number(row.quantity) || 0;
+          products[row.product_id].customers.add(row.customer_id);
+        }
       });
+      setRegionProfile(profile => ({ ...profile, products: Object.keys(products).length }));
 
-      setTopCustomers((customers || [])
-        .map(customer => ({
-          ...customer,
-          amount: totals[customer.id]?.amount || 0,
-          quantity: totals[customer.id]?.quantity || 0,
-          skuCount: totals[customer.id]?.products.size || 0,
-        }))
-        .sort((a, b) => b.amount - a.amount)
-        .slice(0, 6));
+      if (!sheetTopCustomers.length) {
+        setTopCustomers((customers || [])
+          .map(customer => ({
+            ...customer,
+            amount: totals[customer.id]?.amount || 0,
+            quantity: totals[customer.id]?.quantity || 0,
+            skuCount: totals[customer.id]?.products.size || 0,
+          }))
+          .sort((a, b) => b.amount - a.amount)
+          .slice(0, 6));
+      }
+
+      if (!sheetProducts.length) {
+        setProductFocus(Object.values(products)
+          .map(product => ({ ...product, customers: product.customers.size, status: 'قوي', action: 'تعزيز الانتشار لدى عملاء A و B' }))
+          .sort((a, b) => b.amount - a.amount)
+          .slice(0, 8));
+      }
     }
 
-    if (repData.regions?.name) {
+    if (regionName && !sheetRisks.length) {
       const { data: riskRows } = await supabase
         .from('customer_yearly_sales')
         .select('customer_code, customer_name, net_sales, collected, aging_61_90, aging_91_120, aging_120_plus, debt_age, year')
-        .eq('region_name', repData.regions.name)
+        .eq('region_name', regionName)
         .order('year', { ascending: false })
         .limit(500);
 
@@ -195,6 +350,18 @@ export default function RepDashboard({ repId }) {
     { title: 'تغطية صور الرف', value: `${shelfCoverage}%`, tone: '#f59e0b' },
   ];
 
+  const actionPlan = regionStrategy ? [
+    { title: 'تركيز البيع', value: regionStrategy.sales_focus || 'رفع مبيعات العملاء الأعلى قيمة.', tone: '#3b82f6' },
+    { title: 'تركيز التحصيل', value: regionStrategy.collection_focus || 'متابعة العملاء المتأخرين.', tone: '#10b981' },
+    { title: 'خطة الزيارات', value: regionStrategy.visit_plan || 'زيارة العملاء حسب الأولوية.', tone: '#06b6d4' },
+    { title: 'منتجات للدفع', value: regionStrategy.products_to_push || 'تعزيز المنتجات الأعلى دورانًا.', tone: '#f59e0b' },
+  ] : [
+    { title: 'تركيز البيع', value: 'رفع تغطية العملاء الأعلى قيمة ومتابعة الأصناف الجديدة.', tone: '#3b82f6' },
+    { title: 'تركيز التحصيل', value: 'البدء بالعملاء ذوي المديونية الأقدم والأعلى قيمة.', tone: '#10b981' },
+    { title: 'خطة الزيارات', value: 'الحفاظ على زيارة يومية منتظمة مع توثيق صور الرف.', tone: '#06b6d4' },
+    { title: 'منتجات للدفع', value: productFocus.slice(0, 3).map(p => p.product_name).join('، ') || 'تعزيز المنتجات الأعلى دورانًا.', tone: '#f59e0b' },
+  ];
+
   return (
     <div className="rep-dashboard">
       <div className="rep-hero">
@@ -231,6 +398,29 @@ export default function RepDashboard({ repId }) {
         </div>
       </div>
 
+      <div className="rep-profile-strip">
+        <div className="rep-mini-stat">
+          <span>محفظة العملاء</span>
+          <strong>{formatNumber(regionProfile.customers)}</strong>
+        </div>
+        <div className="rep-mini-stat">
+          <span>أصناف نشطة</span>
+          <strong>{formatNumber(regionProfile.products)}</strong>
+        </div>
+        <div className="rep-mini-stat">
+          <span>كبار العملاء</span>
+          <strong>{formatNumber(topCustomers.length)}</strong>
+        </div>
+        <div className="rep-mini-stat">
+          <span>فرص مفتوحة</span>
+          <strong>{formatNumber(opportunities.length)}</strong>
+        </div>
+        <div className="rep-mini-stat">
+          <span>مخاطر تحصيل</span>
+          <strong>{formatNumber(riskCustomers.length)}</strong>
+        </div>
+      </div>
+
       {loading ? (
         <div className="loading"><div className="spinner" />جاري التحميل...</div>
       ) : (
@@ -259,9 +449,16 @@ export default function RepDashboard({ repId }) {
             <section className="rep-panel">
               <div className="card-title">الخطة الاستراتيجية للمنطقة</div>
               <div className="strategy-box">
-                <div><strong>تركيز البيع:</strong> رفع تغطية العملاء الأعلى قيمة ومتابعة الأصناف الجديدة.</div>
-                <div><strong>تركيز التحصيل:</strong> البدء بالعملاء ذوي المديونية الأقدم والأعلى قيمة.</div>
-                <div><strong>إيقاع الزيارات:</strong> الحفاظ على زيارة يومية منتظمة مع توثيق صور الرف.</div>
+                {actionPlan.map(item => (
+                  <div key={item.title} style={{ borderRightColor: item.tone }}>
+                    <strong>{item.title}:</strong> {item.value}
+                  </div>
+                ))}
+                {regionStrategy?.rep_instructions && (
+                  <div style={{ borderRightColor: '#8b5cf6' }}>
+                    <strong>تعليمات مباشرة:</strong> {regionStrategy.rep_instructions}
+                  </div>
+                )}
               </div>
             </section>
           </div>
@@ -301,6 +498,49 @@ export default function RepDashboard({ repId }) {
                         <small>{customer.customer_code} · سنة {customer.year}</small>
                       </div>
                       <b style={{ color: '#ef4444' }}>{formatCurrency(customer.riskAmount)}</b>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+
+          <div className="rep-two-col">
+            <section className="rep-panel">
+              <div className="card-title">منتجات يجب دفعها</div>
+              {productFocus.length === 0 ? (
+                <div className="empty-state" style={{ padding: '2rem' }}>لا توجد بيانات منتجات للمنطقة</div>
+              ) : (
+                <div className="rep-list">
+                  {productFocus.map((product, index) => (
+                    <div className="rep-list-row" key={product.id}>
+                      <span className="rep-rank">{index + 1}</span>
+                      <div>
+                        <strong>{product.product_name}</strong>
+                        <small>{product.product_code || '-'} · {formatNumber(product.customers)} عميل · {formatNumber(product.quantity)} قطعة</small>
+                      </div>
+                      <b>{formatCurrency(product.amount)}</b>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="rep-panel">
+              <div className="card-title">فرص بيع قريبة</div>
+              {opportunities.length === 0 ? (
+                <div className="empty-state" style={{ padding: '2rem' }}>لا توجد فرص مستوردة بعد لهذه المنطقة</div>
+              ) : (
+                <div className="rep-list">
+                  {opportunities.map(opportunity => (
+                    <div className="rep-list-row rep-list-row-wide" key={opportunity.id}>
+                      <span className="badge badge-info">{opportunity.priority || 'فرصة'}</span>
+                      <div>
+                        <strong>{opportunity.customer_name || opportunity.product_name}</strong>
+                        <small>{opportunity.product_name || opportunity.description}</small>
+                        {opportunity.action && <small>{opportunity.action}</small>}
+                      </div>
+                      <b>{formatCurrency(opportunity.value)}</b>
                     </div>
                   ))}
                 </div>
