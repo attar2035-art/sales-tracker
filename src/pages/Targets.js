@@ -1,14 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { MONTHS_AR } from '../lib/helpers';
-
-const EMPTY_TARGET = {
-  target_sales: '', target_collection: '',
-  target_new_customers: '', target_new_customers_value: '',
-  target_total_visits: '', target_successful_visits: '',
-  target_new_products_skus: '', target_new_products_qty: '',
-  target_working_hours: '', target_km: '', overdue_total: '',
-};
+import { buildEffectiveTargetsMap, targetToForm } from '../lib/targets';
 
 export default function Targets() {
   const now = new Date();
@@ -33,11 +26,10 @@ export default function Targets() {
 
   const fetchTargets = async () => {
     const { data } = await supabase.from('monthly_targets')
-      .select('*').eq('year', year).eq('month', month);
+      .select('*')
+      .limit(10000);
     if (data) {
-      const map = {};
-      data.forEach(t => { map[t.rep_id] = t; });
-      setTargets(map);
+      setTargets(buildEffectiveTargetsMap(data, year, month));
     }
   };
 
@@ -50,19 +42,7 @@ export default function Targets() {
     const existing = targets[rep.id];
     setForms(prev => ({
       ...prev,
-      [rep.id]: existing ? {
-        target_sales: existing.target_sales,
-        target_collection: existing.target_collection,
-        target_new_customers: existing.target_new_customers,
-        target_new_customers_value: existing.target_new_customers_value,
-        target_total_visits: existing.target_total_visits,
-        target_successful_visits: existing.target_successful_visits,
-        target_new_products_skus: existing.target_new_products_skus,
-        target_new_products_qty: existing.target_new_products_qty,
-        target_working_hours: existing.target_working_hours,
-        target_km: existing.target_km,
-        overdue_total: existing.overdue_total,
-      } : { ...EMPTY_TARGET }
+      [rep.id]: targetToForm(existing)
     }));
     setSelectedRep(rep.id);
   };
@@ -148,13 +128,15 @@ export default function Targets() {
                       <td>{rep.regions?.name || '-'}</td>
                       <td>
                         {targets[rep.id]
-                          ? <span className="badge badge-success">محددة ✓</span>
+                          ? targets[rep.id]._isInherited
+                            ? <span className="badge badge-info">متكررة من {MONTHS_AR[targets[rep.id]._sourceMonth - 1]} {targets[rep.id]._sourceYear}</span>
+                            : <span className="badge badge-success">محددة ✓</span>
                           : <span className="badge badge-warning">غير محددة</span>}
                       </td>
                       <td>
                         <button className="btn btn-primary btn-sm"
                           onClick={() => selectedRep === rep.id ? setSelectedRep(null) : openForm(rep)}>
-                          {selectedRep === rep.id ? 'إغلاق' : targets[rep.id] ? 'تعديل' : 'تحديد الأهداف'}
+                          {selectedRep === rep.id ? 'إغلاق' : targets[rep.id] ? 'تعديل الأهداف' : 'تحديد الأهداف'}
                         </button>
                       </td>
                     </tr>

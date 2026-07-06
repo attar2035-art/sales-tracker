@@ -36,6 +36,7 @@ const NAV_SUPERVISOR = [
 
 const NAV_DATA_ENTRY = [
   { key: 'daily', label: 'الإدخال اليومي', icon: '📝' },
+  { key: 'targets', label: 'الأهداف الشهرية', icon: '🎯' },
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
 ];
 
@@ -101,6 +102,7 @@ export default function App() {
     }
     if (user.role === 'data_entry') {
       if (page === 'password') return <ChangePassword />;
+      if (page === 'targets') return <Targets />;
       return <DailyEntry />;
     }
     if (user.role === 'supervisor') {
