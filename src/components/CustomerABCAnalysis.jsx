@@ -15,10 +15,10 @@ export default function CustomerABCAnalysis({ year = 2022 }) {
   const loadData = async () => {
     setLoading(true);
     const { data: customersData, error } = await supabase
-      .from('customer_yearly_history')
-      .select('customer_code, customer_name, yearly_sales, year')
+      .from('customer_yearly_sales')
+      .select('customer_code, customer_name, net_sales, year')
       .eq('year', year)
-      .order('yearly_sales', { ascending: false });
+      .order('net_sales', { ascending: false });
 
     if (error) {
       console.error(error);
@@ -26,7 +26,10 @@ export default function CustomerABCAnalysis({ year = 2022 }) {
       return;
     }
 
-    setData(customersData || []);
+    setData((customersData || []).map(c => ({
+      ...c,
+      yearly_sales: Number(c.net_sales) || 0,
+    })));
     setLoading(false);
   };
 
@@ -38,6 +41,7 @@ export default function CustomerABCAnalysis({ year = 2022 }) {
     
     // حساب الإجمالي
     const totalSales = sorted.reduce((sum, c) => sum + c.yearly_sales, 0);
+    if (totalSales <= 0) return null;
     
     // تصنيف ABC
     let cumulative = 0;

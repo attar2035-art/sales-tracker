@@ -17,17 +17,23 @@ export default function CustomerLoyaltyAnalysis({ baseYear = 2022, comparisonYea
     setLoading(true);
     
     const { data: customers2022 } = await supabase
-      .from('customer_yearly_history')
-      .select('id, customer_code, customer_name, yearly_sales, year')
+      .from('customer_yearly_sales')
+      .select('id, customer_code, customer_name, net_sales, year')
       .eq('year', baseYear);
 
     const { data: customers2023 } = await supabase
-      .from('customer_yearly_history')
-      .select('id, customer_code, customer_name, yearly_sales, year')
+      .from('customer_yearly_sales')
+      .select('id, customer_code, customer_name, net_sales, year')
       .eq('year', comparisonYear);
 
-    setData2022(customers2022 || []);
-    setData2023(customers2023 || []);
+    setData2022((customers2022 || []).map(c => ({
+      ...c,
+      yearly_sales: Number(c.net_sales) || 0,
+    })));
+    setData2023((customers2023 || []).map(c => ({
+      ...c,
+      yearly_sales: Number(c.net_sales) || 0,
+    })));
     setLoading(false);
   };
 
@@ -55,7 +61,9 @@ export default function CustomerLoyaltyAnalysis({ baseYear = 2022, comparisonYea
     Object.keys(map2022).forEach(code => {
       if (map2023[code]) {
         const change = map2023[code].yearly_sales - map2022[code].yearly_sales;
-        const changePercent = ((change / map2022[code].yearly_sales) * 100);
+        const changePercent = map2022[code].yearly_sales > 0
+          ? ((change / map2022[code].yearly_sales) * 100)
+          : 0;
         loyal.push({
           code,
           name: map2022[code].customer_name,

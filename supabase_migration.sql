@@ -15,8 +15,24 @@ CREATE TABLE IF NOT EXISTS customer_yearly_sales (
   debt_age TEXT,
   monthly_avg_collection DECIMAL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(customer_code, year)
+  UNIQUE(customer_code, year, region_name)
 );
+
+DO $$
+BEGIN
+  ALTER TABLE customer_yearly_sales
+    DROP CONSTRAINT IF EXISTS customer_yearly_sales_customer_code_year_key;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'customer_yearly_sales_customer_code_year_region_name_key'
+  ) THEN
+    ALTER TABLE customer_yearly_sales
+      ADD CONSTRAINT customer_yearly_sales_customer_code_year_region_name_key
+      UNIQUE (customer_code, year, region_name);
+  END IF;
+END $$;
 
 ALTER TABLE customer_yearly_sales ENABLE ROW LEVEL SECURITY;
 

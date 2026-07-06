@@ -20,6 +20,10 @@ export default function Customers({ user }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [customers, search, regionFilter, sortBy]);
+
   const loadData = async () => {
     setLoading(true);
 
@@ -116,7 +120,6 @@ export default function Customers({ user }) {
   };
 
   const filtered = useMemo(() => {
-    setPage(1);
     let result = customers;
 
     if (regionFilter !== 'all') {

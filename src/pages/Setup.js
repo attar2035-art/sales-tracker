@@ -14,6 +14,10 @@ export default function Setup() {
   const [repName, setRepName] = useState('');
   const [repSup, setRepSup] = useState('');
   const [repRegion, setRepRegion] = useState('');
+  const [editingRep, setEditingRep] = useState(null);
+  const [editRepName, setEditRepName] = useState('');
+  const [editRepSup, setEditRepSup] = useState('');
+  const [editRepRegion, setEditRepRegion] = useState('');
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -73,6 +77,56 @@ export default function Setup() {
   const toggleRepActive = async (rep) => {
     await supabase.from('representatives').update({ is_active: !rep.is_active }).eq('id', rep.id);
     fetchAll();
+  };
+
+  const startEditRep = (rep) => {
+    setEditingRep(rep);
+    setEditRepName(rep.name || '');
+    setEditRepSup(rep.supervisor_id || '');
+    setEditRepRegion(rep.region_id || '');
+  };
+
+  const cancelEditRep = () => {
+    setEditingRep(null);
+    setEditRepName('');
+    setEditRepSup('');
+    setEditRepRegion('');
+  };
+
+  const saveRepEdit = async () => {
+    if (!editingRep || !editRepName.trim()) return;
+    setLoading(true);
+    const { error } = await supabase.from('representatives').update({
+      name: editRepName.trim(),
+      supervisor_id: editRepSup || null,
+      region_id: editRepRegion || null,
+    }).eq('id', editingRep.id);
+    if (error) showMsg('خطأ: ' + error.message, 'error');
+    else { showMsg('تم تعديل بيانات المندوب'); cancelEditRep(); fetchAll(); }
+    setLoading(false);
+  };
+
+  const handoverRep = async () => {
+    if (!editingRep || !editRepName.trim()) return;
+    if (!window.confirm('سيتم إنشاء مندوب جديد بهذه البيانات وتعطيل المندوب الحالي مع حفظ تاريخه. هل تريد المتابعة؟')) return;
+    setLoading(true);
+    const { error: insertError } = await supabase.from('representatives').insert({
+      name: editRepName.trim(),
+      supervisor_id: editRepSup || null,
+      region_id: editRepRegion || null,
+      is_active: true,
+    });
+    if (insertError) {
+      showMsg('خطأ: ' + insertError.message, 'error');
+      setLoading(false);
+      return;
+    }
+    const { error: updateError } = await supabase.from('representatives')
+      .update({ is_active: false })
+      .eq('id', editingRep.id);
+    if (updateError) showMsg('تم إنشاء المندوب الجديد لكن حدث خطأ في تعطيل القديم: ' + updateError.message, 'error');
+    else { showMsg('تم تسليم المنطقة وبدء حساب المندوب الجديد'); cancelEditRep(); fetchAll(); }
+    setLoading(false);
   };
 
   return (
@@ -186,6 +240,39 @@ export default function Setup() {
             </div>
             <button className="btn btn-primary" onClick={addRep} disabled={loading}>إضافة المندوب</button>
           </div>
+          {editingRep && (
+            <div className="card">
+              <div className="card-title">تعديل / تسليم المندوب: {editingRep.name}</div>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label className="form-label">اسم المندوب</label>
+                  <input className="form-input" value={editRepName} onChange={e => setEditRepName(e.target.value)} placeholder="اسم المندوب" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">المشرف</label>
+                  <select className="form-select" value={editRepSup} onChange={e => setEditRepSup(e.target.value)}>
+                    <option value="">-- اختر مشرف --</option>
+                    {supervisors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">المنطقة</label>
+                  <select className="form-select" value={editRepRegion} onChange={e => setEditRepRegion(e.target.value)}>
+                    <option value="">-- اختر منطقة --</option>
+                    {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <button className="btn btn-primary" onClick={saveRepEdit} disabled={loading}>حفظ تعديل نفس المندوب</button>
+                <button className="btn btn-success" onClick={handoverRep} disabled={loading}>تسليم لمندوب جديد</button>
+                <button className="btn btn-ghost" onClick={cancelEditRep} disabled={loading}>إلغاء</button>
+              </div>
+              <div style={{ marginTop: '0.75rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                خيار التسليم ينشئ مندوبًا جديدًا ويوقف القديم، لذلك يبدأ حساب الجديد من الصفر ويبقى تاريخ القديم في التقارير.
+              </div>
+            </div>
+          )}
           <div className="card">
             <div className="card-title">قائمة المندوبين ({reps.length})</div>
             {reps.length === 0 ? (
@@ -202,6 +289,7 @@ export default function Setup() {
                         <td>{r.regions?.name || '-'}</td>
                         <td><span className={`badge ${r.is_active ? 'badge-success' : 'badge-danger'}`}>{r.is_active ? 'نشط' : 'غير نشط'}</span></td>
                         <td style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button className="btn btn-primary btn-sm" onClick={() => startEditRep(r)}>تعديل</button>
                           <button className="btn btn-ghost btn-sm" onClick={() => toggleRepActive(r)}>{r.is_active ? 'تعطيل' : 'تفعيل'}</button>
                           <button className="btn btn-danger btn-sm" onClick={() => deleteItem('representatives', r.id)}>حذف</button>
                         </td>
