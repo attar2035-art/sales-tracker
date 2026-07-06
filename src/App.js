@@ -94,6 +94,9 @@ export default function App() {
   };
 
   const renderPage = () => {
+    if (user.must_change_password) {
+      return <ChangePassword forceChange onChanged={checkUser} />;
+    }
     if (user.role === 'rep') {
       if (page === 'password') return <ChangePassword />;
       if (page === 'customers') return <Customers user={user} />;

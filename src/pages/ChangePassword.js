@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { updatePassword } from '../lib/auth';
 
-export default function ChangePassword() {
+export default function ChangePassword({ forceChange = false, onChanged }) {
   const [newPassword, setNewPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -14,7 +14,12 @@ export default function ChangePassword() {
     setLoading(true);
     const { error } = await updatePassword(newPassword);
     if (error) setMsg({ text: 'خطأ: ' + error.message, type: 'error' });
-    else { setMsg({ text: '✓ تم تغيير كلمة السر بنجاح', type: 'success' }); setNewPassword(''); setConfirm(''); }
+    else {
+      setMsg({ text: '✓ تم تغيير كلمة السر بنجاح', type: 'success' });
+      setNewPassword('');
+      setConfirm('');
+      if (onChanged) setTimeout(onChanged, 500);
+    }
     setLoading(false);
   };
 
@@ -25,6 +30,11 @@ export default function ChangePassword() {
       </div>
       <div className="card" style={{ maxWidth: 450 }}>
         {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
+        {forceChange && (
+          <div className="alert alert-warning">
+            يجب تغيير كلمة السر المؤقتة قبل استخدام النظام.
+          </div>
+        )}
         <div className="form-group">
           <label className="form-label">كلمة السر الجديدة</label>
           <input className="form-input" type="password" value={newPassword}
@@ -39,7 +49,7 @@ export default function ChangePassword() {
         </div>
         <button className="btn btn-primary" onClick={handleChange} disabled={loading}
           style={{ width: '100%', padding: '0.75rem' }}>
-          {loading ? '⏳ جاري الحفظ...' : '💾 حفظ كلمة السر'}
+          {loading ? '⏳ جاري الحفظ...' : forceChange ? 'تغيير كلمة السر والبدء' : '💾 حفظ كلمة السر'}
         </button>
       </div>
     </div>
