@@ -1,5 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { buildEffectiveTargetsMap, TARGET_FIELDS } from '../lib/targets';
+
+const ACHIEVEMENT_FIELD_BY_TARGET = {
+  target_sales: 'daily_sales',
+  target_collection: 'daily_collection',
+  target_new_customers: 'new_customers',
+  target_new_customers_value: 'new_customers_value',
+  target_total_visits: 'total_visits',
+  target_successful_visits: 'successful_visits',
+  target_new_products_skus: 'new_products_skus',
+  target_new_products_qty: 'new_products_qty',
+  target_working_hours: 'working_hours',
+  target_km: 'km',
+  overdue_total: 'overdue_collected',
+};
+
+const getLocalDateParts = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const day = now.getDate();
+  const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  return { year, month, date };
+};
 
 export default function Setup() {
   const [tab, setTab] = useState('regions');
@@ -108,24 +132,73 @@ export default function Setup() {
 
   const handoverRep = async () => {
     if (!editingRep || !editRepName.trim()) return;
-    if (!window.confirm('سيتم إنشاء مندوب جديد بهذه البيانات وتعطيل المندوب الحالي مع حفظ تاريخه. هل تريد المتابعة؟')) return;
+    if (!window.confirm('سيتم إنشاء مندوب جديد وتعطيل الحالي مع تقسيم هدف الشهر: المحقق للقديم والمتبقي للجديد. هل تريد المتابعة؟')) return;
     setLoading(true);
-    const { error: insertError } = await supabase.from('representatives').insert({
+    const { year, month, date } = getLocalDateParts();
+
+    const [targetsResult, entriesResult] = await Promise.all([
+      supabase.from('monthly_targets').select('*').eq('rep_id', editingRep.id).limit(10000),
+      supabase.from('daily_entries').select('*')
+        .eq('rep_id', editingRep.id)
+        .eq('year', year)
+        .eq('month', month)
+        .lte('entry_date', date)
+        .limit(10000),
+    ]);
+
+    if (targetsResult.error || entriesResult.error) {
+      showMsg('خطأ في قراءة بيانات التسليم: ' + (targetsResult.error?.message || entriesResult.error?.message), 'error');
+      setLoading(false);
+      return;
+    }
+
+    const targetMap = buildEffectiveTargetsMap(targetsResult.data || [], year, month);
+    const currentTarget = targetMap[editingRep.id] || null;
+    const entries = entriesResult.data || [];
+    const achieved = TARGET_FIELDS.reduce((acc, field) => {
+      const entryField = ACHIEVEMENT_FIELD_BY_TARGET[field];
+      acc[field] = entries.reduce((sum, entry) => sum + (parseFloat(entry[entryField]) || 0), 0);
+      return acc;
+    }, {});
+
+    const { data: newRep, error: insertError } = await supabase.from('representatives').insert({
       name: editRepName.trim(),
       supervisor_id: editRepSup || null,
       region_id: editRepRegion || null,
       is_active: true,
-    });
+    }).select('id').single();
     if (insertError) {
       showMsg('خطأ: ' + insertError.message, 'error');
       setLoading(false);
       return;
     }
+
+    if (currentTarget) {
+      const oldTargetPayload = { rep_id: editingRep.id, year, month };
+      const newTargetPayload = { rep_id: newRep.id, year, month };
+      TARGET_FIELDS.forEach(field => {
+        const total = parseFloat(currentTarget[field]) || 0;
+        const oldShare = Math.min(parseFloat(achieved[field]) || 0, total);
+        oldTargetPayload[field] = oldShare;
+        newTargetPayload[field] = Math.max(0, total - oldShare);
+      });
+
+      const { error: targetError } = await supabase.from('monthly_targets')
+        .upsert([oldTargetPayload, newTargetPayload], { onConflict: 'rep_id,year,month' });
+
+      if (targetError) {
+        await supabase.from('representatives').delete().eq('id', newRep.id);
+        showMsg('لم يتم التسليم بسبب خطأ في تقسيم الأهداف: ' + targetError.message, 'error');
+        setLoading(false);
+        return;
+      }
+    }
+
     const { error: updateError } = await supabase.from('representatives')
       .update({ is_active: false })
       .eq('id', editingRep.id);
     if (updateError) showMsg('تم إنشاء المندوب الجديد لكن حدث خطأ في تعطيل القديم: ' + updateError.message, 'error');
-    else { showMsg('تم تسليم المنطقة وبدء حساب المندوب الجديد'); cancelEditRep(); fetchAll(); }
+    else { showMsg(currentTarget ? 'تم التسليم وتقسيم هدف الشهر على القديم والجديد' : 'تم التسليم بدون تقسيم أهداف لعدم وجود هدف سابق'); cancelEditRep(); fetchAll(); }
     setLoading(false);
   };
 
@@ -269,7 +342,7 @@ export default function Setup() {
                 <button className="btn btn-ghost" onClick={cancelEditRep} disabled={loading}>إلغاء</button>
               </div>
               <div style={{ marginTop: '0.75rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                خيار التسليم ينشئ مندوبًا جديدًا ويوقف القديم، لذلك يبدأ حساب الجديد من الصفر ويبقى تاريخ القديم في التقارير.
+                خيار التسليم يبقي بيانات القديم باسمه، وينشئ مندوبًا جديدًا، ويقسم هدف الشهر الحالي: المحقق للقديم والمتبقي للجديد.
               </div>
             </div>
           )}
