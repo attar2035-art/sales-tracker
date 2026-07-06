@@ -1,7 +1,70 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { MONTHS_AR, formatCurrency, formatNumber, getRemainingWorkingDays, getTotalWorkingDaysInMonth, getMonthProgress } from '../lib/helpers';
+import {
+  MONTHS_AR,
+  formatCurrency,
+  formatNumber,
+  getRemainingWorkingDays,
+  getTotalWorkingDaysInMonth,
+  getMonthProgress,
+} from '../lib/helpers';
 import { buildEffectiveTargetsMap } from '../lib/targets';
+
+const metricConfig = [
+  { key: 'sales', title: 'المبيعات', icon: '🎯', targetKey: 'target_sales', color: '#3b82f6', currency: true },
+  { key: 'collection', title: 'التحصيل', icon: '💰', targetKey: 'target_collection', color: '#10b981', currency: true },
+  { key: 'total_visits', title: 'الزيارات', icon: '📍', targetKey: 'target_total_visits', color: '#06b6d4' },
+  { key: 'successful_visits', title: 'الزيارات الناجحة', icon: '✅', targetKey: 'target_successful_visits', color: '#14b8a6' },
+  { key: 'new_customers', title: 'عملاء جدد', icon: '👥', targetKey: 'target_new_customers', color: '#8b5cf6' },
+  { key: 'new_products_skus', title: 'أصناف جديدة', icon: '📦', targetKey: 'target_new_products_skus', color: '#f59e0b' },
+];
+
+const sumBy = (rows, field) => rows.reduce((total, row) => total + (parseFloat(row[field]) || 0), 0);
+
+const formatMetric = (value, currency) => currency ? formatCurrency(value) : formatNumber(value);
+
+function getMetricState(percent, monthProgress) {
+  if (percent >= monthProgress + 5) return { label: 'متقدم', color: '#10b981', bg: '#052e25' };
+  if (percent >= monthProgress - 5) return { label: 'في المسار', color: '#f59e0b', bg: '#3f2a05' };
+  return { label: 'يحتاج تركيز', color: '#ef4444', bg: '#3b0909' };
+}
+
+function PerformanceCard({ metric, achieved, target, remainingDays, monthProgress }) {
+  const percent = target > 0 ? Math.round((achieved / target) * 100) : 0;
+  const remaining = target > 0 ? Math.max(0, target - achieved) : 0;
+  const dailyRequired = target > 0 && remainingDays > 0 ? remaining / remainingDays : remaining;
+  const state = target > 0 ? getMetricState(percent, monthProgress) : { label: 'بدون هدف', color: '#94a3b8', bg: '#172033' };
+
+  return (
+    <div className="rep-card" style={{ borderTopColor: metric.color }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start' }}>
+        <div>
+          <div className="rep-card-label">{metric.icon} {metric.title}</div>
+          <div className="rep-card-value" style={{ color: metric.color }}>{formatMetric(achieved, metric.currency)}</div>
+        </div>
+        <span className="badge" style={{ color: state.color, background: state.bg }}>{state.label}</span>
+      </div>
+      <div className="progress-bar" style={{ height: 9, marginTop: '1rem' }}>
+        <div className="progress-fill" style={{ width: `${Math.min(100, percent)}%`, background: metric.color }} />
+      </div>
+      <div className="rep-card-grid">
+        <span>الهدف<br /><strong>{target > 0 ? formatMetric(target, metric.currency) : '-'}</strong></span>
+        <span>المتبقي<br /><strong>{target > 0 ? formatMetric(remaining, metric.currency) : '-'}</strong></span>
+        <span>يوميًا<br /><strong>{target > 0 ? formatMetric(dailyRequired, metric.currency) : '-'}</strong></span>
+        <span>النسبة<br /><strong>{target > 0 ? `${percent}%` : '-'}</strong></span>
+      </div>
+    </div>
+  );
+}
+
+function FocusItem({ title, value, tone = '#3b82f6' }) {
+  return (
+    <div style={{ borderRight: `3px solid ${tone}`, padding: '0.75rem 1rem', background: '#111827', borderRadius: 8 }}>
+      <div style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', marginBottom: 4 }}>{title}</div>
+      <div style={{ color: 'var(--text-primary)', fontWeight: 800 }}>{value}</div>
+    </div>
+  );
+}
 
 export default function RepDashboard({ repId }) {
   const now = new Date();
@@ -10,78 +73,140 @@ export default function RepDashboard({ repId }) {
   const [entries, setEntries] = useState([]);
   const [target, setTarget] = useState(null);
   const [rep, setRep] = useState(null);
+  const [topCustomers, setTopCustomers] = useState([]);
+  const [riskCustomers, setRiskCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { fetchRep(); }, []);
+  useEffect(() => { if (repId) fetchRep(); }, [repId]);
   useEffect(() => { if (repId) fetchDetails(); }, [repId, year, month]);
 
   const fetchRep = async () => {
     const { data } = await supabase.from('representatives')
-      .select('*, supervisors(name), regions(name)').eq('id', repId).single();
-    if (data) setRep(data);
+      .select('*, supervisors(name), regions(id,name)')
+      .eq('id', repId)
+      .single();
+    if (data) {
+      setRep(data);
+      fetchRegionInsights(data);
+    }
   };
 
   const fetchDetails = async () => {
     setLoading(true);
-    const [e, t] = await Promise.all([
+    const [entriesResult, targetsResult] = await Promise.all([
       supabase.from('daily_entries').select('*')
         .eq('rep_id', repId).eq('year', year).eq('month', month).order('entry_date'),
       supabase.from('monthly_targets').select('*')
         .eq('rep_id', repId).limit(10000),
     ]);
-    if (e.data) setEntries(e.data);
-    const targetMap = buildEffectiveTargetsMap(t.data || [], year, month);
+    if (entriesResult.data) setEntries(entriesResult.data);
+    const targetMap = buildEffectiveTargetsMap(targetsResult.data || [], year, month);
     setTarget(targetMap[repId] || null);
     setLoading(false);
+  };
+
+  const fetchRegionInsights = async (repData) => {
+    if (!repData?.region_id) return;
+
+    const { data: customers } = await supabase
+      .from('customers')
+      .select('id, customer_code, customer_name')
+      .eq('region_id', repData.region_id)
+      .limit(500);
+
+    const customerIds = (customers || []).map(c => c.id);
+    if (customerIds.length) {
+      const { data: salesRows } = await supabase
+        .from('customer_product_sales')
+        .select('customer_id, amount, quantity, product_id')
+        .in('customer_id', customerIds)
+        .limit(5000);
+
+      const totals = {};
+      (salesRows || []).forEach(row => {
+        if (!totals[row.customer_id]) totals[row.customer_id] = { amount: 0, quantity: 0, products: new Set() };
+        totals[row.customer_id].amount += Number(row.amount) || 0;
+        totals[row.customer_id].quantity += Number(row.quantity) || 0;
+        if (row.product_id) totals[row.customer_id].products.add(row.product_id);
+      });
+
+      setTopCustomers((customers || [])
+        .map(customer => ({
+          ...customer,
+          amount: totals[customer.id]?.amount || 0,
+          quantity: totals[customer.id]?.quantity || 0,
+          skuCount: totals[customer.id]?.products.size || 0,
+        }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 6));
+    }
+
+    if (repData.regions?.name) {
+      const { data: riskRows } = await supabase
+        .from('customer_yearly_sales')
+        .select('customer_code, customer_name, net_sales, collected, aging_61_90, aging_91_120, aging_120_plus, debt_age, year')
+        .eq('region_name', repData.regions.name)
+        .order('year', { ascending: false })
+        .limit(500);
+
+      setRiskCustomers((riskRows || [])
+        .map(row => ({
+          ...row,
+          riskAmount: (Number(row.aging_61_90) || 0) + (Number(row.aging_91_120) || 0) + (Number(row.aging_120_plus) || 0),
+        }))
+        .filter(row => row.riskAmount > 0)
+        .sort((a, b) => b.riskAmount - a.riskAmount)
+        .slice(0, 5));
+    }
   };
 
   const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
   const remainingDays = getRemainingWorkingDays(year, month);
   const totalDays = getTotalWorkingDaysInMonth(year, month);
-  const monthProg = Math.round(getMonthProgress(year, month));
+  const monthProgress = Math.round(getMonthProgress(year, month));
 
-  const sum = (field) => entries.reduce((a, e) => a + (parseFloat(e[field]) || 0), 0);
-  const totals = {
-    sales: sum('daily_sales'), collection: sum('daily_collection'),
-    new_customers: sum('new_customers'), new_customers_value: sum('new_customers_value'),
-    total_visits: sum('total_visits'), successful_visits: sum('successful_visits'),
-    shelf_photos: sum('shelf_photos'),
-    new_products_skus: sum('new_products_skus'), new_products_qty: sum('new_products_qty'),
-    working_hours: sum('working_hours'), km: sum('km'),
-    expenses: sum('daily_expenses'), overdue_collected: sum('overdue_collected'),
-  };
+  const totals = useMemo(() => ({
+    sales: sumBy(entries, 'daily_sales'),
+    collection: sumBy(entries, 'daily_collection'),
+    new_customers: sumBy(entries, 'new_customers'),
+    new_customers_value: sumBy(entries, 'new_customers_value'),
+    total_visits: sumBy(entries, 'total_visits'),
+    successful_visits: sumBy(entries, 'successful_visits'),
+    shelf_photos: sumBy(entries, 'shelf_photos'),
+    new_products_skus: sumBy(entries, 'new_products_skus'),
+    new_products_qty: sumBy(entries, 'new_products_qty'),
+    working_hours: sumBy(entries, 'working_hours'),
+    km: sumBy(entries, 'km'),
+    expenses: sumBy(entries, 'daily_expenses'),
+    overdue_collected: sumBy(entries, 'overdue_collected'),
+  }), [entries]);
 
-  const KPIRow = ({ label, achieved, targetVal, currency }) => {
-    const pct = targetVal > 0 ? Math.round((achieved / targetVal) * 100) : null;
-    const remaining = targetVal > 0 ? Math.max(0, targetVal - achieved) : null;
-    const daily = remaining !== null && remainingDays > 0 ? remaining / remainingDays : null;
-    const fmt = currency ? formatCurrency : formatNumber;
-    const color = pct === null ? '#94a3b8' : pct >= monthProg + 5 ? '#10b981' : pct >= monthProg - 5 ? '#f59e0b' : '#ef4444';
-    return (
-      <tr>
-        <td>{label}</td>
-        <td style={{ color: '#10b981', fontWeight: 700 }}>{fmt(achieved)}</td>
-        <td>{targetVal > 0 ? fmt(targetVal) : '-'}</td>
-        <td style={{ color: '#ef4444' }}>{remaining !== null ? fmt(remaining) : '-'}</td>
-        <td style={{ color: '#f59e0b' }}>{daily !== null ? fmt(daily) : '-'}</td>
-        <td>
-          {pct !== null ? (
-            <div>
-              <span style={{ fontWeight: 700, color }}>{pct}%</span>
-              <div className="progress-bar">
-                <div className="progress-fill" style={{ width: `${Math.min(100, pct)}%`, background: color }} />
-              </div>
-            </div>
-          ) : '-'}
-        </td>
-      </tr>
-    );
-  };
+  const salesTarget = target?.target_sales || 0;
+  const collectionTarget = target?.target_collection || 0;
+  const visitSuccessRate = totals.total_visits > 0 ? Math.round((totals.successful_visits / totals.total_visits) * 100) : 0;
+  const shelfCoverage = totals.total_visits > 0 ? Math.round((totals.shelf_photos / totals.total_visits) * 100) : 0;
+  const salesRemaining = Math.max(0, salesTarget - totals.sales);
+  const collectionRemaining = Math.max(0, collectionTarget - totals.collection);
+
+  const nextActions = [
+    { title: 'مبيعات مطلوبة يوميًا', value: salesTarget > 0 ? formatCurrency(remainingDays > 0 ? salesRemaining / remainingDays : salesRemaining) : '-', tone: '#3b82f6' },
+    { title: 'تحصيل مطلوب يوميًا', value: collectionTarget > 0 ? formatCurrency(remainingDays > 0 ? collectionRemaining / remainingDays : collectionRemaining) : '-', tone: '#10b981' },
+    { title: 'نسبة نجاح الزيارات', value: `${visitSuccessRate}%`, tone: '#06b6d4' },
+    { title: 'تغطية صور الرف', value: `${shelfCoverage}%`, tone: '#f59e0b' },
+  ];
 
   return (
-    <div>
-      <div className="page-header">
-        <h1 className="page-title">📊 تقريري</h1>
+    <div className="rep-dashboard">
+      <div className="rep-hero">
+        <div>
+          <div className="rep-eyebrow">لوحة تشغيل المندوب</div>
+          <h1>{rep?.name || 'تقريري'}</h1>
+          <div className="rep-meta">
+            <span>المنطقة: <strong>{rep?.regions?.name || '-'}</strong></span>
+            <span>المشرف: <strong>{rep?.supervisors?.name || 'بدون مشرف'}</strong></span>
+            <span>الشهر: <strong>{MONTHS_AR[month - 1]} {year}</strong></span>
+          </div>
+        </div>
         <div className="month-selector">
           <select value={month} onChange={e => setMonth(+e.target.value)}>
             {MONTHS_AR.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
@@ -92,23 +217,17 @@ export default function RepDashboard({ repId }) {
         </div>
       </div>
 
-      {rep && (
-        <div className="card" style={{ padding: '1rem 1.5rem', marginBottom: '1rem' }}>
-          <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
-            <div><span className="form-label">المندوب: </span><strong>{rep.name}</strong></div>
-            <div><span className="form-label">المشرف: </span>{rep.supervisors?.name || 'بدون مشرف'}</div>
-            <div><span className="form-label">المنطقة: </span>{rep.regions?.name || '-'}</div>
-          </div>
+      <div className="rep-month-band">
+        <div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>تقدم الشهر</div>
+          <strong>{monthProgress}%</strong>
         </div>
-      )}
-
-      <div className="card" style={{ padding: '1rem 1.5rem', marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-          <span style={{ fontWeight: 700 }}>📅 تقدم الشهر — {MONTHS_AR[month-1]} {year}</span>
-          <span style={{ color: '#8b5cf6', fontWeight: 700 }}>{monthProg}% — متبقي {remainingDays} يوم من {totalDays}</span>
+        <div className="progress-bar" style={{ height: 10, flex: 1, margin: 0 }}>
+          <div className="progress-fill" style={{ width: `${monthProgress}%`, background: '#8b5cf6' }} />
         </div>
-        <div className="progress-bar" style={{ height: 10 }}>
-          <div className="progress-fill" style={{ width: `${monthProg}%`, background: '#8b5cf6' }} />
+        <div style={{ textAlign: 'left' }}>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>المتبقي</div>
+          <strong>{remainingDays} من {totalDays} يوم</strong>
         </div>
       </div>
 
@@ -116,34 +235,81 @@ export default function RepDashboard({ repId }) {
         <div className="loading"><div className="spinner" />جاري التحميل...</div>
       ) : (
         <>
-          <div className="card">
-            <div className="card-title">📈 ملخص الأداء</div>
-            <div className="table-wrapper">
-              <table>
-                <thead>
-                  <tr><th>البند</th><th>المنجز</th><th>الهدف</th><th>المتبقي</th><th>يومي مطلوب</th><th>%</th></tr>
-                </thead>
-                <tbody>
-                  <KPIRow label="🎯 المبيعات" achieved={totals.sales} targetVal={target?.target_sales || 0} currency />
-                  <KPIRow label="💰 التحصيل" achieved={totals.collection} targetVal={target?.target_collection || 0} currency />
-                  <KPIRow label="👥 العملاء الجدد" achieved={totals.new_customers} targetVal={target?.target_new_customers || 0} />
-                  <KPIRow label="🧾 قيمة فواتير العملاء" achieved={totals.new_customers_value} targetVal={0} currency />
-                  <KPIRow label="📍 الزيارات الإجمالي" achieved={totals.total_visits} targetVal={target?.target_total_visits || 0} />
-                  <KPIRow label="✅ الزيارات الناجحة" achieved={totals.successful_visits} targetVal={target?.target_successful_visits || 0} />
-                  <KPIRow label="📸 صور الرف" achieved={totals.shelf_photos} targetVal={totals.total_visits} />
-                  <KPIRow label="📦 الأصناف الجديدة" achieved={totals.new_products_skus} targetVal={target?.target_new_products_skus || 0} />
-                  <KPIRow label="📦 القطع الجديدة" achieved={totals.new_products_qty} targetVal={target?.target_new_products_qty || 0} />
-                  <KPIRow label="⏰ ساعات العمل" achieved={totals.working_hours} targetVal={target?.target_working_hours || 0} />
-                  <KPIRow label="🚗 الكيلومترات" achieved={totals.km} targetVal={0} />
-                  <KPIRow label="💸 المصروفات" achieved={totals.expenses} targetVal={0} currency />
-                  <KPIRow label="⚠️ محصل المتأخرات" achieved={totals.overdue_collected} targetVal={target?.overdue_total || 0} currency />
-                </tbody>
-              </table>
-            </div>
+          <div className="rep-grid">
+            {metricConfig.map(metric => (
+              <PerformanceCard
+                key={metric.key}
+                metric={metric}
+                achieved={totals[metric.key] || 0}
+                target={target?.[metric.targetKey] || 0}
+                remainingDays={remainingDays}
+                monthProgress={monthProgress}
+              />
+            ))}
           </div>
 
-          <div className="card">
-            <div className="card-title">📅 السجل اليومي ({entries.length} يوم)</div>
+          <div className="rep-two-col">
+            <section className="rep-panel">
+              <div className="card-title">خطة اليوم</div>
+              <div className="rep-focus-list">
+                {nextActions.map(item => <FocusItem key={item.title} {...item} />)}
+              </div>
+            </section>
+
+            <section className="rep-panel">
+              <div className="card-title">الخطة الاستراتيجية للمنطقة</div>
+              <div className="strategy-box">
+                <div><strong>تركيز البيع:</strong> رفع تغطية العملاء الأعلى قيمة ومتابعة الأصناف الجديدة.</div>
+                <div><strong>تركيز التحصيل:</strong> البدء بالعملاء ذوي المديونية الأقدم والأعلى قيمة.</div>
+                <div><strong>إيقاع الزيارات:</strong> الحفاظ على زيارة يومية منتظمة مع توثيق صور الرف.</div>
+              </div>
+            </section>
+          </div>
+
+          <div className="rep-two-col">
+            <section className="rep-panel">
+              <div className="card-title">كبار عملاء المنطقة</div>
+              {topCustomers.length === 0 ? (
+                <div className="empty-state" style={{ padding: '2rem' }}>لا توجد بيانات عملاء كافية</div>
+              ) : (
+                <div className="rep-list">
+                  {topCustomers.map((customer, index) => (
+                    <div className="rep-list-row" key={customer.id}>
+                      <span className="rep-rank">{index + 1}</span>
+                      <div>
+                        <strong>{customer.customer_name}</strong>
+                        <small>{customer.customer_code} · {formatNumber(customer.skuCount)} صنف</small>
+                      </div>
+                      <b>{formatCurrency(customer.amount)}</b>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="rep-panel">
+              <div className="card-title">مخاطر التحصيل</div>
+              {riskCustomers.length === 0 ? (
+                <div className="empty-state" style={{ padding: '2rem' }}>لا توجد مخاطر تحصيل مسجلة للمنطقة</div>
+              ) : (
+                <div className="rep-list">
+                  {riskCustomers.map(customer => (
+                    <div className="rep-list-row" key={`${customer.customer_code}-${customer.year}`}>
+                      <span className="badge badge-danger">{customer.debt_age || 'متأخر'}</span>
+                      <div>
+                        <strong>{customer.customer_name}</strong>
+                        <small>{customer.customer_code} · سنة {customer.year}</small>
+                      </div>
+                      <b style={{ color: '#ef4444' }}>{formatCurrency(customer.riskAmount)}</b>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+
+          <section className="rep-panel">
+            <div className="card-title">السجل اليومي ({entries.length} يوم)</div>
             {entries.length === 0 ? (
               <div className="empty-state"><div className="empty-state-icon">📅</div><div className="empty-state-text">لا توجد إدخالات بعد</div></div>
             ) : (
@@ -157,41 +323,41 @@ export default function RepDashboard({ repId }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {entries.map(e => (
-                      <tr key={e.id}>
-                        <td>{new Date(e.entry_date).toLocaleDateString('ar-SA-u-ca-gregory')}</td>
-                        <td style={{ color: '#10b981' }}>{formatCurrency(e.daily_sales)}</td>
-                        <td style={{ color: '#10b981' }}>{formatCurrency(e.daily_collection)}</td>
-                        <td>{e.new_customers}</td>
-                        <td>{e.total_visits}</td>
-                        <td>{e.successful_visits}</td>
-                        <td>{e.shelf_photos || 0}</td>
-                        <td>{e.new_products_skus}</td>
-                        <td>{e.new_products_qty}</td>
-                        <td>{e.working_hours}</td>
-                        <td>{e.km}</td>
-                        <td>{formatCurrency(e.daily_expenses)}</td>
+                    {entries.map(entry => (
+                      <tr key={entry.id}>
+                        <td>{new Date(entry.entry_date).toLocaleDateString('ar-SA-u-ca-gregory')}</td>
+                        <td style={{ color: '#10b981' }}>{formatCurrency(entry.daily_sales)}</td>
+                        <td style={{ color: '#10b981' }}>{formatCurrency(entry.daily_collection)}</td>
+                        <td>{entry.new_customers}</td>
+                        <td>{entry.total_visits}</td>
+                        <td>{entry.successful_visits}</td>
+                        <td>{entry.shelf_photos || 0}</td>
+                        <td>{entry.new_products_skus}</td>
+                        <td>{entry.new_products_qty}</td>
+                        <td>{entry.working_hours}</td>
+                        <td>{entry.km}</td>
+                        <td>{formatCurrency(entry.daily_expenses)}</td>
                       </tr>
                     ))}
                     <tr style={{ background: '#0f172a', fontWeight: 700 }}>
                       <td>الإجمالي</td>
                       <td style={{ color: '#10b981' }}>{formatCurrency(totals.sales)}</td>
                       <td style={{ color: '#10b981' }}>{formatCurrency(totals.collection)}</td>
-                      <td>{totals.new_customers}</td>
-                      <td>{totals.total_visits}</td>
-                      <td>{totals.successful_visits}</td>
-                      <td>{totals.shelf_photos}</td>
-                      <td>{totals.new_products_skus}</td>
-                      <td>{totals.new_products_qty}</td>
-                      <td>{totals.working_hours}</td>
-                      <td>{totals.km}</td>
+                      <td>{formatNumber(totals.new_customers)}</td>
+                      <td>{formatNumber(totals.total_visits)}</td>
+                      <td>{formatNumber(totals.successful_visits)}</td>
+                      <td>{formatNumber(totals.shelf_photos)}</td>
+                      <td>{formatNumber(totals.new_products_skus)}</td>
+                      <td>{formatNumber(totals.new_products_qty)}</td>
+                      <td>{formatNumber(totals.working_hours)}</td>
+                      <td>{formatNumber(totals.km)}</td>
                       <td style={{ color: '#f59e0b' }}>{formatCurrency(totals.expenses)}</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
             )}
-          </div>
+          </section>
         </>
       )}
     </div>
