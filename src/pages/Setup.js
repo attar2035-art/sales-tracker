@@ -299,7 +299,7 @@ export default function Setup() {
               <div className="form-group">
                 <label className="form-label">المشرف</label>
                 <select className="form-select" value={repSup} onChange={e => setRepSup(e.target.value)}>
-                  <option value="">-- اختر مشرف --</option>
+                  <option value="">بدون مشرف</option>
                   {supervisors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
@@ -324,7 +324,7 @@ export default function Setup() {
                 <div className="form-group">
                   <label className="form-label">المشرف</label>
                   <select className="form-select" value={editRepSup} onChange={e => setEditRepSup(e.target.value)}>
-                    <option value="">-- اختر مشرف --</option>
+                    <option value="">بدون مشرف</option>
                     {supervisors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </div>
@@ -358,7 +358,7 @@ export default function Setup() {
                     {reps.map((r, i) => (
                       <tr key={r.id}>
                         <td>{i + 1}</td><td>{r.name}</td>
-                        <td>{r.supervisors?.name || '-'}</td>
+                        <td>{r.supervisors?.name || 'بدون مشرف'}</td>
                         <td>{r.regions?.name || '-'}</td>
                         <td><span className={`badge ${r.is_active ? 'badge-success' : 'badge-danger'}`}>{r.is_active ? 'نشط' : 'غير نشط'}</span></td>
                         <td style={{ display: 'flex', gap: '0.5rem' }}>

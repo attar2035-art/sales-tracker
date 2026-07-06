@@ -7,6 +7,8 @@ import {
 } from '../lib/helpers';
 import { buildEffectiveTargetsMap } from '../lib/targets';
 
+const NO_SUPERVISOR = '__none__';
+
 function calcPoints(achieved, target) {
   const sales = target.target_sales > 0 ? Math.min(1, achieved.sales / target.target_sales) * 40 : 0;
   const collection = target.target_collection > 0 ? Math.min(1, achieved.collection / target.target_collection) * 30 : 0;
@@ -97,6 +99,7 @@ export default function Dashboard({ supervisorId }) {
       .select('*, supervisors(name,id), regions(name,id)')
       .order('name');
     if (supervisorId) query = query.eq('supervisor_id', supervisorId);
+    else if (filterSup === NO_SUPERVISOR) query = query.is('supervisor_id', null);
     else if (filterSup) query = query.eq('supervisor_id', filterSup);
     const { data: reps } = await query;
     if (!reps) { setLoading(false); return; }
@@ -201,8 +204,14 @@ export default function Dashboard({ supervisorId }) {
   const remainingDays = getRemainingWorkingDays(year, month);
   const totalDays = getTotalWorkingDaysInMonth(year, month);
 
-  const supervisorStats = supervisors.map(sup => {
-    const supReps = data.filter(d => d.supervisors?.id === sup.id);
+  const supervisorRows = data.some(d => !d.supervisors?.id)
+    ? [...supervisors, { id: NO_SUPERVISOR, name: 'بدون مشرف' }]
+    : supervisors;
+
+  const supervisorStats = supervisorRows.map(sup => {
+    const supReps = sup.id === NO_SUPERVISOR
+      ? data.filter(d => !d.supervisors?.id)
+      : data.filter(d => d.supervisors?.id === sup.id);
     const totalTargetSales = supReps.reduce((a, d) => a + (d.target.target_sales || 0), 0);
     const totalTargetCollection = supReps.reduce((a, d) => a + (d.target.target_collection || 0), 0);
     const totalSales = supReps.reduce((a, d) => a + d.achieved.sales, 0);
@@ -241,6 +250,7 @@ export default function Dashboard({ supervisorId }) {
             <select className="form-select" style={{ width: 'auto' }} value={filterSup}
               onChange={e => { setFilterSup(e.target.value); setFilterRegion(''); }}>
               <option value="">كل المشرفين</option>
+              <option value={NO_SUPERVISOR}>بدون مشرف</option>
               {supervisors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           )}
@@ -317,7 +327,7 @@ export default function Dashboard({ supervisorId }) {
                   <tr key={d.id} style={{ background: i === 0 ? '#1a2a1a' : i === 1 ? '#1a1a2a' : i === 2 ? '#2a1a0a' : '' }}>
                     <td style={{ fontSize: '1.25rem', textAlign: 'center' }}>{getMedal(i + 1)}</td>
                     <td><strong>{d.name}</strong></td>
-                    <td style={{ color: 'var(--text-secondary)' }}>{d.supervisors?.name || '-'}</td>
+                    <td style={{ color: 'var(--text-secondary)' }}>{d.supervisors?.name || 'بدون مشرف'}</td>
                     <td style={{ color: 'var(--text-secondary)' }}>{d.regions?.name || '-'}</td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -418,7 +428,7 @@ export default function Dashboard({ supervisorId }) {
                     return (
                       <tr key={d.id}>
                         <td><strong>{d.name}</strong></td>
-                        <td style={{ color: 'var(--text-secondary)' }}>{d.supervisors?.name || '-'}</td>
+                        <td style={{ color: 'var(--text-secondary)' }}>{d.supervisors?.name || 'بدون مشرف'}</td>
                         <td style={{ color: 'var(--text-secondary)' }}>{d.regions?.name || '-'}</td>
                         <td><span style={{ fontWeight: 800, color: getPointsColor(d.points) }}>{d.points}</span></td>
                         {activeMetric === 'sales' && <>

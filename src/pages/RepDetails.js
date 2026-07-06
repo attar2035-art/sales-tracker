@@ -78,7 +78,7 @@ export default function RepDetails({ supervisorId }) {
         <div className="card">
           <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
             <div><span className="form-label">المندوب: </span><strong>{rep.name}</strong></div>
-            <div><span className="form-label">المشرف: </span>{rep.supervisors?.name || '-'}</div>
+            <div><span className="form-label">المشرف: </span>{rep.supervisors?.name || 'بدون مشرف'}</div>
             <div><span className="form-label">المنطقة: </span>{rep.regions?.name || '-'}</div>
             <div><span className="form-label">أيام العمل المتبقية: </span><strong style={{ color: '#f59e0b' }}>{remainingDays} من {totalDays}</strong></div>
           </div>
