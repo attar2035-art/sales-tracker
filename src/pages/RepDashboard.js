@@ -96,7 +96,7 @@ export default function RepDashboard({ repId }) {
         <div className="card" style={{ padding: '1rem 1.5rem', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
             <div><span className="form-label">المندوب: </span><strong>{rep.name}</strong></div>
-            <div><span className="form-label">المشرف: </span>{rep.supervisors?.name || '-'}</div>
+            <div><span className="form-label">المشرف: </span>{rep.supervisors?.name || 'بدون مشرف'}</div>
             <div><span className="form-label">المنطقة: </span>{rep.regions?.name || '-'}</div>
           </div>
         </div>

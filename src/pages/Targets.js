@@ -124,7 +124,7 @@ export default function Targets() {
                   <React.Fragment key={rep.id}>
                     <tr>
                       <td><strong>{rep.name}</strong></td>
-                      <td>{rep.supervisors?.name || '-'}</td>
+                      <td>{rep.supervisors?.name || 'بدون مشرف'}</td>
                       <td>{rep.regions?.name || '-'}</td>
                       <td>
                         {targets[rep.id]
