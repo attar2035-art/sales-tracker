@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { createRepLoginAccount } from '../lib/auth';
 import { buildEffectiveTargetsMap, TARGET_FIELDS } from '../lib/targets';
 
 const ACHIEVEMENT_FIELD_BY_TARGET = {
@@ -42,6 +43,9 @@ export default function Setup() {
   const [editRepName, setEditRepName] = useState('');
   const [editRepSup, setEditRepSup] = useState('');
   const [editRepRegion, setEditRepRegion] = useState('');
+  const [accountRep, setAccountRep] = useState('');
+  const [accountEmail, setAccountEmail] = useState('');
+  const [accountPassword, setAccountPassword] = useState('');
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -59,6 +63,11 @@ export default function Setup() {
   const showMsg = (text, type = 'success') => {
     setMsg({ text, type });
     setTimeout(() => setMsg(null), 3000);
+  };
+
+  const generateTempPassword = () => {
+    const randomPart = Math.random().toString(36).slice(2, 8).toUpperCase();
+    setAccountPassword(`Hwf-${randomPart}-${new Date().getFullYear()}`);
   };
 
   const addRegion = async () => {
@@ -127,6 +136,34 @@ export default function Setup() {
     }).eq('id', editingRep.id);
     if (error) showMsg('خطأ: ' + error.message, 'error');
     else { showMsg('تم تعديل بيانات المندوب'); cancelEditRep(); fetchAll(); }
+    setLoading(false);
+  };
+
+  const startAccountForRep = (rep) => {
+    setTab('accounts');
+    setAccountRep(rep.id);
+    setAccountEmail('');
+    if (!accountPassword) generateTempPassword();
+  };
+
+  const createRepAccount = async () => {
+    if (!accountRep) { showMsg('اختر المندوب أولاً', 'error'); return; }
+    if (!accountEmail.trim()) { showMsg('أدخل إيميل المندوب', 'error'); return; }
+    if (!accountPassword || accountPassword.length < 6) { showMsg('كلمة السر المؤقتة يجب أن تكون 6 أحرف على الأقل', 'error'); return; }
+
+    setLoading(true);
+    const { error } = await createRepLoginAccount({
+      email: accountEmail,
+      password: accountPassword,
+      repId: accountRep,
+    });
+    if (error) showMsg('خطأ في إنشاء الحساب: ' + error.message, 'error');
+    else {
+      showMsg('تم إنشاء حساب دخول المندوب. أعطه كلمة السر المؤقتة وسيغيرها عند أول دخول.');
+      setAccountRep('');
+      setAccountEmail('');
+      setAccountPassword('');
+    }
     setLoading(false);
   };
 
@@ -209,7 +246,7 @@ export default function Setup() {
       </div>
       {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
       <div className="tabs">
-        {[['regions','🗺️ المناطق'], ['supervisors','👔 المشرفون'], ['reps','👤 المندوبون']].map(([k, label]) => (
+        {[['regions','🗺️ المناطق'], ['supervisors','👔 المشرفون'], ['reps','👤 المندوبون'], ['accounts','🔐 حسابات الدخول']].map(([k, label]) => (
           <button key={k} className={`tab ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>{label}</button>
         ))}
       </div>
@@ -361,8 +398,9 @@ export default function Setup() {
                         <td>{r.supervisors?.name || 'بدون مشرف'}</td>
                         <td>{r.regions?.name || '-'}</td>
                         <td><span className={`badge ${r.is_active ? 'badge-success' : 'badge-danger'}`}>{r.is_active ? 'نشط' : 'غير نشط'}</span></td>
-                        <td style={{ display: 'flex', gap: '0.5rem' }}>
+                        <td style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                           <button className="btn btn-primary btn-sm" onClick={() => startEditRep(r)}>تعديل</button>
+                          <button className="btn btn-success btn-sm" onClick={() => startAccountForRep(r)}>حساب دخول</button>
                           <button className="btn btn-ghost btn-sm" onClick={() => toggleRepActive(r)}>{r.is_active ? 'تعطيل' : 'تفعيل'}</button>
                           <button className="btn btn-danger btn-sm" onClick={() => deleteItem('representatives', r.id)}>حذف</button>
                         </td>
@@ -372,6 +410,47 @@ export default function Setup() {
                 </table>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {tab === 'accounts' && (
+        <div>
+          <div className="card">
+            <div className="card-title">🔐 إنشاء حساب دخول لمندوب</div>
+            <div className="form-grid">
+              <div className="form-group">
+                <label className="form-label">المندوب</label>
+                <select className="form-select" value={accountRep} onChange={e => setAccountRep(e.target.value)}>
+                  <option value="">-- اختر المندوب --</option>
+                  {reps.map(r => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} — {r.regions?.name || 'بدون منطقة'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">إيميل الدخول</label>
+                <input className="form-input" type="email" value={accountEmail}
+                  onChange={e => setAccountEmail(e.target.value)}
+                  placeholder="rep@hawafel.com" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">كلمة السر المؤقتة</label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input className="form-input" type="text" value={accountPassword}
+                    onChange={e => setAccountPassword(e.target.value)}
+                    placeholder="كلمة سر مؤقتة" />
+                  <button className="btn btn-ghost" type="button" onClick={generateTempPassword}>توليد</button>
+                </div>
+              </div>
+            </div>
+            <button className="btn btn-primary" onClick={createRepAccount} disabled={loading}>
+              {loading ? 'جاري إنشاء الحساب...' : 'إنشاء الحساب وربطه بالمندوب'}
+            </button>
+            <div style={{ marginTop: '0.75rem', color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.7 }}>
+              بعد الإنشاء أعطِ المندوب الإيميل وكلمة السر المؤقتة. عند أول دخول سيجبره النظام على تغيير كلمة السر قبل عرض صفحته.
+            </div>
           </div>
         </div>
       )}
