@@ -23,6 +23,59 @@ const sumBy = (rows, field) => rows.reduce((total, row) => total + (parseFloat(r
 
 const formatMetric = (value, currency) => currency ? formatCurrency(value) : formatNumber(value);
 
+const toDateString = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getSixMonthWindow = (year, month) => {
+  const start = new Date(year, month - 1, 1);
+  start.setMonth(start.getMonth() - 5);
+  const end = new Date(year, month, 0);
+  const months = [];
+  for (let i = 0; i < 6; i += 1) {
+    const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
+    months.push({
+      year: d.getFullYear(),
+      month: d.getMonth() + 1,
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      label: `${MONTHS_AR[d.getMonth()]} ${d.getFullYear()}`,
+    });
+  }
+  return { months, startDate: toDateString(start), endDate: toDateString(end) };
+};
+
+const calcPercent = (achieved, target) => target > 0 ? Math.round((achieved / target) * 100) : 0;
+
+const buildHistoryRows = (months, rows, targets, repId) => {
+  return months.map(period => {
+    const monthRows = (rows || []).filter(row => row.year === period.year && row.month === period.month);
+    const effectiveTarget = buildEffectiveTargetsMap(targets || [], period.year, period.month)[repId] || null;
+    const sales = sumBy(monthRows, 'daily_sales');
+    const collection = sumBy(monthRows, 'daily_collection');
+    const visits = sumBy(monthRows, 'total_visits');
+    const successfulVisits = sumBy(monthRows, 'successful_visits');
+    const newCustomers = sumBy(monthRows, 'new_customers');
+    const salesTarget = parseFloat(effectiveTarget?.target_sales) || 0;
+    const collectionTarget = parseFloat(effectiveTarget?.target_collection) || 0;
+    return {
+      ...period,
+      days: monthRows.length,
+      sales,
+      collection,
+      visits,
+      successfulVisits,
+      newCustomers,
+      salesTarget,
+      collectionTarget,
+      salesPercent: calcPercent(sales, salesTarget),
+      collectionPercent: calcPercent(collection, collectionTarget),
+    };
+  });
+};
+
 function getMetricState(percent, monthProgress) {
   if (percent >= monthProgress + 5) return { label: 'متقدم', color: '#10b981', bg: '#052e25' };
   if (percent >= monthProgress - 5) return { label: 'في المسار', color: '#f59e0b', bg: '#3f2a05' };
@@ -92,6 +145,7 @@ export default function RepDashboard({ repId }) {
   const [opportunities, setOpportunities] = useState([]);
   const [regionStrategy, setRegionStrategy] = useState(null);
   const [regionProfile, setRegionProfile] = useState({ customers: 0, products: 0, source: 'computed' });
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => { if (repId) fetchRep(); }, [repId]);
@@ -110,15 +164,22 @@ export default function RepDashboard({ repId }) {
 
   const fetchDetails = async () => {
     setLoading(true);
-    const [entriesResult, targetsResult] = await Promise.all([
+    const historyWindow = getSixMonthWindow(year, month);
+    const [entriesResult, targetsResult, historyResult] = await Promise.all([
       supabase.from('daily_entries').select('*')
         .eq('rep_id', repId).eq('year', year).eq('month', month).order('entry_date'),
       supabase.from('monthly_targets').select('*')
         .eq('rep_id', repId).limit(10000),
+      supabase.from('daily_entries').select('*')
+        .eq('rep_id', repId)
+        .gte('entry_date', historyWindow.startDate)
+        .lte('entry_date', historyWindow.endDate)
+        .order('entry_date'),
     ]);
     if (entriesResult.data) setEntries(entriesResult.data);
     const targetMap = buildEffectiveTargetsMap(targetsResult.data || [], year, month);
     setTarget(targetMap[repId] || null);
+    setHistory(buildHistoryRows(historyWindow.months, historyResult.data || [], targetsResult.data || [], repId));
     setLoading(false);
   };
 
@@ -362,6 +423,15 @@ export default function RepDashboard({ repId }) {
     { title: 'منتجات للدفع', value: productFocus.slice(0, 3).map(p => p.product_name).join('، ') || 'تعزيز المنتجات الأعلى دورانًا.', tone: '#f59e0b' },
   ];
 
+  const historyTotals = history.reduce((acc, row) => {
+    acc.sales += row.sales;
+    acc.collection += row.collection;
+    acc.visits += row.visits;
+    acc.newCustomers += row.newCustomers;
+    return acc;
+  }, { sales: 0, collection: 0, visits: 0, newCustomers: 0 });
+  const bestHistoryMonth = [...history].sort((a, b) => b.salesPercent - a.salesPercent)[0];
+
   return (
     <div className="rep-dashboard">
       <div className="rep-hero">
@@ -437,6 +507,63 @@ export default function RepDashboard({ repId }) {
               />
             ))}
           </div>
+
+          <section className="rep-panel">
+            <div className="card-title">إنجاز آخر 6 شهور</div>
+            <div className="rep-history-summary">
+              <div><span>إجمالي المبيعات</span><strong>{formatCurrency(historyTotals.sales)}</strong></div>
+              <div><span>إجمالي التحصيل</span><strong>{formatCurrency(historyTotals.collection)}</strong></div>
+              <div><span>إجمالي الزيارات</span><strong>{formatNumber(historyTotals.visits)}</strong></div>
+              <div><span>عملاء جدد</span><strong>{formatNumber(historyTotals.newCustomers)}</strong></div>
+              <div><span>أفضل شهر</span><strong>{bestHistoryMonth?.salesPercent > 0 ? `${bestHistoryMonth.label} (${bestHistoryMonth.salesPercent}%)` : '-'}</strong></div>
+            </div>
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>الشهر</th>
+                    <th>هدف المبيعات</th>
+                    <th>مبيعات محققة</th>
+                    <th>نسبة المبيعات</th>
+                    <th>هدف التحصيل</th>
+                    <th>تحصيل محقق</th>
+                    <th>نسبة التحصيل</th>
+                    <th>الزيارات</th>
+                    <th>ناجحة</th>
+                    <th>عملاء جدد</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map(row => (
+                    <tr key={row.key}>
+                      <td>{row.label}</td>
+                      <td>{row.salesTarget > 0 ? formatCurrency(row.salesTarget) : '-'}</td>
+                      <td style={{ color: '#10b981' }}>{formatCurrency(row.sales)}</td>
+                      <td><span className={`badge ${row.salesPercent >= 100 ? 'badge-success' : row.salesPercent > 0 ? 'badge-warning' : 'badge-danger'}`}>{row.salesTarget > 0 ? `${row.salesPercent}%` : '-'}</span></td>
+                      <td>{row.collectionTarget > 0 ? formatCurrency(row.collectionTarget) : '-'}</td>
+                      <td style={{ color: '#10b981' }}>{formatCurrency(row.collection)}</td>
+                      <td><span className={`badge ${row.collectionPercent >= 100 ? 'badge-success' : row.collectionPercent > 0 ? 'badge-warning' : 'badge-danger'}`}>{row.collectionTarget > 0 ? `${row.collectionPercent}%` : '-'}</span></td>
+                      <td>{formatNumber(row.visits)}</td>
+                      <td>{formatNumber(row.successfulVisits)}</td>
+                      <td>{formatNumber(row.newCustomers)}</td>
+                    </tr>
+                  ))}
+                  <tr style={{ background: '#0f172a', fontWeight: 700 }}>
+                    <td>الإجمالي</td>
+                    <td>-</td>
+                    <td style={{ color: '#10b981' }}>{formatCurrency(historyTotals.sales)}</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td style={{ color: '#10b981' }}>{formatCurrency(historyTotals.collection)}</td>
+                    <td>-</td>
+                    <td>{formatNumber(historyTotals.visits)}</td>
+                    <td>-</td>
+                    <td>{formatNumber(historyTotals.newCustomers)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
 
           <div className="rep-two-col">
             <section className="rep-panel">
