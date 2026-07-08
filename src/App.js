@@ -12,6 +12,8 @@ import RepDashboard from './pages/RepDashboard';
 import Customers from './pages/Customers';
 import CustomerAnalytics from './components/CustomerAnalytics';
 import CustomerSegmentation from './pages/CustomerSegmentation';
+import ActivityLog from './pages/ActivityLog';
+import { logAuditEvent } from './lib/audit';
 
 const NAV_ADMIN = [
   { key: 'dashboard', label: 'لوحة المتابعة', icon: '📊' },
@@ -21,6 +23,7 @@ const NAV_ADMIN = [
   { key: 'customers', label: 'العملاء', icon: '👥' },
   { key: 'analytics', label: 'تحليل العملاء', icon: '📈' },
   { key: 'segmentation', label: 'تقسيم العملاء', icon: '📊' },
+  { key: 'audit', label: 'سجل النشاط', icon: '🧾' },
   { key: 'setup', label: 'الإعدادات', icon: '⚙️' },
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
 ];
@@ -60,6 +63,11 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (!user || user.must_change_password) return;
+    logAuditEvent({ eventType: 'page_view', pageKey: page });
+  }, [page, user?.id, user?.must_change_password]);
+
   const checkUser = async () => {
     setLoading(true);
     const u = await getCurrentUser();
@@ -73,6 +81,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    await logAuditEvent({ eventType: 'logout', pageKey: page });
     await signOut();
     setUser(null);
   };
@@ -124,6 +133,7 @@ export default function App() {
       case 'customers': return <Customers user={user} />;
       case 'analytics': return <CustomerAnalytics />;
       case 'segmentation': return <CustomerSegmentation />;
+      case 'audit': return <ActivityLog />;
       case 'setup': return <Setup />;
       case 'password': return <ChangePassword />;
       default: return <Dashboard />;

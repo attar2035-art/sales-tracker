@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { MONTHS_AR } from '../lib/helpers';
 import { buildEffectiveTargetsMap, targetToForm } from '../lib/targets';
+import { logAuditEvent } from '../lib/audit';
 
 export default function Targets() {
   const now = new Date();
@@ -72,7 +73,23 @@ export default function Targets() {
     const { error } = await supabase.from('monthly_targets')
       .upsert(payload, { onConflict: 'rep_id,year,month' });
     if (error) showMsg('خطأ: ' + error.message, 'error');
-    else { showMsg('تم حفظ الأهداف ✓'); fetchTargets(); setSelectedRep(null); }
+    else {
+      const rep = reps.find(item => item.id === repId);
+      await logAuditEvent({
+        eventType: targets[repId] ? 'update' : 'create',
+        pageKey: 'targets',
+        entityType: 'monthly_targets',
+        entityId: `${repId}:${year}-${month}`,
+        details: {
+          name: rep?.name || '',
+          month,
+          year,
+          sales_target: payload.target_sales,
+          collection_target: payload.target_collection,
+        },
+      });
+      showMsg('تم حفظ الأهداف ✓'); fetchTargets(); setSelectedRep(null);
+    }
     setLoading(false);
   };
 

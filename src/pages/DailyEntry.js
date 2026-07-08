@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { MONTHS_AR, isWorkingDay } from '../lib/helpers';
+import { logAuditEvent } from '../lib/audit';
 
 const EMPTY_ENTRY = {
   daily_sales: '', daily_collection: '',
@@ -100,7 +101,22 @@ export default function DailyEntry() {
     const { error } = await supabase.from('daily_entries')
       .upsert(payload, { onConflict: 'rep_id,entry_date' });
     if (error) showMsg('خطأ: ' + error.message, 'error');
-    else { showMsg('✓ تم حفظ البيانات'); fetchEntry(); }
+    else {
+      const rep = reps.find(item => item.id === selectedRep);
+      await logAuditEvent({
+        eventType: existingEntry ? 'update' : 'create',
+        pageKey: 'daily',
+        entityType: 'daily_entries',
+        entityId: existingEntry?.id || `${selectedRep}:${selectedDate}`,
+        details: {
+          name: rep?.name || '',
+          date: selectedDate,
+          sales: payload.daily_sales,
+          collection: payload.daily_collection,
+        },
+      });
+      showMsg('✓ تم حفظ البيانات'); fetchEntry();
+    }
     setLoading(false);
   };
 
