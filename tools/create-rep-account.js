@@ -17,6 +17,18 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+async function findUserByEmail(email) {
+  const perPage = 1000;
+  for (let page = 1; page <= 20; page += 1) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+    if (error) throw error;
+    const match = data.users.find(user => user.email?.toLowerCase() === email);
+    if (match) return match;
+    if (data.users.length < perPage) return null;
+  }
+  return null;
+}
+
 async function main() {
   let repQuery = supabase.from('representatives').select('id,name');
   repQuery = REP_ID ? repQuery.eq('id', REP_ID) : repQuery.ilike('name', REP_NAME);
@@ -29,19 +41,40 @@ async function main() {
   }
   const rep = repMatches[0];
 
-  const { data: created, error: createError } = await supabase.auth.admin.createUser({
-    email: REP_EMAIL,
-    password: REP_PASSWORD,
-    email_confirm: true,
-    user_metadata: {
-      role: 'rep',
-      rep_id: rep.id,
-      must_change_password: true,
-    },
-  });
+  let authUser = await findUserByEmail(REP_EMAIL);
+  let mode = 'created';
 
-  if (createError) throw createError;
-  const userId = created.user?.id;
+  if (authUser) {
+    const { data: updated, error: updateUserError } = await supabase.auth.admin.updateUserById(authUser.id, {
+      password: REP_PASSWORD,
+      email_confirm: true,
+      user_metadata: {
+        ...(authUser.user_metadata || {}),
+        role: 'rep',
+        rep_id: rep.id,
+        must_change_password: true,
+      },
+    });
+    if (updateUserError) throw updateUserError;
+    authUser = updated.user;
+    mode = 'linked existing';
+  } else {
+    const { data: created, error: createError } = await supabase.auth.admin.createUser({
+      email: REP_EMAIL,
+      password: REP_PASSWORD,
+      email_confirm: true,
+      user_metadata: {
+        role: 'rep',
+        rep_id: rep.id,
+        must_change_password: true,
+      },
+    });
+
+    if (createError) throw createError;
+    authUser = created.user;
+  }
+
+  const userId = authUser?.id;
   if (!userId) throw new Error('Supabase did not return a user id');
 
   const { data: existingRole } = await supabase
@@ -62,11 +95,11 @@ async function main() {
     : await supabase.from('user_roles').insert(rolePayload);
 
   if (roleResult.error) {
-    await supabase.auth.admin.deleteUser(userId);
+    if (mode === 'created') await supabase.auth.admin.deleteUser(userId);
     throw roleResult.error;
   }
 
-  console.log(`Created representative account. rep=${rep.name} email=${REP_EMAIL}`);
+  console.log(`Representative account ready (${mode}). rep=${rep.name} email=${REP_EMAIL}`);
 }
 
 main().catch((error) => {

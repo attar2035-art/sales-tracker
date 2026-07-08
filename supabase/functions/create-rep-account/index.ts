@@ -12,6 +12,18 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
   headers: { ...corsHeaders, 'Content-Type': 'application/json' },
 });
 
+const findUserByEmail = async (admin: ReturnType<typeof createClient>, email: string) => {
+  const perPage = 1000;
+  for (let page = 1; page <= 20; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+    if (error) throw error;
+    const match = data.users.find(user => user.email?.toLowerCase() === email);
+    if (match) return match;
+    if (data.users.length < perPage) return null;
+  }
+  return null;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -57,20 +69,40 @@ serve(async (req) => {
 
   if (repError || !rep) return json({ error: 'Representative not found' }, 404);
 
-  const { data: created, error: createError } = await admin.auth.admin.createUser({
-    email: normalizedEmail,
-    password,
-    email_confirm: true,
-    user_metadata: {
-      role: 'rep',
-      rep_id: repId,
-      must_change_password: true,
-    },
-  });
+  let authUser = await findUserByEmail(admin, normalizedEmail);
+  let createdNewUser = false;
 
-  if (createError) return json({ error: createError.message }, 400);
+  if (authUser) {
+    const { data: updated, error: updateUserError } = await admin.auth.admin.updateUserById(authUser.id, {
+      password,
+      email_confirm: true,
+      user_metadata: {
+        ...(authUser.user_metadata || {}),
+        role: 'rep',
+        rep_id: repId,
+        must_change_password: true,
+      },
+    });
+    if (updateUserError) return json({ error: updateUserError.message }, 400);
+    authUser = updated.user;
+  } else {
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
+      email: normalizedEmail,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        role: 'rep',
+        rep_id: repId,
+        must_change_password: true,
+      },
+    });
 
-  const userId = created.user?.id;
+    if (createError) return json({ error: createError.message }, 400);
+    authUser = created.user;
+    createdNewUser = true;
+  }
+
+  const userId = authUser?.id;
   if (!userId) return json({ error: 'Supabase did not return a user id' }, 500);
 
   const { data: existingRole } = await admin
@@ -91,9 +123,15 @@ serve(async (req) => {
     : await admin.from('user_roles').insert(rolePayload);
 
   if (roleResult.error) {
-    await admin.auth.admin.deleteUser(userId);
+    if (createdNewUser) await admin.auth.admin.deleteUser(userId);
     return json({ error: roleResult.error.message }, 400);
   }
 
-  return json({ userId, email: normalizedEmail, repId, repName: rep.name });
+  return json({
+    userId,
+    email: normalizedEmail,
+    repId,
+    repName: rep.name,
+    mode: createdNewUser ? 'created' : 'linked_existing',
+  });
 });
