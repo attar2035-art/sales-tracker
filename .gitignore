@@ -141,3 +141,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Raw customer data exports (real business/financial data, not for version control)
+customer_data_all_years.csv
+
