@@ -24,6 +24,33 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check required secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          REPORTS_FROM_EMAIL: ${{ secrets.REPORTS_FROM_EMAIL }}
+          REPORTS_FROM_NAME: ${{ secrets.REPORTS_FROM_NAME }}
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          node - <<'NODE'
+          const required = [
+            'SUPABASE_URL',
+            'SUPABASE_SERVICE_ROLE_KEY',
+            'RESEND_API_KEY',
+            'REPORTS_FROM_EMAIL',
+            'REPORTS_FROM_NAME',
+            'APP_URL',
+          ];
+          for (const name of required) {
+            console.log(`${name}: ${process.env[name] ? 'set' : 'missing'}`);
+          }
+          const missing = required.filter((name) => !process.env[name]);
+          if (missing.length) {
+            throw new Error(`Missing secrets: ${missing.join(', ')}`);
+          }
+          NODE
+
       - name: Send daily representative reports
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

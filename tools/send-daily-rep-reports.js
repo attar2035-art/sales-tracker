@@ -15,9 +15,9 @@ const APP_URL = process.env.APP_URL || 'https://sales-tracker-ijyb.onrender.com/
 const DRY_RUN = process.env.DRY_RUN === 'true';
 const REPORT_DATE = process.env.REPORT_DATE || getYesterdayInRiyadh();
 
-if (!SUPABASE_URL) throw new Error('Missing SUPABASE_URL');
-if (!SUPABASE_SERVICE_ROLE_KEY) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY');
-if (!EMAIL_API_KEY && !DRY_RUN) throw new Error('Missing RESEND_API_KEY or EMAIL_API_KEY');
+if (!SUPABASE_URL) throw new Error('Missing required secret: SUPABASE_URL');
+if (!SUPABASE_SERVICE_ROLE_KEY) throw new Error('Missing required secret: SUPABASE_SERVICE_ROLE_KEY');
+if (!EMAIL_API_KEY && !DRY_RUN) throw new Error('Missing required secret: RESEND_API_KEY');
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -328,6 +328,8 @@ async function main() {
 }
 
 main().catch(error => {
+  const message = error?.message || String(error);
+  console.error(`::error title=Daily report failed::${message.replace(/\r?\n/g, ' ')}`);
   console.error(error);
   process.exit(1);
 });
