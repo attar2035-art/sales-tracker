@@ -49,6 +49,140 @@ const getSixMonthWindow = (year, month) => {
 
 const calcPercent = (achieved, target) => target > 0 ? Math.round((achieved / target) * 100) : 0;
 
+const clampPercent = (value) => Math.max(0, Math.min(100, Math.round(value || 0)));
+
+const dailyRequired = (remaining, days) => days > 0 ? remaining / days : remaining;
+
+const getScoreLabel = (score) => {
+  if (score >= 90) return 'أداء قوي جدًا';
+  if (score >= 75) return 'أداء جيد';
+  if (score >= 55) return 'يحتاج متابعة';
+  return 'يحتاج تدخل سريع';
+};
+
+const buildSmartGoals = ({
+  totals,
+  target,
+  remainingDays,
+  monthProgress,
+  topCustomers,
+  riskCustomers,
+  productFocus,
+}) => {
+  const goals = [];
+  const pushGoal = (goal) => goals.push({ id: `${goal.type}-${goals.length}`, ...goal });
+
+  const salesTarget = parseFloat(target?.target_sales) || 0;
+  const collectionTarget = parseFloat(target?.target_collection) || 0;
+  const visitTarget = parseFloat(target?.target_total_visits) || 0;
+  const successVisitTarget = parseFloat(target?.target_successful_visits) || 0;
+  const newCustomerTarget = parseFloat(target?.target_new_customers) || 0;
+
+  const salesPercent = calcPercent(totals.sales, salesTarget);
+  const collectionPercent = calcPercent(totals.collection, collectionTarget);
+  const visitPercent = calcPercent(totals.total_visits, visitTarget);
+  const successVisitPercent = calcPercent(totals.successful_visits, successVisitTarget);
+  const newCustomerPercent = calcPercent(totals.new_customers, newCustomerTarget);
+
+  if (salesTarget > 0 && salesPercent < Math.max(100, monthProgress) && salesPercent < 100) {
+    const gap = Math.max(0, salesTarget - totals.sales);
+    pushGoal({
+      type: 'sales',
+      title: 'إغلاق فجوة المبيعات',
+      target: `${formatCurrency(dailyRequired(gap, remainingDays))} يوميًا`,
+      detail: `المحقق ${salesPercent}% من هدف المبيعات. المتبقي ${formatCurrency(gap)}.`,
+      priority: salesPercent < monthProgress - 10 ? 'عالي' : 'متوسط',
+      tone: '#3b82f6',
+    });
+  }
+
+  if (collectionTarget > 0 && collectionPercent < Math.max(100, monthProgress) && collectionPercent < 100) {
+    const gap = Math.max(0, collectionTarget - totals.collection);
+    pushGoal({
+      type: 'collection',
+      title: 'رفع التحصيل اليومي',
+      target: `${formatCurrency(dailyRequired(gap, remainingDays))} يوميًا`,
+      detail: `المحقق ${collectionPercent}% من هدف التحصيل. ابدأ بالعملاء الأعلى مديونية.`,
+      priority: collectionPercent < monthProgress - 10 ? 'عالي' : 'متوسط',
+      tone: '#10b981',
+    });
+  }
+
+  if (visitTarget > 0 && visitPercent < 100) {
+    const gap = Math.max(0, visitTarget - totals.total_visits);
+    pushGoal({
+      type: 'visits',
+      title: 'استكمال الزيارات',
+      target: `${formatNumber(Math.ceil(dailyRequired(gap, remainingDays)))} زيارة يوميًا`,
+      detail: `المتبقي ${formatNumber(gap)} زيارة من هدف الشهر.`,
+      priority: visitPercent < monthProgress - 10 ? 'عالي' : 'متوسط',
+      tone: '#06b6d4',
+    });
+  }
+
+  if (successVisitTarget > 0 && successVisitPercent < 100) {
+    const gap = Math.max(0, successVisitTarget - totals.successful_visits);
+    pushGoal({
+      type: 'successful-visits',
+      title: 'تحويل الزيارات إلى زيارات ناجحة',
+      target: `${formatNumber(Math.ceil(dailyRequired(gap, remainingDays)))} زيارة ناجحة يوميًا`,
+      detail: `نسبة نجاح الزيارات الحالية ${totals.total_visits > 0 ? Math.round((totals.successful_visits / totals.total_visits) * 100) : 0}%.`,
+      priority: 'متوسط',
+      tone: '#14b8a6',
+    });
+  }
+
+  if (newCustomerTarget > 0 && newCustomerPercent < 100) {
+    const gap = Math.max(0, newCustomerTarget - totals.new_customers);
+    pushGoal({
+      type: 'new-customers',
+      title: 'إضافة عملاء جدد',
+      target: `${formatNumber(Math.ceil(dailyRequired(gap, remainingDays)))} عميل يوميًا`,
+      detail: `المتبقي ${formatNumber(gap)} عميل جديد للوصول للهدف.`,
+      priority: 'متوسط',
+      tone: '#8b5cf6',
+    });
+  }
+
+  if (topCustomers.length) {
+    pushGoal({
+      type: 'top-customers',
+      title: 'زيارة كبار العملاء',
+      target: topCustomers.slice(0, 3).map(customer => customer.customer_name).join('، '),
+      detail: 'ابدأ بالعملاء الأعلى قيمة في المنطقة قبل توسيع الزيارات.',
+      priority: 'عالي',
+      tone: '#f59e0b',
+    });
+  }
+
+  if (riskCustomers.length) {
+    const risk = riskCustomers[0];
+    pushGoal({
+      type: 'risk',
+      title: 'متابعة أكبر خطر تحصيل',
+      target: risk.customer_name || 'عميل متأخر',
+      detail: `قيمة الخطر ${formatCurrency(risk.riskAmount || 0)}. المطلوب إجراء متابعة اليوم.`,
+      priority: 'عالي',
+      tone: '#ef4444',
+    });
+  }
+
+  if (productFocus.length) {
+    pushGoal({
+      type: 'product',
+      title: 'دفع المنتجات ذات الأولوية',
+      target: productFocus.slice(0, 3).map(product => product.product_name).join('، '),
+      detail: 'ركز على الأصناف الأعلى دورانًا أو المطلوبة في خطة المنطقة.',
+      priority: 'متوسط',
+      tone: '#22c55e',
+    });
+  }
+
+  return goals
+    .sort((a, b) => (a.priority === 'عالي' ? -1 : 1) - (b.priority === 'عالي' ? -1 : 1))
+    .slice(0, 5);
+};
+
 const buildHistoryRows = (months, rows, targets, repId) => {
   return months.map(period => {
     const monthRows = (rows || []).filter(row => row.year === period.year && row.month === period.month);
@@ -431,6 +565,37 @@ export default function RepDashboard({ repId }) {
     return acc;
   }, { sales: 0, collection: 0, visits: 0, newCustomers: 0 });
   const bestHistoryMonth = [...history].sort((a, b) => b.salesPercent - a.salesPercent)[0];
+  const salesPercent = calcPercent(totals.sales, salesTarget);
+  const collectionPercent = calcPercent(totals.collection, collectionTarget);
+  const visitPercent = calcPercent(totals.total_visits, target?.target_total_visits || 0);
+  const successVisitPercent = calcPercent(totals.successful_visits, target?.target_successful_visits || 0);
+  const newCustomerPercent = calcPercent(totals.new_customers, target?.target_new_customers || 0);
+  const scoreParts = [
+    salesTarget > 0 ? clampPercent(salesPercent) : null,
+    collectionTarget > 0 ? clampPercent(collectionPercent) : null,
+    target?.target_total_visits > 0 ? clampPercent(visitPercent) : null,
+    target?.target_successful_visits > 0 ? clampPercent(successVisitPercent) : null,
+    target?.target_new_customers > 0 ? clampPercent(newCustomerPercent) : null,
+  ].filter(value => value !== null);
+  const performanceScore = scoreParts.length
+    ? Math.round(scoreParts.reduce((sum, value) => sum + value, 0) / scoreParts.length)
+    : 0;
+  const smartGoals = buildSmartGoals({
+    totals,
+    target,
+    remainingDays,
+    monthProgress,
+    topCustomers,
+    riskCustomers,
+    productFocus,
+  });
+  const assistantSummary = scoreParts.length === 0
+    ? 'لم يتم تحديد أهداف لهذا الشهر بعد. ستظهر التوصيات الذكية بمجرد إضافة الأهداف.'
+    : performanceScore >= 75
+    ? 'أداؤك جيد. حافظ على الإيقاع وركز على التحصيل والزيارات ذات القيمة الأعلى.'
+    : performanceScore >= 55
+      ? 'أنت قريب من المسار المطلوب. الأولوية الآن للفجوات اليومية الموضحة بالأسفل.'
+      : 'اللوحة تشير إلى فجوة واضحة. ابدأ اليوم بأعلى هدف أولوية ثم تابع كبار العملاء.';
 
   return (
     <div className="rep-dashboard">
@@ -490,6 +655,48 @@ export default function RepDashboard({ repId }) {
           <strong>{formatNumber(riskCustomers.length)}</strong>
         </div>
       </div>
+
+      <section className="rep-ai-panel">
+        <div className="rep-score-card">
+          <span>درجة الأداء الذكية</span>
+          <strong>{performanceScore}%</strong>
+          <b>{scoreParts.length ? getScoreLabel(performanceScore) : 'بدون أهداف محددة'}</b>
+          <div className="progress-bar" style={{ height: 9, marginTop: '0.85rem' }}>
+            <div className="progress-fill" style={{ width: `${performanceScore}%`, background: performanceScore >= 75 ? '#10b981' : performanceScore >= 55 ? '#f59e0b' : '#ef4444' }} />
+          </div>
+        </div>
+        <div className="rep-assistant-card">
+          <div className="rep-assistant-head">
+            <div>
+              <span>المساعد الذكي</span>
+              <strong>أهدافك العملية لهذا الشهر</strong>
+            </div>
+            <span className="badge badge-info">تحديث تلقائي</span>
+          </div>
+          <p>{assistantSummary}</p>
+          <div className="rep-ai-goals">
+            {smartGoals.length === 0 ? (
+              <div className="rep-ai-goal" style={{ borderRightColor: '#10b981' }}>
+                <span className="badge badge-success">مكتمل</span>
+                <div>
+                  <strong>لا توجد فجوات واضحة الآن</strong>
+                  <small>تابع الإدخال اليومي وحافظ على نفس المعدل.</small>
+                </div>
+                <b>استمرار</b>
+              </div>
+            ) : smartGoals.map(goal => (
+              <div className="rep-ai-goal" key={goal.id} style={{ borderRightColor: goal.tone }}>
+                <span className={`badge ${goal.priority === 'عالي' ? 'badge-danger' : 'badge-warning'}`}>{goal.priority}</span>
+                <div>
+                  <strong>{goal.title}</strong>
+                  <small>{goal.detail}</small>
+                </div>
+                <b>{goal.target}</b>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {loading ? (
         <div className="loading"><div className="spinner" />جاري التحميل...</div>
