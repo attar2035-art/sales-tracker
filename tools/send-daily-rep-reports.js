@@ -18,6 +18,9 @@ const REPORT_DATE = process.env.REPORT_DATE || getYesterdayInRiyadh();
 if (!SUPABASE_URL) throw new Error('Missing required secret: SUPABASE_URL');
 if (!SUPABASE_SERVICE_ROLE_KEY) throw new Error('Missing required secret: SUPABASE_SERVICE_ROLE_KEY');
 if (!EMAIL_API_KEY && !DRY_RUN) throw new Error('Missing required secret: RESEND_API_KEY');
+if (!DRY_RUN && (!/^[\x20-\x7E]+$/.test(EMAIL_API_KEY) || !EMAIL_API_KEY.startsWith('re_'))) {
+  throw new Error('RESEND_API_KEY is invalid. Paste the real Resend API key value that starts with re_, not placeholder text.');
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
