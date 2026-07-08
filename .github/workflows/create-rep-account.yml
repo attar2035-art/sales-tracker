@@ -3,9 +3,12 @@ name: Create representative login account
 on:
   workflow_dispatch:
     inputs:
+      rep_name:
+        description: 'Representative name exactly as shown in the app'
+        required: false
       rep_id:
-        description: 'Representative id from the representatives table'
-        required: true
+        description: 'Optional representative id if names are duplicated'
+        required: false
       email:
         description: 'Representative email'
         required: true
@@ -33,6 +36,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           REP_ID: ${{ github.event.inputs.rep_id }}
+          REP_NAME: ${{ github.event.inputs.rep_name }}
           REP_EMAIL: ${{ github.event.inputs.email }}
           REP_PASSWORD: ${{ github.event.inputs.temporary_password }}
         run: node tools/create-rep-account.js
