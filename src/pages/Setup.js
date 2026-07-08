@@ -179,7 +179,7 @@ export default function Setup() {
     if (!accountPassword || accountPassword.length < 6) { showMsg('كلمة السر المؤقتة يجب أن تكون 6 أحرف على الأقل', 'error'); return; }
 
     setLoading(true);
-    const { error } = await createRepLoginAccount({
+    const { data, error } = await createRepLoginAccount({
       email: accountEmail,
       password: accountPassword,
       repId: accountRep,
@@ -194,7 +194,10 @@ export default function Setup() {
         entityId: accountRep,
         details: { name: rep?.name || '', email: accountEmail.trim().toLowerCase() },
       });
-      showMsg('تم إنشاء حساب دخول المندوب. أعطه كلمة السر المؤقتة وسيغيرها عند أول دخول.');
+      const successText = data?.mode === 'linked_existing'
+        ? 'الإيميل كان موجودًا بالفعل، وتم ربطه بالمندوب وتحديث كلمة السر المؤقتة.'
+        : 'تم إنشاء حساب دخول المندوب. أعطه كلمة السر المؤقتة وسيغيرها عند أول دخول.';
+      showMsg(successText);
       setAccountRep('');
       setAccountEmail('');
       setAccountPassword('');
