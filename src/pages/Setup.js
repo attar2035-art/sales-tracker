@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { createRepLoginAccount } from '../lib/auth';
 import { buildEffectiveTargetsMap, TARGET_FIELDS } from '../lib/targets';
+import { logAuditEvent } from '../lib/audit';
 
 const ACHIEVEMENT_FIELD_BY_TARGET = {
   target_sales: 'daily_sales',
@@ -75,7 +76,10 @@ export default function Setup() {
     setLoading(true);
     const { error } = await supabase.from('regions').insert({ name: regionName.trim() });
     if (error) showMsg('خطأ: ' + error.message, 'error');
-    else { showMsg('تم إضافة المنطقة'); setRegionName(''); fetchAll(); }
+    else {
+      await logAuditEvent({ eventType: 'create', pageKey: 'setup', entityType: 'regions', details: { name: regionName.trim() } });
+      showMsg('تم إضافة المنطقة'); setRegionName(''); fetchAll();
+    }
     setLoading(false);
   };
 
@@ -84,7 +88,10 @@ export default function Setup() {
     setLoading(true);
     const { error } = await supabase.from('supervisors').insert({ name: supName.trim(), region_id: supRegion || null });
     if (error) showMsg('خطأ: ' + error.message, 'error');
-    else { showMsg('تم إضافة المشرف'); setSupName(''); setSupRegion(''); fetchAll(); }
+    else {
+      await logAuditEvent({ eventType: 'create', pageKey: 'setup', entityType: 'supervisors', details: { name: supName.trim(), region_id: supRegion || null } });
+      showMsg('تم إضافة المشرف'); setSupName(''); setSupRegion(''); fetchAll();
+    }
     setLoading(false);
   };
 
@@ -97,18 +104,29 @@ export default function Setup() {
       region_id: repRegion || null,
     });
     if (error) showMsg('خطأ: ' + error.message, 'error');
-    else { showMsg('تم إضافة المندوب'); setRepName(''); setRepSup(''); setRepRegion(''); fetchAll(); }
+    else {
+      await logAuditEvent({ eventType: 'create', pageKey: 'setup', entityType: 'representatives', details: { name: repName.trim(), supervisor_id: repSup || null, region_id: repRegion || null } });
+      showMsg('تم إضافة المندوب'); setRepName(''); setRepSup(''); setRepRegion(''); fetchAll();
+    }
     setLoading(false);
   };
 
   const deleteItem = async (table, id) => {
     if (!window.confirm('هل أنت متأكد من الحذف؟')) return;
     await supabase.from(table).delete().eq('id', id);
+    await logAuditEvent({ eventType: 'delete', pageKey: 'setup', entityType: table, entityId: id, details: { table } });
     fetchAll();
   };
 
   const toggleRepActive = async (rep) => {
     await supabase.from('representatives').update({ is_active: !rep.is_active }).eq('id', rep.id);
+    await logAuditEvent({
+      eventType: 'status_change',
+      pageKey: 'setup',
+      entityType: 'representatives',
+      entityId: rep.id,
+      details: { name: rep.name, from: rep.is_active ? 'نشط' : 'غير نشط', to: !rep.is_active ? 'نشط' : 'غير نشط' },
+    });
     fetchAll();
   };
 
@@ -135,7 +153,16 @@ export default function Setup() {
       region_id: editRepRegion || null,
     }).eq('id', editingRep.id);
     if (error) showMsg('خطأ: ' + error.message, 'error');
-    else { showMsg('تم تعديل بيانات المندوب'); cancelEditRep(); fetchAll(); }
+    else {
+      await logAuditEvent({
+        eventType: 'update',
+        pageKey: 'setup',
+        entityType: 'representatives',
+        entityId: editingRep.id,
+        details: { from: editingRep.name, to: editRepName.trim(), supervisor_id: editRepSup || null, region_id: editRepRegion || null },
+      });
+      showMsg('تم تعديل بيانات المندوب'); cancelEditRep(); fetchAll();
+    }
     setLoading(false);
   };
 
@@ -159,6 +186,14 @@ export default function Setup() {
     });
     if (error) showMsg('خطأ في إنشاء الحساب: ' + error.message, 'error');
     else {
+      const rep = reps.find(item => item.id === accountRep);
+      await logAuditEvent({
+        eventType: 'account_create',
+        pageKey: 'setup',
+        entityType: 'representatives',
+        entityId: accountRep,
+        details: { name: rep?.name || '', email: accountEmail.trim().toLowerCase() },
+      });
       showMsg('تم إنشاء حساب دخول المندوب. أعطه كلمة السر المؤقتة وسيغيرها عند أول دخول.');
       setAccountRep('');
       setAccountEmail('');
@@ -235,7 +270,16 @@ export default function Setup() {
       .update({ is_active: false })
       .eq('id', editingRep.id);
     if (updateError) showMsg('تم إنشاء المندوب الجديد لكن حدث خطأ في تعطيل القديم: ' + updateError.message, 'error');
-    else { showMsg(currentTarget ? 'تم التسليم وتقسيم هدف الشهر على القديم والجديد' : 'تم التسليم بدون تقسيم أهداف لعدم وجود هدف سابق'); cancelEditRep(); fetchAll(); }
+    else {
+      await logAuditEvent({
+        eventType: 'handover',
+        pageKey: 'setup',
+        entityType: 'representatives',
+        entityId: editingRep.id,
+        details: { from: editingRep.name, to: editRepName.trim(), new_rep_id: newRep.id },
+      });
+      showMsg(currentTarget ? 'تم التسليم وتقسيم هدف الشهر على القديم والجديد' : 'تم التسليم بدون تقسيم أهداف لعدم وجود هدف سابق'); cancelEditRep(); fetchAll();
+    }
     setLoading(false);
   };
 

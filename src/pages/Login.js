@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { signIn } from '../lib/auth';
+import { logAuditEvent } from '../lib/audit';
 
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState('');
@@ -13,7 +14,10 @@ export default function Login({ onLogin }) {
     setError('');
     const { error } = await signIn(email, password);
     if (error) setError('إيميل أو كلمة سر غلط');
-    else onLogin();
+    else {
+      await logAuditEvent({ eventType: 'login', pageKey: 'login' });
+      onLogin();
+    }
     setLoading(false);
   };
 
