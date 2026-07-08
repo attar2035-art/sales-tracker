@@ -1,0 +1,38 @@
+name: Create representative login account
+
+on:
+  workflow_dispatch:
+    inputs:
+      rep_id:
+        description: 'Representative id from the representatives table'
+        required: true
+      email:
+        description: 'Representative email'
+        required: true
+      temporary_password:
+        description: 'Temporary password, minimum 6 characters'
+        required: true
+
+jobs:
+  create-account:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create representative account
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          REP_ID: ${{ github.event.inputs.rep_id }}
+          REP_EMAIL: ${{ github.event.inputs.email }}
+          REP_PASSWORD: ${{ github.event.inputs.temporary_password }}
+        run: node tools/create-rep-account.js

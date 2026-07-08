@@ -1,4 +1,4 @@
-import { createDetachedSupabaseClient, supabase } from './supabase';
+import { supabase } from './supabase';
 
 export const signIn = async (email, password) => {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -35,8 +35,8 @@ export const updatePassword = async (newPassword) => {
 
 const getRepAccountErrorMessage = (error) => {
   const message = (error?.message || '').toLowerCase();
-  if (message.includes('email rate limit')) {
-    return 'تم الوصول لحد إرسال إيميلات Supabase مؤقتًا. انتظر قليلًا أو أوقف تأكيد الإيميل من إعدادات Supabase، أو استخدم إنشاء الحسابات من API آمن بدون إرسال رسالة تأكيد.';
+  if (message.includes('function not found') || message.includes('failed to fetch') || message.includes('404')) {
+    return 'مسار إنشاء الحساب الآمن غير منشور بعد في Supabase Edge Functions. استخدم تشغيل GitHub اليدوي مؤقتًا أو انشر وظيفة create-rep-account.';
   }
   if (message.includes('user already registered') || message.includes('already registered')) {
     return 'هذا الإيميل مسجل بالفعل. استخدم إيميل آخر أو اربط الحساب الموجود بالمندوب من Supabase.';
@@ -45,40 +45,32 @@ const getRepAccountErrorMessage = (error) => {
 };
 
 export const createRepLoginAccount = async ({ email, password, repId }) => {
-  const authClient = createDetachedSupabaseClient();
   const normalizedEmail = email.trim().toLowerCase();
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData?.session?.access_token;
 
-  const { data, error } = await authClient.auth.signUp({
-    email: normalizedEmail,
-    password,
-    options: {
-      data: {
-        role: 'rep',
-        rep_id: repId,
-        must_change_password: true,
-      },
-    },
-  });
-
-  if (error) return { data: null, error: { ...error, message: getRepAccountErrorMessage(error) } };
-
-  const userId = data?.user?.id;
-  const identities = data?.user?.identities || [];
-  if (!userId || identities.length === 0) {
-    return {
-      data: null,
-      error: { message: 'هذا الإيميل مسجل بالفعل أو لم يرجع رقم مستخدم صالح من Supabase.' },
-    };
+  if (!token) {
+    return { data: null, error: { message: 'يجب تسجيل الدخول كمدير قبل إنشاء حساب مندوب.' } };
   }
 
-  const { error: roleError } = await supabase.from('user_roles').insert({
-    user_id: userId,
-    role: 'rep',
-    rep_id: repId,
-  });
-
-  await authClient.auth.signOut();
-
-  if (roleError) return { data: null, error: roleError };
-  return { data: { userId, email: normalizedEmail }, error: null };
+  try {
+    const response = await fetch(`${process.env.REACT_APP_SUPABASE_URL}/functions/v1/create-rep-account`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email: normalizedEmail, password, repId }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return {
+        data: null,
+        error: { message: getRepAccountErrorMessage({ message: payload.error || response.statusText || String(response.status) }) },
+      };
+    }
+    return { data: payload, error: null };
+  } catch (error) {
+    return { data: null, error: { message: getRepAccountErrorMessage(error) } };
+  }
 };
