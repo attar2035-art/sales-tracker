@@ -9,8 +9,8 @@ const SUPABASE_URL = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const EMAIL_API_KEY = process.env.RESEND_API_KEY || process.env.EMAIL_API_KEY;
 const EMAIL_API_URL = process.env.EMAIL_API_URL || 'https://api.resend.com/emails';
-const FROM_EMAIL = process.env.REPORTS_FROM_EMAIL || 'may@hawafwl.com';
-const FROM_NAME = process.env.REPORTS_FROM_NAME || 'تقارير الأداء اليومي حوافل';
+const FROM_EMAIL = process.env.REPORTS_FROM_EMAIL || process.env.FROM_EMAIL || 'may@hawafel.com';
+const FROM_NAME = process.env.REPORTS_FROM_NAME || process.env.FROM_NAME || 'نظام متابعة المبيعات';
 const APP_URL = process.env.APP_URL || 'https://sales-tracker-ijyb.onrender.com/';
 const DRY_RUN = process.env.DRY_RUN === 'true';
 const REPORT_DATE = process.env.REPORT_DATE || getYesterdayInRiyadh();
