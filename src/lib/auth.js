@@ -35,7 +35,13 @@ export const updatePassword = async (newPassword) => {
 
 const getRepAccountErrorMessage = (error) => {
   const message = (error?.message || '').toLowerCase();
-  if (message.includes('function not found') || message.includes('failed to fetch') || message.includes('404')) {
+  if (
+    message.includes('function not found')
+    || message.includes('failed to fetch')
+    || message.includes('networkerror')
+    || message.includes('load failed')
+    || message.includes('404')
+  ) {
     return 'مسار إنشاء الحساب الآمن غير منشور بعد في Supabase Edge Functions. استخدم تشغيل GitHub اليدوي مؤقتًا أو انشر وظيفة create-rep-account.';
   }
   if (message.includes('user already registered') || message.includes('already registered')) {
@@ -53,8 +59,13 @@ export const createRepLoginAccount = async ({ email, password, repId }) => {
     return { data: null, error: { message: 'يجب تسجيل الدخول كمدير قبل إنشاء حساب مندوب.' } };
   }
 
+  const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+  if (!supabaseUrl) {
+    return { data: null, error: { message: 'رابط Supabase غير مضبوط في إعدادات التشغيل.' } };
+  }
+
   try {
-    const response = await fetch(`${process.env.REACT_APP_SUPABASE_URL}/functions/v1/create-rep-account`, {
+    const response = await fetch(`${supabaseUrl.replace(/\/$/, '')}/functions/v1/create-rep-account`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
