@@ -1,0 +1,4 @@
+project_id = "dujwpemfdbxkqbjqmyot"
+
+[functions.create-rep-account]
+verify_jwt = false
