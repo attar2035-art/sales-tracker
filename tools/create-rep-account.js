@@ -3,12 +3,13 @@ const { createClient } = require('@supabase/supabase-js');
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const REP_ID = process.env.REP_ID;
+const REP_NAME = (process.env.REP_NAME || '').trim();
 const REP_EMAIL = (process.env.REP_EMAIL || '').trim().toLowerCase();
 const REP_PASSWORD = process.env.REP_PASSWORD;
 
 if (!SUPABASE_URL) throw new Error('Missing SUPABASE_URL');
 if (!SUPABASE_SERVICE_ROLE_KEY) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY');
-if (!REP_ID) throw new Error('Missing REP_ID');
+if (!REP_ID && !REP_NAME) throw new Error('Missing REP_ID or REP_NAME');
 if (!REP_EMAIL || !REP_EMAIL.includes('@')) throw new Error('Missing or invalid REP_EMAIL');
 if (!REP_PASSWORD || REP_PASSWORD.length < 6) throw new Error('REP_PASSWORD must be at least 6 characters');
 
@@ -17,13 +18,16 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 });
 
 async function main() {
-  const { data: rep, error: repError } = await supabase
-    .from('representatives')
-    .select('id,name')
-    .eq('id', REP_ID)
-    .single();
+  let repQuery = supabase.from('representatives').select('id,name');
+  repQuery = REP_ID ? repQuery.eq('id', REP_ID) : repQuery.ilike('name', REP_NAME);
+  const { data: repMatches, error: repError } = await repQuery.limit(10);
 
-  if (repError || !rep) throw new Error(`Representative not found: ${REP_ID}`);
+  if (repError) throw repError;
+  if (!repMatches || repMatches.length === 0) throw new Error(`Representative not found: ${REP_ID || REP_NAME}`);
+  if (repMatches.length > 1) {
+    throw new Error(`More than one representative matched "${REP_NAME}". Use REP_ID instead.`);
+  }
+  const rep = repMatches[0];
 
   const { data: created, error: createError } = await supabase.auth.admin.createUser({
     email: REP_EMAIL,
@@ -31,7 +35,7 @@ async function main() {
     email_confirm: true,
     user_metadata: {
       role: 'rep',
-      rep_id: REP_ID,
+      rep_id: rep.id,
       must_change_password: true,
     },
   });
@@ -49,7 +53,7 @@ async function main() {
   const rolePayload = {
     user_id: userId,
     role: 'rep',
-    rep_id: REP_ID,
+    rep_id: rep.id,
     supervisor_id: null,
   };
 
