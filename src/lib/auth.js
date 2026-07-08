@@ -33,6 +33,17 @@ export const updatePassword = async (newPassword) => {
   return { error };
 };
 
+const getRepAccountErrorMessage = (error) => {
+  const message = (error?.message || '').toLowerCase();
+  if (message.includes('email rate limit')) {
+    return 'تم الوصول لحد إرسال إيميلات Supabase مؤقتًا. انتظر قليلًا أو أوقف تأكيد الإيميل من إعدادات Supabase، أو استخدم إنشاء الحسابات من API آمن بدون إرسال رسالة تأكيد.';
+  }
+  if (message.includes('user already registered') || message.includes('already registered')) {
+    return 'هذا الإيميل مسجل بالفعل. استخدم إيميل آخر أو اربط الحساب الموجود بالمندوب من Supabase.';
+  }
+  return error?.message || 'تعذر إنشاء الحساب.';
+};
+
 export const createRepLoginAccount = async ({ email, password, repId }) => {
   const authClient = createDetachedSupabaseClient();
   const normalizedEmail = email.trim().toLowerCase();
@@ -49,7 +60,7 @@ export const createRepLoginAccount = async ({ email, password, repId }) => {
     },
   });
 
-  if (error) return { data: null, error };
+  if (error) return { data: null, error: { ...error, message: getRepAccountErrorMessage(error) } };
 
   const userId = data?.user?.id;
   const identities = data?.user?.identities || [];
