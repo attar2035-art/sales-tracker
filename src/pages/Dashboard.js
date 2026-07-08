@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import {
+  Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from 'recharts';
 import { supabase } from '../lib/supabase';
 import {
   MONTHS_AR, formatCurrency, formatNumber,
@@ -8,6 +11,32 @@ import {
 import { buildEffectiveTargetsMap } from '../lib/targets';
 
 const NO_SUPERVISOR = '__none__';
+
+const toDateString = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const getSixMonthWindow = (year, month) => {
+  const start = new Date(year, month - 1, 1);
+  start.setMonth(start.getMonth() - 5);
+  const end = new Date(year, month, 0);
+  const months = [];
+  for (let i = 0; i < 6; i += 1) {
+    const date = new Date(start.getFullYear(), start.getMonth() + i, 1);
+    months.push({
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
+      label: MONTHS_AR[date.getMonth()],
+    });
+  }
+  return { months, startDate: toDateString(start), endDate: toDateString(end) };
+};
+
+const metricPercent = (achieved, target) => target > 0 ? Math.round((achieved / target) * 100) : 0;
 
 function calcPoints(achieved, target) {
   const sales = target.target_sales > 0 ? Math.min(1, achieved.sales / target.target_sales) * 40 : 0;
@@ -54,6 +83,23 @@ function KPICard({ icon, title, achieved, target, unit = '', color = '#3b82f6' }
   );
 }
 
+function CircleMetric({ label, value, target, color = '#3b82f6', currency = false }) {
+  const pct = target > 0 ? Math.min(100, Math.round((value / target) * 100)) : 0;
+  const formatter = currency ? formatCurrency : formatNumber;
+  return (
+    <div className="circle-metric-card">
+      <div className="circle-meter" style={{ '--pct': `${pct}%`, '--meter-color': color }}>
+        <span>{target > 0 ? `${pct}%` : '-'}</span>
+      </div>
+      <div>
+        <strong>{label}</strong>
+        <span>{formatter(value)}</span>
+        <small>{target > 0 ? `الهدف ${formatter(target)}` : 'بدون هدف'}</small>
+      </div>
+    </div>
+  );
+}
+
 function getMedal(rank) {
   if (rank === 1) return '🥇';
   if (rank === 2) return '🥈';
@@ -78,6 +124,7 @@ export default function Dashboard({ supervisorId }) {
   const [filterRegion, setFilterRegion] = useState('');
   const [supervisors, setSupervisors] = useState([]);
   const [regions, setRegions] = useState([]);
+  const [regionHistory, setRegionHistory] = useState({ months: [], rows: [], chartRows: [] });
   const [activeMetric, setActiveMetric] = useState('sales');
   const [activeView, setActiveView] = useState('points');
 
@@ -107,6 +154,14 @@ export default function Dashboard({ supervisorId }) {
       .select('*').limit(10000);
     const { data: entries } = await supabase.from('daily_entries')
       .select('*').eq('year', year).eq('month', month).limit(10000);
+    const repIds = reps.map(rep => rep.id);
+    const historyWindow = getSixMonthWindow(year, month);
+    const { data: historyEntries } = repIds.length ? await supabase.from('daily_entries')
+      .select('*')
+      .in('rep_id', repIds)
+      .gte('entry_date', historyWindow.startDate)
+      .lte('entry_date', historyWindow.endDate)
+      .limit(50000) : { data: [] };
     const targetsMap = buildEffectiveTargetsMap(targets || [], year, month);
     const entriesMap = {};
     (entries || []).forEach(e => {
@@ -157,6 +212,7 @@ export default function Dashboard({ supervisorId }) {
       };
     }).filter(rep => rep.is_active || rep.hasMonthlyData);
     setData(combined);
+    setRegionHistory(buildRegionHistory(historyWindow.months, reps, historyEntries || []));
     if (supervisorId || filterSup) {
       const supRegions = [...new Map(combined
         .filter(r => r.regions)
@@ -168,6 +224,56 @@ export default function Dashboard({ supervisorId }) {
       if (r) setRegions(r);
     }
     setLoading(false);
+  };
+
+  const buildRegionHistory = (months, reps, entries) => {
+    const repMap = {};
+    (reps || []).forEach(rep => {
+      repMap[rep.id] = rep;
+    });
+    const regionMap = {};
+    (reps || []).forEach(rep => {
+      const regionName = rep.regions?.name || 'بدون منطقة';
+      if (!regionMap[regionName]) {
+        regionMap[regionName] = {
+          region: regionName,
+          sales: 0,
+          collection: 0,
+          visits: 0,
+          successfulVisits: 0,
+          reps: new Set(),
+          months: months.map(period => ({ ...period, sales: 0, collection: 0 })),
+        };
+      }
+      regionMap[regionName].reps.add(rep.id);
+    });
+    (entries || []).forEach(entry => {
+      const rep = repMap[entry.rep_id];
+      if (!rep) return;
+      const regionName = rep.regions?.name || 'بدون منطقة';
+      if (!regionMap[regionName]) return;
+      const row = regionMap[regionName];
+      const monthRow = row.months.find(period => period.year === entry.year && period.month === entry.month);
+      const sales = parseFloat(entry.daily_sales) || 0;
+      const collection = parseFloat(entry.daily_collection) || 0;
+      row.sales += sales;
+      row.collection += collection;
+      row.visits += parseFloat(entry.total_visits) || 0;
+      row.successfulVisits += parseFloat(entry.successful_visits) || 0;
+      if (monthRow) {
+        monthRow.sales += sales;
+        monthRow.collection += collection;
+      }
+    });
+    const rows = Object.values(regionMap)
+      .map(row => ({ ...row, repsCount: row.reps.size }))
+      .sort((a, b) => b.sales - a.sales);
+    const chartRows = rows.slice(0, 12).map(row => ({
+      region: row.region,
+      sales: Math.round(row.sales),
+      collection: Math.round(row.collection),
+    }));
+    return { months, rows, chartRows };
   };
 
   const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
@@ -300,6 +406,60 @@ export default function Dashboard({ supervisorId }) {
         <KPICard icon="💸" title="المصروفات" achieved={kpi.expenses} target={0} color="#64748b" />
         <KPICard icon="⚠️" title="المحصل من المتأخرات" achieved={kpi.overdueCollected} target={kpi.overdueTotal} color="#ef4444" />
       </div>
+
+      <section className="dashboard-visual-panel">
+        <div className="card-title">تقرير الشهر الحالي — مؤشرات دائرية</div>
+        <div className="circle-metric-grid">
+          <CircleMetric label="المبيعات" value={kpi.sales} target={kpi.targetSales} color="#3b82f6" currency />
+          <CircleMetric label="التحصيل" value={kpi.collection} target={kpi.targetCollection} color="#10b981" currency />
+          <CircleMetric label="الزيارات" value={kpi.totalVisits} target={kpi.targetVisits} color="#06b6d4" />
+          <CircleMetric label="الزيارات الناجحة" value={kpi.successfulVisits} target={kpi.targetSuccessfulVisits} color="#14b8a6" />
+          <CircleMetric label="العملاء الجدد" value={kpi.newCustomers} target={kpi.targetNewCustomers} color="#8b5cf6" />
+          <CircleMetric label="الأصناف الجديدة" value={kpi.newProductsSkus} target={kpi.targetNewProductsSkus} color="#f59e0b" />
+        </div>
+      </section>
+
+      <section className="dashboard-visual-panel">
+        <div className="section-head">
+          <div>
+            <div className="card-title">المناطق — آخر 6 شهور</div>
+            <div className="muted-text">بيع وتحصيل لكل المناطق حسب المناديب المرتبطين بها</div>
+          </div>
+          <span className="badge badge-info">{regionHistory.rows.length} منطقة</span>
+        </div>
+        <div className="region-history-layout">
+          <div className="chart-box">
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={regionHistory.chartRows} margin={{ top: 12, right: 12, left: 0, bottom: 72 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#263244" />
+                <XAxis dataKey="region" stroke="#94a3b8" angle={-35} textAnchor="end" interval={0} height={86} />
+                <YAxis stroke="#94a3b8" tickFormatter={value => `${Math.round(value / 1000)}k`} />
+                <Tooltip formatter={(value) => formatCurrency(value)} contentStyle={{ background: '#111827', border: '1px solid #334155', color: '#f8fafc' }} />
+                <Legend />
+                <Bar dataKey="sales" name="المبيعات" fill="#3b82f6" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="collection" name="التحصيل" fill="#10b981" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="region-history-list">
+            {regionHistory.rows.slice(0, 8).map(region => {
+              const collectionRate = region.sales > 0 ? Math.round((region.collection / region.sales) * 100) : 0;
+              return (
+                <div className="region-history-card" key={region.region}>
+                  <div>
+                    <strong>{region.region}</strong>
+                    <span>{region.repsCount} مندوب · {formatNumber(region.visits)} زيارة</span>
+                  </div>
+                  <div>
+                    <b>{formatCurrency(region.sales)}</b>
+                    <small>تحصيل {formatCurrency(region.collection)} · {collectionRate}%</small>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
 
       <div className="tabs">
         <button className={`tab ${activeView === 'points' ? 'active' : ''}`} onClick={() => setActiveView('points')}>🏆 ترتيب النقاط</button>

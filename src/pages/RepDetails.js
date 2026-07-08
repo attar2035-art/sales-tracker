@@ -3,6 +3,25 @@ import { supabase } from '../lib/supabase';
 import { MONTHS_AR, formatCurrency, formatNumber, getRemainingWorkingDays, getTotalWorkingDaysInMonth } from '../lib/helpers';
 import { buildEffectiveTargetsMap } from '../lib/targets';
 
+const calcPercent = (achieved, target) => target > 0 ? Math.min(100, Math.round((achieved / target) * 100)) : 0;
+
+function CircleMetric({ label, value, target, color = '#3b82f6', currency = false }) {
+  const pct = calcPercent(value, target);
+  const formatter = currency ? formatCurrency : formatNumber;
+  return (
+    <div className="circle-metric-card">
+      <div className="circle-meter" style={{ '--pct': `${pct}%`, '--meter-color': color }}>
+        <span>{target > 0 ? `${pct}%` : '-'}</span>
+      </div>
+      <div>
+        <strong>{label}</strong>
+        <span>{formatter(value)}</span>
+        <small>{target > 0 ? `الهدف ${formatter(target)}` : 'بدون هدف'}</small>
+      </div>
+    </div>
+  );
+}
+
 export default function RepDetails({ supervisorId }) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -46,7 +65,7 @@ export default function RepDetails({ supervisorId }) {
   const totals = {
     sales: sum('daily_sales'), collection: sum('daily_collection'),
     new_customers: sum('new_customers'), new_customers_value: sum('new_customers_value'),
-    total_visits: sum('total_visits'), successful_visits: sum('successful_visits'),
+    total_visits: sum('total_visits'), successful_visits: sum('successful_visits'), shelf_photos: sum('shelf_photos'),
     new_products_skus: sum('new_products_skus'), new_products_qty: sum('new_products_qty'),
     working_hours: sum('working_hours'), km: sum('km'),
     expenses: sum('daily_expenses'), overdue_collected: sum('overdue_collected'),
@@ -83,6 +102,31 @@ export default function RepDetails({ supervisorId }) {
             <div><span className="form-label">أيام العمل المتبقية: </span><strong style={{ color: '#f59e0b' }}>{remainingDays} من {totalDays}</strong></div>
           </div>
         </div>
+      )}
+      {selectedRep && target && (
+        <section className="dashboard-visual-panel">
+          <div className="section-head">
+            <div>
+              <div className="card-title">تقرير لحظي للمندوب — {MONTHS_AR[month - 1]} {year}</div>
+              <div className="muted-text">بيع، تحصيل، زيارات، عملاء، منتجات، ومؤشرات تشغيلية للشهر الحالي</div>
+            </div>
+            <span className="badge badge-info">{entries.length} يوم إدخال</span>
+          </div>
+          <div className="circle-metric-grid">
+            <CircleMetric label="المبيعات" value={totals.sales} target={target.target_sales || 0} color="#3b82f6" currency />
+            <CircleMetric label="التحصيل" value={totals.collection} target={target.target_collection || 0} color="#10b981" currency />
+            <CircleMetric label="الزيارات" value={totals.total_visits} target={target.target_total_visits || 0} color="#06b6d4" />
+            <CircleMetric label="الزيارات الناجحة" value={totals.successful_visits} target={target.target_successful_visits || 0} color="#14b8a6" />
+            <CircleMetric label="العملاء الجدد" value={totals.new_customers} target={target.target_new_customers || 0} color="#8b5cf6" />
+            <CircleMetric label="قيمة العملاء الجدد" value={totals.new_customers_value} target={target.target_new_customers_value || 0} color="#a855f7" currency />
+            <CircleMetric label="الأصناف الجديدة" value={totals.new_products_skus} target={target.target_new_products_skus || 0} color="#f59e0b" />
+            <CircleMetric label="قطع المنتجات" value={totals.new_products_qty} target={target.target_new_products_qty || 0} color="#f97316" />
+            <CircleMetric label="ساعات العمل" value={totals.working_hours} target={target.target_working_hours || 0} color="#64748b" />
+            <CircleMetric label="الكيلومترات" value={totals.km} target={target.target_km || 0} color="#475569" />
+            <CircleMetric label="تحصيل المتأخرات" value={totals.overdue_collected} target={target.overdue_total || 0} color="#ef4444" currency />
+            <CircleMetric label="صور الرف" value={totals.shelf_photos} target={totals.total_visits || 0} color="#22c55e" />
+          </div>
+        </section>
       )}
       {selectedRep && target && (
         <div className="card">
