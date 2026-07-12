@@ -1,0 +1,31 @@
+name: Production health check
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 3 * * *'
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Supabase production access and dashboard data
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          HEALTH_CHECK_YEAR: '2026'
+          HEALTH_CHECK_MONTH: '7'
+          HEALTH_CHECK_MIN_DAILY_ROWS: '1'
+          HEALTH_CHECK_MIN_TARGET_ROWS: '1'
+        run: node tools/production-health-check.js

@@ -14,6 +14,7 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "health:production": "node tools/production-health-check.js",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
