@@ -20,8 +20,8 @@ const FROM_EMAIL = process.env.REPORTS_FROM_EMAIL || process.env.FROM_EMAIL || '
 const FROM_NAME = process.env.REPORTS_FROM_NAME || process.env.FROM_NAME || 'نظام متابعة المبيعات';
 const APP_URL = process.env.APP_URL || 'https://sales-tracker-ijyb.onrender.com/';
 const DRY_RUN = process.env.DRY_RUN === 'true';
-// Optional fixed admin recipients (comma-separated). When empty, admin
-// accounts are auto-detected from user_roles (role='admin').
+// Optional fixed full-report recipients (comma-separated). When empty,
+// recipients are auto-detected from user_roles (role='admin' or 'data_entry').
 const ADMIN_REPORT_EMAILS = (process.env.ADMIN_REPORT_EMAILS || '')
   .split(',')
   .map(value => value.trim())
@@ -385,18 +385,18 @@ async function main() {
     outbox.push(buildRepEmail(metrics, email, REPORT_DATE, remainingDays));
   }
 
-  // 2) Admin summary (all reps)
-  const adminEmails = ADMIN_REPORT_EMAILS.length
+  // 2) Full report (all reps) — for admins and data-entry users alike.
+  const fullReportEmails = ADMIN_REPORT_EMAILS.length
     ? ADMIN_REPORT_EMAILS
-    : [...new Set(roles.filter(role => role.role === 'admin')
+    : [...new Set(roles.filter(role => role.role === 'admin' || role.role === 'data_entry')
         .map(role => emailByUserId[role.user_id])
         .filter(Boolean))];
   if (!repMetrics.length) {
-    console.log('No active reps found — skipping admin/supervisor summaries');
-  } else if (!adminEmails.length) {
-    console.log('No admin recipients found (set ADMIN_REPORT_EMAILS or add an admin role) — skipping admin summary');
+    console.log('No active reps found — skipping full/supervisor summaries');
+  } else if (!fullReportEmails.length) {
+    console.log('No full-report recipients found (set ADMIN_REPORT_EMAILS or add an admin/data_entry role) — skipping full summary');
   } else {
-    for (const to of adminEmails) {
+    for (const to of fullReportEmails) {
       outbox.push(buildSummaryEmail({ to, scopeName: 'كل المناديب', metricsList: repMetrics, reportDate: REPORT_DATE, remainingDays }));
     }
   }
@@ -426,7 +426,7 @@ async function main() {
     }
   }
 
-  console.log(`Daily reports complete. date=${REPORT_DATE} reps=${repMetrics.length} admins=${adminEmails.length} supervisors=${supervisors.length} sent=${sent} failed=${failed}`);
+  console.log(`Daily reports complete. date=${REPORT_DATE} reps=${repMetrics.length} fullReports=${fullReportEmails.length} supervisors=${supervisors.length} sent=${sent} failed=${failed}`);
   if (failed > 0) process.exit(1);
 }
 
