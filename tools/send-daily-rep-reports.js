@@ -26,6 +26,9 @@ const ADMIN_REPORT_EMAILS = (process.env.ADMIN_REPORT_EMAILS || '')
   .split(',')
   .map(value => value.trim())
   .filter(Boolean);
+// Test mode: when set, send ONE sample of each report type (rep, full,
+// supervisor) to this single address instead of the real recipients.
+const TEST_RECIPIENT = (process.env.TEST_RECIPIENT || '').trim();
 
 // Supabase client is created lazily so this file can be `require`d in tests
 // (to exercise the email builders) without valid secrets or network access.
@@ -411,7 +414,7 @@ async function main() {
       console.log(`Skipped rep ${metrics.rep.name}: no linked email`);
       continue;
     }
-    outbox.push(buildRepEmail(metrics, email, REPORT_DATE, remainingDays));
+    outbox.push({ ...buildRepEmail(metrics, email, REPORT_DATE, remainingDays), kind: 'rep' });
   }
 
   // 2) Full report (all reps) — for admins and data-entry users alike.
@@ -426,7 +429,7 @@ async function main() {
     console.log('No full-report recipients found (set ADMIN_REPORT_EMAILS or add an admin/data_entry role) — skipping full summary');
   } else {
     for (const to of fullReportEmails) {
-      outbox.push(buildSummaryEmail({ to, scopeName: 'كل المناديب', metricsList: repMetrics, reportDate: REPORT_DATE, remainingDays }));
+      outbox.push({ ...buildSummaryEmail({ to, scopeName: 'كل المناديب', metricsList: repMetrics, reportDate: REPORT_DATE, remainingDays }), kind: 'full' });
     }
   }
 
@@ -439,13 +442,27 @@ async function main() {
       continue;
     }
     const scopeName = `فريق ${teamMetrics[0].rep.supervisors?.name || 'المشرف'}`;
-    outbox.push(buildSummaryEmail({ to: emailByUserId[role.user_id], scopeName, metricsList: teamMetrics, reportDate: REPORT_DATE, remainingDays }));
+    outbox.push({ ...buildSummaryEmail({ to: emailByUserId[role.user_id], scopeName, metricsList: teamMetrics, reportDate: REPORT_DATE, remainingDays }), kind: 'supervisor' });
+  }
+
+  // Test mode: send one sample of each report type to a single address.
+  let toSend = outbox;
+  if (TEST_RECIPIENT) {
+    const seenKinds = new Set();
+    toSend = outbox
+      .filter(email => {
+        if (seenKinds.has(email.kind)) return false;
+        seenKinds.add(email.kind);
+        return true;
+      })
+      .map(email => ({ ...email, to: TEST_RECIPIENT, subject: `[تجربة] ${email.subject}` }));
+    console.log(`TEST mode: redirecting ${toSend.length} sample email(s) to ${TEST_RECIPIENT} (kinds: ${[...seenKinds].join(', ') || 'none'})`);
   }
 
   // Send everything; one failure must not block the rest.
   let sent = 0;
   let failed = 0;
-  for (const email of outbox) {
+  for (const email of toSend) {
     try {
       await sendEmail(email);
       sent += 1;
@@ -455,7 +472,7 @@ async function main() {
     }
   }
 
-  console.log(`Daily reports complete. date=${REPORT_DATE} reps=${repMetrics.length} fullReports=${fullReportEmails.length} supervisors=${supervisors.length} sent=${sent} failed=${failed}`);
+  console.log(`Daily reports complete. date=${REPORT_DATE} mode=${TEST_RECIPIENT ? 'test' : 'live'} reps=${repMetrics.length} fullReports=${fullReportEmails.length} supervisors=${supervisors.length} queued=${toSend.length} sent=${sent} failed=${failed}`);
   if (failed > 0) process.exit(1);
 }
 
