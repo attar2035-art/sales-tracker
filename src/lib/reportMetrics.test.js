@@ -118,6 +118,40 @@ describe('computeRepMetrics', () => {
     expect(m.salesStatus).toBe('بدون هدف');
     expect(m.requiredSalesDaily).toBe(0);
   });
+
+  it('builds a per-indicator breakdown with remaining and daily-required', () => {
+    const target = {
+      target_sales: 600, target_collection: 200, target_total_visits: 20,
+      target_successful_visits: 12, target_new_customers: 6, target_new_products_skus: 9,
+    };
+    const m = computeRepMetrics({ rep, yesterdayRows, monthRows, target, remainingDays: 5, monthProgress: 50 });
+    expect(m.breakdown.map(r => r.key)).toEqual([
+      'sales', 'collection', 'visits', 'successfulVisits', 'newCustomers', 'newProductsSkus',
+    ]);
+    const sales = m.breakdown.find(r => r.key === 'sales');
+    expect(sales.achieved).toBe(300);
+    expect(sales.remaining).toBe(300); // 600 - 300
+    expect(sales.dailyRequired).toBe(60); // 300 / 5
+    expect(sales.percent).toBe(50);
+    expect(sales.currency).toBe(true);
+
+    // "الأصناف الجديدة المنتشرة خلال الشهر" = month total of new_products_skus (2 + 1 = 3)
+    const skus = m.breakdown.find(r => r.key === 'newProductsSkus');
+    expect(skus.achieved).toBe(3);
+    expect(skus.remaining).toBe(6); // 9 - 3
+    expect(skus.currency).toBe(false);
+
+    const visits = m.breakdown.find(r => r.key === 'visits');
+    expect(m.visitsRemaining).toBe(visits.remaining); // 20 - 8 = 12
+    expect(m.requiredVisitsDaily).toBe(visits.dailyRequired);
+  });
+
+  it('marks an indicator with no target inside the breakdown', () => {
+    const m = computeRepMetrics({ rep, yesterdayRows, monthRows, target: { target_sales: 600 }, remainingDays: 5, monthProgress: 50 });
+    const visits = m.breakdown.find(r => r.key === 'visits');
+    expect(visits.target).toBe(0);
+    expect(visits.status).toBe('بدون هدف');
+  });
 });
 
 describe('aggregateMetrics', () => {

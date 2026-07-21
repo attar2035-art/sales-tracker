@@ -106,19 +106,51 @@ function computeRepMetrics({ rep, yesterdayRows, monthRows, target, remainingDay
     sales: Number(target?.target_sales) || 0,
     collection: Number(target?.target_collection) || 0,
     visits: Number(target?.target_total_visits) || 0,
+    successfulVisits: Number(target?.target_successful_visits) || 0,
+    newCustomers: Number(target?.target_new_customers) || 0,
+    newProductsSkus: Number(target?.target_new_products_skus) || 0,
   };
   const salesRemaining = Math.max(0, targets.sales - month.sales);
   const collectionRemaining = Math.max(0, targets.collection - month.collection);
+
+  // One row per indicator: achieved, target, remaining, the daily rate still
+  // required for the rest of the month, achievement % and status.
+  const monthRow = (key, label, achieved, target, currency) => {
+    const remaining = Math.max(0, target - achieved);
+    return {
+      key,
+      label,
+      achieved,
+      target,
+      currency: Boolean(currency),
+      remaining,
+      dailyRequired: remainingDays > 0 ? remaining / remainingDays : remaining,
+      percent: percent(achieved, target),
+      status: statusLabel(achieved, target, monthProgress),
+    };
+  };
+  const breakdown = [
+    monthRow('sales', 'المبيعات', month.sales, targets.sales, true),
+    monthRow('collection', 'التحصيل', month.collection, targets.collection, true),
+    monthRow('visits', 'الزيارات', month.visits, targets.visits, false),
+    monthRow('successfulVisits', 'الزيارات الناجحة', month.successfulVisits, targets.successfulVisits, false),
+    monthRow('newCustomers', 'العملاء الجدد', month.newCustomers, targets.newCustomers, false),
+    monthRow('newProductsSkus', 'الأصناف الجديدة المنتشرة', month.newProductsSkus, targets.newProductsSkus, false),
+  ];
+
   return {
     rep,
     hasEntryYesterday: (yesterdayRows || []).length > 0,
     yesterday,
     month,
     targets,
+    breakdown,
     salesRemaining,
     collectionRemaining,
     requiredSalesDaily: remainingDays > 0 ? salesRemaining / remainingDays : salesRemaining,
     requiredCollectionDaily: remainingDays > 0 ? collectionRemaining / remainingDays : collectionRemaining,
+    requiredVisitsDaily: breakdown[2].dailyRequired,
+    visitsRemaining: breakdown[2].remaining,
     salesPercent: percent(month.sales, targets.sales),
     collectionPercent: percent(month.collection, targets.collection),
     visitsPercent: percent(month.visits, targets.visits),

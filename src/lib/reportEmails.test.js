@@ -31,6 +31,19 @@ describe('buildRepEmail', () => {
     expect(email.html).toContain('الرياض');
     expect(email.text).toContain('مبيعات أمس');
   });
+
+  it('includes the full month breakdown: remaining, daily-required, and all indicators', () => {
+    const email = buildRepEmail(makeMetrics(repA, 200, 100), 'ahmed@example.com', '2026-07-15', 5);
+    // Column headers proving remaining + daily-required are shown
+    expect(email.html).toContain('المتبقي');
+    expect(email.html).toContain('مطلوب يوميًا');
+    // Every requested indicator row is present
+    ['المبيعات', 'التحصيل', 'الزيارات', 'الزيارات الناجحة', 'العملاء الجدد', 'الأصناف الجديدة المنتشرة']
+      .forEach(label => expect(email.html).toContain(label));
+    // Daily-distribution card includes visits, not just sales/collection
+    expect(email.html).toContain('زيارات يومية');
+    expect(email.text).toContain('المتبقي');
+  });
 });
 
 describe('buildSummaryEmail', () => {

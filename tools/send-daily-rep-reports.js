@@ -92,10 +92,11 @@ function statusPillClass(status) {
 }
 
 function buildRepEmail(metrics, email, reportDate, remainingDays) {
-  const { rep, yesterday, month, targets, requiredSalesDaily, requiredCollectionDaily,
-    salesPercent, collectionPercent, visitsPercent, salesStatus, collectionStatus } = metrics;
+  const { rep, yesterday, breakdown, requiredSalesDaily, requiredCollectionDaily, requiredVisitsDaily } = metrics;
   const [year, monthNum] = reportDate.split('-').map(Number);
+  const fmt = (row, value) => (row.currency ? formatCurrency(value) : formatNumber(value));
   const subject = `تقرير أداء أمس - ${rep.name} - ${reportDate}`;
+
   const text = [
     `تقرير أداء أمس للمندوب: ${rep.name}`,
     `التاريخ: ${reportDate}`,
@@ -103,16 +104,40 @@ function buildRepEmail(metrics, email, reportDate, remainingDays) {
     '',
     `مبيعات أمس: ${formatCurrency(yesterday.sales)}`,
     `تحصيل أمس: ${formatCurrency(yesterday.collection)}`,
-    `الزيارات: ${formatNumber(yesterday.visits)}`,
-    `الزيارات الناجحة: ${formatNumber(yesterday.successfulVisits)}`,
-    `العملاء الجدد: ${formatNumber(yesterday.newCustomers)}`,
+    `زيارات أمس: ${formatNumber(yesterday.visits)} (ناجحة ${formatNumber(yesterday.successfulVisits)})`,
+    `عملاء جدد أمس: ${formatNumber(yesterday.newCustomers)}`,
     '',
-    `مبيعات الشهر: ${formatCurrency(month.sales)} من ${formatCurrency(targets.sales)} (${salesPercent}%) - ${salesStatus}`,
-    `تحصيل الشهر: ${formatCurrency(month.collection)} من ${formatCurrency(targets.collection)} (${collectionPercent}%) - ${collectionStatus}`,
-    `المطلوب يوميًا للمبيعات: ${formatCurrency(requiredSalesDaily)}`,
-    `المطلوب يوميًا للتحصيل: ${formatCurrency(requiredCollectionDaily)}`,
+    'موقف الشهر حتى أمس:',
+    ...breakdown.map(row => row.target > 0
+      ? `- ${row.label}: المحقق ${fmt(row, row.achieved)} من ${fmt(row, row.target)} (${row.percent}%) · المتبقي ${fmt(row, row.remaining)} · يوميًا ${fmt(row, row.dailyRequired)} · ${row.status}`
+      : `- ${row.label}: المحقق ${fmt(row, row.achieved)} (بدون هدف)`),
+    '',
+    `المطلوب يوميًا: مبيعات ${formatCurrency(requiredSalesDaily)} · تحصيل ${formatCurrency(requiredCollectionDaily)} · زيارات ${formatNumber(Math.ceil(requiredVisitsDaily))}`,
+    `أيام العمل المتبقية: ${formatNumber(remainingDays)}`,
     APP_URL,
   ].join('\n');
+
+  const breakdownRows = breakdown.map(row => {
+    if (row.target > 0) {
+      return `
+        <tr>
+          <td>${escapeHtml(row.label)}</td>
+          <td>${fmt(row, row.achieved)}</td>
+          <td>${fmt(row, row.target)}</td>
+          <td>${fmt(row, row.remaining)}</td>
+          <td>${fmt(row, row.dailyRequired)}</td>
+          <td>${row.percent}%</td>
+          <td><span class="pill ${statusPillClass(row.status)}">${row.status}</span></td>
+        </tr>`;
+    }
+    return `
+        <tr>
+          <td>${escapeHtml(row.label)}</td>
+          <td>${fmt(row, row.achieved)}</td>
+          <td>-</td><td>-</td><td>-</td><td>-</td>
+          <td><span class="pill">بدون هدف</span></td>
+        </tr>`;
+  }).join('');
 
   const html = `<!doctype html>
 <html lang="ar" dir="rtl">
@@ -147,23 +172,27 @@ function buildRepEmail(metrics, email, reportDate, remainingDays) {
     </div>
 
     <div class="card">
-      <h2>موقف الشهر حتى أمس</h2>
-      <table>
-        <tr><th>البند</th><th>المحقق</th><th>الهدف</th><th>النسبة</th><th>الحالة</th></tr>
-        <tr><td>المبيعات</td><td>${formatCurrency(month.sales)}</td><td>${formatCurrency(targets.sales)}</td><td>${salesPercent}%</td><td><span class="pill ${statusPillClass(salesStatus)}">${salesStatus}</span></td></tr>
-        <tr><td>التحصيل</td><td>${formatCurrency(month.collection)}</td><td>${formatCurrency(targets.collection)}</td><td>${collectionPercent}%</td><td><span class="pill ${statusPillClass(collectionStatus)}">${collectionStatus}</span></td></tr>
-        <tr><td>الزيارات</td><td>${formatNumber(month.visits)}</td><td>${formatNumber(targets.visits)}</td><td>${visitsPercent}%</td><td>-</td></tr>
-      </table>
+      <h2>موقف الشهر حتى أمس — كل المؤشرات</h2>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr><th>البند</th><th>المحقق</th><th>الهدف</th><th>المتبقي</th><th>مطلوب يوميًا</th><th>النسبة</th><th>الحالة</th></tr>
+          </thead>
+          <tbody>${breakdownRows}
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div class="card">
-      <h2>المطلوب يوميًا لباقي الشهر</h2>
+      <h2>المتبقي الموزّع على اليومي لباقي الشهر</h2>
       <div class="grid">
         <div class="stat"><span>مبيعات يومية</span><strong>${formatCurrency(requiredSalesDaily)}</strong></div>
         <div class="stat"><span>تحصيل يومي</span><strong>${formatCurrency(requiredCollectionDaily)}</strong></div>
+        <div class="stat"><span>زيارات يومية</span><strong>${formatNumber(Math.ceil(requiredVisitsDaily))}</strong></div>
         <div class="stat"><span>أيام العمل المتبقية</span><strong>${formatNumber(remainingDays)}</strong></div>
       </div>
-      <p class="muted">هذا التقرير مرسل آليًا بناءً على إدخال أمس في نظام متابعة المبيعات.</p>
+      <p class="muted">هذا التقرير مرسل آليًا بناءً على إدخالات الشهر في نظام متابعة المبيعات.</p>
       <a class="btn" href="${escapeHtml(APP_URL)}">فتح لوحة المندوب</a>
     </div>
   </div>
