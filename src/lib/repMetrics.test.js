@@ -5,6 +5,7 @@ import {
   calcPercent,
   clampPercent,
   dailyRequired,
+  getDailyRequirement,
   getScoreLabel,
   getMetricState,
   buildSmartGoals,
@@ -79,6 +80,26 @@ describe('dailyRequired', () => {
   });
 });
 
+describe('getDailyRequirement', () => {
+  it('returns null for a finished (past) month — no daily rate applies', () => {
+    // Regression: previously a past month (remainingDays=0) showed the whole gap
+    // as the "required per day" figure.
+    expect(getDailyRequirement(1000, 0, 'past', 22)).toBeNull();
+  });
+
+  it('spreads the remaining over the days left in the current month', () => {
+    expect(getDailyRequirement(1000, 4, 'current', 22)).toBe(250);
+  });
+
+  it('shows the whole remaining when it is the last day of the current month', () => {
+    expect(getDailyRequirement(1000, 0, 'current', 22)).toBe(1000);
+  });
+
+  it('spreads the remaining over ALL working days for a future month', () => {
+    expect(getDailyRequirement(1000, 20, 'future', 20)).toBe(50);
+  });
+});
+
 describe('getScoreLabel', () => {
   it('maps score bands to Arabic labels', () => {
     expect(getScoreLabel(95)).toBe('أداء قوي جدًا');
@@ -117,6 +138,17 @@ describe('buildSmartGoals', () => {
 
   it('returns no goals when there is no target and no insights', () => {
     expect(buildSmartGoals(baseArgs)).toEqual([]);
+  });
+
+  it('returns no goals for a finished (past) month even when behind target', () => {
+    const goals = buildSmartGoals({
+      ...baseArgs,
+      monthPhase: 'past',
+      target: { target_sales: 1000 },
+      totals: { ...baseArgs.totals, sales: 100 },
+      topCustomers: [{ customer_name: 'A' }],
+    });
+    expect(goals).toEqual([]);
   });
 
   it('creates a sales goal when behind target', () => {

@@ -39,6 +39,16 @@ export const clampPercent = (value) => Math.max(0, Math.min(100, Math.round(valu
 
 export const dailyRequired = (remaining, days) => (days > 0 ? remaining / days : remaining);
 
+// Per-day requirement that respects the month phase:
+// - past  => null (the month is over, a daily rate is not actionable)
+// - future => spread the remaining amount over ALL working days of the month
+// - current => spread over the working days that are still left
+export const getDailyRequirement = (remaining, remainingDays, monthPhase, totalDays) => {
+  if (monthPhase === 'past') return null;
+  const days = monthPhase === 'future' ? totalDays : remainingDays;
+  return dailyRequired(remaining, days);
+};
+
 export const getScoreLabel = (score) => {
   if (score >= 90) return 'أداء قوي جدًا';
   if (score >= 75) return 'أداء جيد';
@@ -57,10 +67,14 @@ export const buildSmartGoals = ({
   target,
   remainingDays,
   monthProgress,
+  monthPhase,
   topCustomers,
   riskCustomers,
   productFocus,
 }) => {
+  // A finished month has no actionable daily goals — it is for review only.
+  if (monthPhase === 'past') return [];
+
   const goals = [];
   const pushGoal = (goal) => goals.push({ id: `${goal.type}-${goals.length}`, ...goal });
 

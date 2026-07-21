@@ -5,6 +5,7 @@ import {
   getPassedWorkingDays,
   getTotalWorkingDaysInMonth,
   getMonthProgress,
+  getMonthPhase,
   formatNumber,
   formatCurrency,
   getAchievementStatus,
@@ -76,18 +77,36 @@ describe('remaining / passed working days (time-dependent)', () => {
   });
 });
 
+describe('getMonthPhase', () => {
+  const now = new Date(2026, 6, 21); // 2026-07 is "current"
+
+  it('classifies an earlier month as past', () => {
+    expect(getMonthPhase(2026, 6, now)).toBe('past');
+    expect(getMonthPhase(2025, 12, now)).toBe('past');
+  });
+
+  it('classifies the same year and month as current', () => {
+    expect(getMonthPhase(2026, 7, now)).toBe('current');
+  });
+
+  it('classifies a later month as future', () => {
+    expect(getMonthPhase(2026, 8, now)).toBe('future');
+    expect(getMonthPhase(2027, 1, now)).toBe('future');
+  });
+});
+
 describe('formatNumber / formatCurrency', () => {
   it('rounds and returns a string', () => {
     expect(typeof formatNumber(1234.6)).toBe('string');
     expect(formatNumber(0)).not.toBe('');
   });
 
-  it('documents an inconsistency: null/undefined => ASCII "0", but 0 => localized "٠"', () => {
-    // helpers.js guard `if (!num && num !== 0) return '0'` returns a plain ASCII zero,
-    // while the Intl formatter renders 0 as an Arabic-Indic digit. They differ.
-    expect(formatNumber(null)).toBe('0');
-    expect(formatNumber(0)).not.toBe('0'); // localized digit
-    expect(formatCurrency(undefined)).toBe('0');
+  it('formats null/undefined/NaN consistently with 0 (localized)', () => {
+    const zero = formatNumber(0);
+    expect(formatNumber(null)).toBe(zero);
+    expect(formatNumber(undefined)).toBe(zero);
+    expect(formatNumber('not a number')).toBe(zero);
+    expect(formatCurrency(undefined)).toBe(formatCurrency(0));
   });
 
   it('rounds to the nearest integer', () => {

@@ -7,6 +7,7 @@ import {
   getRemainingWorkingDays,
   getTotalWorkingDaysInMonth,
   getMonthProgress,
+  getMonthPhase,
 } from '../lib/helpers';
 import { buildEffectiveTargetsMap } from '../lib/targets';
 import {
@@ -16,6 +17,7 @@ import {
   clampPercent,
   getScoreLabel,
   getMetricState,
+  getDailyRequirement,
   buildSmartGoals,
   buildHistoryRows,
 } from '../lib/repMetrics';
@@ -31,10 +33,10 @@ const metricConfig = [
 
 const formatMetric = (value, currency) => currency ? formatCurrency(value) : formatNumber(value);
 
-function PerformanceCard({ metric, achieved, target, remainingDays, monthProgress }) {
+function PerformanceCard({ metric, achieved, target, remainingDays, totalDays, monthPhase, monthProgress }) {
   const percent = target > 0 ? Math.round((achieved / target) * 100) : 0;
   const remaining = target > 0 ? Math.max(0, target - achieved) : 0;
-  const dailyRequired = target > 0 && remainingDays > 0 ? remaining / remainingDays : remaining;
+  const dailyRequired = target > 0 ? getDailyRequirement(remaining, remainingDays, monthPhase, totalDays) : null;
   const state = target > 0 ? getMetricState(percent, monthProgress) : { label: 'بدون هدف', color: '#94a3b8', bg: '#172033' };
 
   return (
@@ -52,7 +54,7 @@ function PerformanceCard({ metric, achieved, target, remainingDays, monthProgres
       <div className="rep-card-grid">
         <span>الهدف<br /><strong>{target > 0 ? formatMetric(target, metric.currency) : '-'}</strong></span>
         <span>المتبقي<br /><strong>{target > 0 ? formatMetric(remaining, metric.currency) : '-'}</strong></span>
-        <span>يوميًا<br /><strong>{target > 0 ? formatMetric(dailyRequired, metric.currency) : '-'}</strong></span>
+        <span>يوميًا<br /><strong>{target > 0 && dailyRequired !== null ? formatMetric(dailyRequired, metric.currency) : '-'}</strong></span>
         <span>النسبة<br /><strong>{target > 0 ? `${percent}%` : '-'}</strong></span>
       </div>
     </div>
@@ -329,6 +331,7 @@ export default function RepDashboard({ repId }) {
   const remainingDays = getRemainingWorkingDays(year, month);
   const totalDays = getTotalWorkingDaysInMonth(year, month);
   const monthProgress = Math.round(getMonthProgress(year, month));
+  const monthPhase = getMonthPhase(year, month);
 
   const totals = useMemo(() => ({
     sales: sumBy(entries, 'daily_sales'),
@@ -353,9 +356,11 @@ export default function RepDashboard({ repId }) {
   const salesRemaining = Math.max(0, salesTarget - totals.sales);
   const collectionRemaining = Math.max(0, collectionTarget - totals.collection);
 
+  const salesDaily = getDailyRequirement(salesRemaining, remainingDays, monthPhase, totalDays);
+  const collectionDaily = getDailyRequirement(collectionRemaining, remainingDays, monthPhase, totalDays);
   const nextActions = [
-    { title: 'مبيعات مطلوبة يوميًا', value: salesTarget > 0 ? formatCurrency(remainingDays > 0 ? salesRemaining / remainingDays : salesRemaining) : '-', tone: '#3b82f6' },
-    { title: 'تحصيل مطلوب يوميًا', value: collectionTarget > 0 ? formatCurrency(remainingDays > 0 ? collectionRemaining / remainingDays : collectionRemaining) : '-', tone: '#10b981' },
+    { title: 'مبيعات مطلوبة يوميًا', value: salesTarget > 0 && salesDaily !== null ? formatCurrency(salesDaily) : '-', tone: '#3b82f6' },
+    { title: 'تحصيل مطلوب يوميًا', value: collectionTarget > 0 && collectionDaily !== null ? formatCurrency(collectionDaily) : '-', tone: '#10b981' },
     { title: 'نسبة نجاح الزيارات', value: `${visitSuccessRate}%`, tone: '#06b6d4' },
     { title: 'تغطية صور الرف', value: `${shelfCoverage}%`, tone: '#f59e0b' },
   ];
@@ -400,11 +405,14 @@ export default function RepDashboard({ repId }) {
     target,
     remainingDays,
     monthProgress,
+    monthPhase,
     topCustomers,
     riskCustomers,
     productFocus,
   });
-  const assistantSummary = scoreParts.length === 0
+  const assistantSummary = monthPhase === 'past'
+    ? 'هذا الشهر مكتمل. البيانات معروضة للمراجعة والمقارنة فقط، ولا توجد أهداف يومية قابلة للتنفيذ.'
+    : scoreParts.length === 0
     ? 'لم يتم تحديد أهداف لهذا الشهر بعد. ستظهر التوصيات الذكية بمجرد إضافة الأهداف.'
     : performanceScore >= 75
     ? 'أداؤك جيد. حافظ على الإيقاع وركز على التحصيل والزيارات ذات القيمة الأعلى.'
@@ -525,6 +533,8 @@ export default function RepDashboard({ repId }) {
                 achieved={totals[metric.key] || 0}
                 target={target?.[metric.targetKey] || 0}
                 remainingDays={remainingDays}
+                totalDays={totalDays}
+                monthPhase={monthPhase}
                 monthProgress={monthProgress}
               />
             ))}
