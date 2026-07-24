@@ -16,6 +16,11 @@ Branch: `claude/dashboard-review-5oyboy` (PR #2) · App: sales-tracker (CRA + Su
 - [ ] Seed a small **test dataset**: 1 admin, 1 data_entry, 2 supervisors, ~4 reps
       across 2 regions, a handful of customers/products, a few `daily_entries` and
       `monthly_targets`, and some `customer_yearly_sales` rows for 2024/2025.
+      Ready-made scripts:
+      - `qa-reports/staging/seed_test_data.sql` — idempotent, id-type agnostic seed
+        (create the test auth users first — see the header of that file).
+      - `qa-reports/staging/rls_verification.sql` — per-role RLS checks with expected
+        counts (impersonates each user via JWT claims; read-only, auto-rolls back).
 
 ### A2. Environment variables (frontend build)
 - [ ] `REACT_APP_SUPABASE_URL` = staging project URL
