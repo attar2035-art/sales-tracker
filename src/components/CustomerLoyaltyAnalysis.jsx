@@ -1,39 +1,41 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { formatCurrency, formatNumber } from '../lib/helpers';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { formatCurrency } from '../lib/helpers';
+import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 export default function CustomerLoyaltyAnalysis({ baseYear = 2022, comparisonYear = 2023 }) {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [data2022, setData2022] = useState([]);
   const [data2023, setData2023] = useState([]);
-  const [loyaltyAnalysis, setLoyaltyAnalysis] = useState(null);
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseYear, comparisonYear]);
 
   const loadData = async () => {
     setLoading(true);
-    
-    const { data: customers2022 } = await supabase
-      .from('customer_yearly_sales')
-      .select('id, customer_code, customer_name, net_sales, year')
-      .eq('year', baseYear);
+    setError('');
 
-    const { data: customers2023 } = await supabase
-      .from('customer_yearly_sales')
-      .select('id, customer_code, customer_name, net_sales, year')
-      .eq('year', comparisonYear);
+    const [baseRes, compRes] = await Promise.all([
+      supabase.from('customer_yearly_sales')
+        .select('id, customer_code, customer_name, net_sales, year').eq('year', baseYear),
+      supabase.from('customer_yearly_sales')
+        .select('id, customer_code, customer_name, net_sales, year').eq('year', comparisonYear),
+    ]);
 
-    setData2022((customers2022 || []).map(c => ({
-      ...c,
-      yearly_sales: Number(c.net_sales) || 0,
-    })));
-    setData2023((customers2023 || []).map(c => ({
-      ...c,
-      yearly_sales: Number(c.net_sales) || 0,
-    })));
+    if (baseRes.error || compRes.error) {
+      console.error(baseRes.error || compRes.error);
+      setError('تعذّر تحميل بيانات المقارنة. حاول مرة أخرى.');
+      setData2022([]);
+      setData2023([]);
+      setLoading(false);
+      return;
+    }
+
+    setData2022((baseRes.data || []).map(c => ({ ...c, yearly_sales: Number(c.net_sales) || 0 })));
+    setData2023((compRes.data || []).map(c => ({ ...c, yearly_sales: Number(c.net_sales) || 0 })));
     setLoading(false);
   };
 
@@ -104,12 +106,12 @@ export default function CustomerLoyaltyAnalysis({ baseYear = 2022, comparisonYea
     const decliningCount = loyal.filter(c => c.change < 0).length;
     const stableCount = loyal.filter(c => c.change === 0).length;
 
-    // بيانات الرسم البياني
+    // بيانات الرسم البياني — مفاتيح ديناميكية حسب السنوات المختارة
     growth_data = [
       {
         category: 'عملاء موالون',
-        'سنة 2022': Math.round(loyalSales2022),
-        'سنة 2023': Math.round(loyalSales2023)
+        [`سنة ${baseYear}`]: Math.round(loyalSales2022),
+        [`سنة ${comparisonYear}`]: Math.round(loyalSales2023)
       }
     ];
 
@@ -130,11 +132,13 @@ export default function CustomerLoyaltyAnalysis({ baseYear = 2022, comparisonYea
         newSales,
         loyalSales2022,
         loyalSales2023,
-        loyalGrowth: ((loyalSales2023 - loyalSales2022) / loyalSales2022 * 100).toFixed(1)
+        loyalGrowth: loyalSales2022 > 0
+          ? ((loyalSales2023 - loyalSales2022) / loyalSales2022 * 100).toFixed(1)
+          : '0.0'
       },
       growth_data
     };
-  }, [data2022, data2023]);
+  }, [data2022, data2023, baseYear, comparisonYear]);
 
   if (loading) {
     return (
@@ -143,6 +147,10 @@ export default function CustomerLoyaltyAnalysis({ baseYear = 2022, comparisonYea
         جاري تحميل البيانات...
       </div>
     );
+  }
+
+  if (error) {
+    return <div className="alert alert-error" style={{ margin: '1rem 0' }}>{error}</div>;
   }
 
   if (!analysis) {
@@ -243,8 +251,8 @@ export default function CustomerLoyaltyAnalysis({ baseYear = 2022, comparisonYea
                 <tr>
                   <th>الكود</th>
                   <th>اسم العميل</th>
-                  <th>مبيعات 2022</th>
-                  <th>مبيعات 2023</th>
+                  <th>مبيعات {baseYear}</th>
+                  <th>مبيعات {comparisonYear}</th>
                   <th>التغير</th>
                   <th>النسبة %</th>
                   <th>الحالة</th>
@@ -297,7 +305,7 @@ export default function CustomerLoyaltyAnalysis({ baseYear = 2022, comparisonYea
                   <tr>
                     <th>الكود</th>
                     <th>اسم العميل</th>
-                    <th>آخر مبيعات (2022)</th>
+                    <th>آخر مبيعات ({baseYear})</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -324,7 +332,7 @@ export default function CustomerLoyaltyAnalysis({ baseYear = 2022, comparisonYea
                   <tr>
                     <th>الكود</th>
                     <th>اسم العميل</th>
-                    <th>مبيعات 2023</th>
+                    <th>مبيعات {comparisonYear}</th>
                   </tr>
                 </thead>
                 <tbody>

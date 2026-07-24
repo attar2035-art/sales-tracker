@@ -37,14 +37,24 @@ export const getMonthProgress = (year, month) => {
   return total > 0 ? (passed / total) * 100 : 0;
 };
 
+// Where the selected month sits relative to "today": a finished (past) month,
+// the current month, or a month that has not started yet (future).
+export const getMonthPhase = (year, month, now = new Date()) => {
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  if (year < currentYear || (year === currentYear && month < currentMonth)) return 'past';
+  if (year === currentYear && month === currentMonth) return 'current';
+  return 'future';
+};
+
 export const formatNumber = (num) => {
-  if (!num && num !== 0) return '0';
-  return new Intl.NumberFormat('ar-SA').format(Math.round(num));
+  const value = Number(num);
+  return new Intl.NumberFormat('ar-SA').format(Math.round(Number.isFinite(value) ? value : 0));
 };
 
 export const formatCurrency = (num) => {
-  if (!num && num !== 0) return '0';
-  return new Intl.NumberFormat('ar-SA').format(Math.round(num));
+  const value = Number(num);
+  return new Intl.NumberFormat('ar-SA').format(Math.round(Number.isFinite(value) ? value : 0));
 };
 
 export const getAchievementStatus = (achieved, target, monthProgress) => {

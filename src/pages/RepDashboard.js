@@ -7,8 +7,20 @@ import {
   getRemainingWorkingDays,
   getTotalWorkingDaysInMonth,
   getMonthProgress,
+  getMonthPhase,
 } from '../lib/helpers';
 import { buildEffectiveTargetsMap } from '../lib/targets';
+import {
+  sumBy,
+  getSixMonthWindow,
+  calcPercent,
+  clampPercent,
+  getScoreLabel,
+  getMetricState,
+  getDailyRequirement,
+  buildSmartGoals,
+  buildHistoryRows,
+} from '../lib/repMetrics';
 
 const metricConfig = [
   { key: 'sales', title: 'المبيعات', icon: '🎯', targetKey: 'target_sales', color: '#3b82f6', currency: true },
@@ -19,207 +31,12 @@ const metricConfig = [
   { key: 'new_products_skus', title: 'أصناف جديدة', icon: '📦', targetKey: 'target_new_products_skus', color: '#f59e0b' },
 ];
 
-const sumBy = (rows, field) => rows.reduce((total, row) => total + (parseFloat(row[field]) || 0), 0);
-
 const formatMetric = (value, currency) => currency ? formatCurrency(value) : formatNumber(value);
 
-const toDateString = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const getSixMonthWindow = (year, month) => {
-  const start = new Date(year, month - 1, 1);
-  start.setMonth(start.getMonth() - 5);
-  const end = new Date(year, month, 0);
-  const months = [];
-  for (let i = 0; i < 6; i += 1) {
-    const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
-    months.push({
-      year: d.getFullYear(),
-      month: d.getMonth() + 1,
-      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-      label: `${MONTHS_AR[d.getMonth()]} ${d.getFullYear()}`,
-    });
-  }
-  return { months, startDate: toDateString(start), endDate: toDateString(end) };
-};
-
-const calcPercent = (achieved, target) => target > 0 ? Math.round((achieved / target) * 100) : 0;
-
-const clampPercent = (value) => Math.max(0, Math.min(100, Math.round(value || 0)));
-
-const dailyRequired = (remaining, days) => days > 0 ? remaining / days : remaining;
-
-const getScoreLabel = (score) => {
-  if (score >= 90) return 'أداء قوي جدًا';
-  if (score >= 75) return 'أداء جيد';
-  if (score >= 55) return 'يحتاج متابعة';
-  return 'يحتاج تدخل سريع';
-};
-
-const buildSmartGoals = ({
-  totals,
-  target,
-  remainingDays,
-  monthProgress,
-  topCustomers,
-  riskCustomers,
-  productFocus,
-}) => {
-  const goals = [];
-  const pushGoal = (goal) => goals.push({ id: `${goal.type}-${goals.length}`, ...goal });
-
-  const salesTarget = parseFloat(target?.target_sales) || 0;
-  const collectionTarget = parseFloat(target?.target_collection) || 0;
-  const visitTarget = parseFloat(target?.target_total_visits) || 0;
-  const successVisitTarget = parseFloat(target?.target_successful_visits) || 0;
-  const newCustomerTarget = parseFloat(target?.target_new_customers) || 0;
-
-  const salesPercent = calcPercent(totals.sales, salesTarget);
-  const collectionPercent = calcPercent(totals.collection, collectionTarget);
-  const visitPercent = calcPercent(totals.total_visits, visitTarget);
-  const successVisitPercent = calcPercent(totals.successful_visits, successVisitTarget);
-  const newCustomerPercent = calcPercent(totals.new_customers, newCustomerTarget);
-
-  if (salesTarget > 0 && salesPercent < Math.max(100, monthProgress) && salesPercent < 100) {
-    const gap = Math.max(0, salesTarget - totals.sales);
-    pushGoal({
-      type: 'sales',
-      title: 'إغلاق فجوة المبيعات',
-      target: `${formatCurrency(dailyRequired(gap, remainingDays))} يوميًا`,
-      detail: `المحقق ${salesPercent}% من هدف المبيعات. المتبقي ${formatCurrency(gap)}.`,
-      priority: salesPercent < monthProgress - 10 ? 'عالي' : 'متوسط',
-      tone: '#3b82f6',
-    });
-  }
-
-  if (collectionTarget > 0 && collectionPercent < Math.max(100, monthProgress) && collectionPercent < 100) {
-    const gap = Math.max(0, collectionTarget - totals.collection);
-    pushGoal({
-      type: 'collection',
-      title: 'رفع التحصيل اليومي',
-      target: `${formatCurrency(dailyRequired(gap, remainingDays))} يوميًا`,
-      detail: `المحقق ${collectionPercent}% من هدف التحصيل. ابدأ بالعملاء الأعلى مديونية.`,
-      priority: collectionPercent < monthProgress - 10 ? 'عالي' : 'متوسط',
-      tone: '#10b981',
-    });
-  }
-
-  if (visitTarget > 0 && visitPercent < 100) {
-    const gap = Math.max(0, visitTarget - totals.total_visits);
-    pushGoal({
-      type: 'visits',
-      title: 'استكمال الزيارات',
-      target: `${formatNumber(Math.ceil(dailyRequired(gap, remainingDays)))} زيارة يوميًا`,
-      detail: `المتبقي ${formatNumber(gap)} زيارة من هدف الشهر.`,
-      priority: visitPercent < monthProgress - 10 ? 'عالي' : 'متوسط',
-      tone: '#06b6d4',
-    });
-  }
-
-  if (successVisitTarget > 0 && successVisitPercent < 100) {
-    const gap = Math.max(0, successVisitTarget - totals.successful_visits);
-    pushGoal({
-      type: 'successful-visits',
-      title: 'تحويل الزيارات إلى زيارات ناجحة',
-      target: `${formatNumber(Math.ceil(dailyRequired(gap, remainingDays)))} زيارة ناجحة يوميًا`,
-      detail: `نسبة نجاح الزيارات الحالية ${totals.total_visits > 0 ? Math.round((totals.successful_visits / totals.total_visits) * 100) : 0}%.`,
-      priority: 'متوسط',
-      tone: '#14b8a6',
-    });
-  }
-
-  if (newCustomerTarget > 0 && newCustomerPercent < 100) {
-    const gap = Math.max(0, newCustomerTarget - totals.new_customers);
-    pushGoal({
-      type: 'new-customers',
-      title: 'إضافة عملاء جدد',
-      target: `${formatNumber(Math.ceil(dailyRequired(gap, remainingDays)))} عميل يوميًا`,
-      detail: `المتبقي ${formatNumber(gap)} عميل جديد للوصول للهدف.`,
-      priority: 'متوسط',
-      tone: '#8b5cf6',
-    });
-  }
-
-  if (topCustomers.length) {
-    pushGoal({
-      type: 'top-customers',
-      title: 'زيارة كبار العملاء',
-      target: topCustomers.slice(0, 3).map(customer => customer.customer_name).join('، '),
-      detail: 'ابدأ بالعملاء الأعلى قيمة في المنطقة قبل توسيع الزيارات.',
-      priority: 'عالي',
-      tone: '#f59e0b',
-    });
-  }
-
-  if (riskCustomers.length) {
-    const risk = riskCustomers[0];
-    pushGoal({
-      type: 'risk',
-      title: 'متابعة أكبر خطر تحصيل',
-      target: risk.customer_name || 'عميل متأخر',
-      detail: `قيمة الخطر ${formatCurrency(risk.riskAmount || 0)}. المطلوب إجراء متابعة اليوم.`,
-      priority: 'عالي',
-      tone: '#ef4444',
-    });
-  }
-
-  if (productFocus.length) {
-    pushGoal({
-      type: 'product',
-      title: 'دفع المنتجات ذات الأولوية',
-      target: productFocus.slice(0, 3).map(product => product.product_name).join('، '),
-      detail: 'ركز على الأصناف الأعلى دورانًا أو المطلوبة في خطة المنطقة.',
-      priority: 'متوسط',
-      tone: '#22c55e',
-    });
-  }
-
-  return goals
-    .sort((a, b) => (a.priority === 'عالي' ? -1 : 1) - (b.priority === 'عالي' ? -1 : 1))
-    .slice(0, 5);
-};
-
-const buildHistoryRows = (months, rows, targets, repId) => {
-  return months.map(period => {
-    const monthRows = (rows || []).filter(row => row.year === period.year && row.month === period.month);
-    const effectiveTarget = buildEffectiveTargetsMap(targets || [], period.year, period.month)[repId] || null;
-    const sales = sumBy(monthRows, 'daily_sales');
-    const collection = sumBy(monthRows, 'daily_collection');
-    const visits = sumBy(monthRows, 'total_visits');
-    const successfulVisits = sumBy(monthRows, 'successful_visits');
-    const newCustomers = sumBy(monthRows, 'new_customers');
-    const salesTarget = parseFloat(effectiveTarget?.target_sales) || 0;
-    const collectionTarget = parseFloat(effectiveTarget?.target_collection) || 0;
-    return {
-      ...period,
-      days: monthRows.length,
-      sales,
-      collection,
-      visits,
-      successfulVisits,
-      newCustomers,
-      salesTarget,
-      collectionTarget,
-      salesPercent: calcPercent(sales, salesTarget),
-      collectionPercent: calcPercent(collection, collectionTarget),
-    };
-  });
-};
-
-function getMetricState(percent, monthProgress) {
-  if (percent >= monthProgress + 5) return { label: 'متقدم', color: '#10b981', bg: '#052e25' };
-  if (percent >= monthProgress - 5) return { label: 'في المسار', color: '#f59e0b', bg: '#3f2a05' };
-  return { label: 'يحتاج تركيز', color: '#ef4444', bg: '#3b0909' };
-}
-
-function PerformanceCard({ metric, achieved, target, remainingDays, monthProgress }) {
+function PerformanceCard({ metric, achieved, target, remainingDays, totalDays, monthPhase, monthProgress }) {
   const percent = target > 0 ? Math.round((achieved / target) * 100) : 0;
   const remaining = target > 0 ? Math.max(0, target - achieved) : 0;
-  const dailyRequired = target > 0 && remainingDays > 0 ? remaining / remainingDays : remaining;
+  const dailyRequired = target > 0 ? getDailyRequirement(remaining, remainingDays, monthPhase, totalDays) : null;
   const state = target > 0 ? getMetricState(percent, monthProgress) : { label: 'بدون هدف', color: '#94a3b8', bg: '#172033' };
 
   return (
@@ -237,7 +54,7 @@ function PerformanceCard({ metric, achieved, target, remainingDays, monthProgres
       <div className="rep-card-grid">
         <span>الهدف<br /><strong>{target > 0 ? formatMetric(target, metric.currency) : '-'}</strong></span>
         <span>المتبقي<br /><strong>{target > 0 ? formatMetric(remaining, metric.currency) : '-'}</strong></span>
-        <span>يوميًا<br /><strong>{target > 0 ? formatMetric(dailyRequired, metric.currency) : '-'}</strong></span>
+        <span>يوميًا<br /><strong>{target > 0 && dailyRequired !== null ? formatMetric(dailyRequired, metric.currency) : '-'}</strong></span>
         <span>النسبة<br /><strong>{target > 0 ? `${percent}%` : '-'}</strong></span>
       </div>
     </div>
@@ -282,8 +99,16 @@ export default function RepDashboard({ repId }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (repId) fetchRep(); }, [repId]);
-  useEffect(() => { if (repId) fetchDetails(); }, [repId, year, month]);
+  useEffect(() => {
+    if (!repId) return undefined;
+    let ignore = false;
+    fetchDetails(() => !ignore);
+    return () => { ignore = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repId, year, month]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (rep?.id) fetchRegionInsights(rep); }, [rep, year, month]);
 
   const fetchRep = async () => {
@@ -296,7 +121,7 @@ export default function RepDashboard({ repId }) {
     }
   };
 
-  const fetchDetails = async () => {
+  const fetchDetails = async (isCurrent = () => true) => {
     setLoading(true);
     const historyWindow = getSixMonthWindow(year, month);
     const [entriesResult, targetsResult, historyResult] = await Promise.all([
@@ -310,6 +135,7 @@ export default function RepDashboard({ repId }) {
         .lte('entry_date', historyWindow.endDate)
         .order('entry_date'),
     ]);
+    if (!isCurrent()) return; // a newer month/rep selection superseded this response
     if (entriesResult.data) setEntries(entriesResult.data);
     const targetMap = buildEffectiveTargetsMap(targetsResult.data || [], year, month);
     setTarget(targetMap[repId] || null);
@@ -514,6 +340,7 @@ export default function RepDashboard({ repId }) {
   const remainingDays = getRemainingWorkingDays(year, month);
   const totalDays = getTotalWorkingDaysInMonth(year, month);
   const monthProgress = Math.round(getMonthProgress(year, month));
+  const monthPhase = getMonthPhase(year, month);
 
   const totals = useMemo(() => ({
     sales: sumBy(entries, 'daily_sales'),
@@ -538,9 +365,11 @@ export default function RepDashboard({ repId }) {
   const salesRemaining = Math.max(0, salesTarget - totals.sales);
   const collectionRemaining = Math.max(0, collectionTarget - totals.collection);
 
+  const salesDaily = getDailyRequirement(salesRemaining, remainingDays, monthPhase, totalDays);
+  const collectionDaily = getDailyRequirement(collectionRemaining, remainingDays, monthPhase, totalDays);
   const nextActions = [
-    { title: 'مبيعات مطلوبة يوميًا', value: salesTarget > 0 ? formatCurrency(remainingDays > 0 ? salesRemaining / remainingDays : salesRemaining) : '-', tone: '#3b82f6' },
-    { title: 'تحصيل مطلوب يوميًا', value: collectionTarget > 0 ? formatCurrency(remainingDays > 0 ? collectionRemaining / remainingDays : collectionRemaining) : '-', tone: '#10b981' },
+    { title: 'مبيعات مطلوبة يوميًا', value: salesTarget > 0 && salesDaily !== null ? formatCurrency(salesDaily) : '-', tone: '#3b82f6' },
+    { title: 'تحصيل مطلوب يوميًا', value: collectionTarget > 0 && collectionDaily !== null ? formatCurrency(collectionDaily) : '-', tone: '#10b981' },
     { title: 'نسبة نجاح الزيارات', value: `${visitSuccessRate}%`, tone: '#06b6d4' },
     { title: 'تغطية صور الرف', value: `${shelfCoverage}%`, tone: '#f59e0b' },
   ];
@@ -585,11 +414,14 @@ export default function RepDashboard({ repId }) {
     target,
     remainingDays,
     monthProgress,
+    monthPhase,
     topCustomers,
     riskCustomers,
     productFocus,
   });
-  const assistantSummary = scoreParts.length === 0
+  const assistantSummary = monthPhase === 'past'
+    ? 'هذا الشهر مكتمل. البيانات معروضة للمراجعة والمقارنة فقط، ولا توجد أهداف يومية قابلة للتنفيذ.'
+    : scoreParts.length === 0
     ? 'لم يتم تحديد أهداف لهذا الشهر بعد. ستظهر التوصيات الذكية بمجرد إضافة الأهداف.'
     : performanceScore >= 75
     ? 'أداؤك جيد. حافظ على الإيقاع وركز على التحصيل والزيارات ذات القيمة الأعلى.'
@@ -710,6 +542,8 @@ export default function RepDashboard({ repId }) {
                 achieved={totals[metric.key] || 0}
                 target={target?.[metric.targetKey] || 0}
                 remainingDays={remainingDays}
+                totalDays={totalDays}
+                monthPhase={monthPhase}
                 monthProgress={monthProgress}
               />
             ))}

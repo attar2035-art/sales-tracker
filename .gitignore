@@ -145,3 +145,6 @@ vite.config.ts.timestamp-*
 # Raw customer data exports (real business/financial data, not for version control)
 customer_data_all_years.csv
 
+
+# Create React App production build (built in CI / host, not committed)
+/build

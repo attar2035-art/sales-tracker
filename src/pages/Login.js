@@ -10,6 +10,7 @@ export default function Login({ onLogin }) {
 
   const handleLogin = async () => {
     if (!email || !password) { setError('أدخل الإيميل وكلمة السر'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError('صيغة البريد الإلكتروني غير صحيحة'); return; }
     setLoading(true);
     setError('');
     const { error } = await signIn(email, password);

@@ -8,6 +8,9 @@ on:
       report_date:
         description: 'Optional report date in YYYY-MM-DD format'
         required: false
+      test_recipient:
+        description: 'Optional test email. When set, sends one sample of each report type to this address only.'
+        required: false
 
 jobs:
   send-reports:
@@ -51,7 +54,7 @@ jobs:
           }
           NODE
 
-      - name: Send daily representative reports
+      - name: Send daily representative and summary reports
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -59,5 +62,9 @@ jobs:
           REPORTS_FROM_EMAIL: ${{ secrets.REPORTS_FROM_EMAIL }}
           REPORTS_FROM_NAME: ${{ secrets.REPORTS_FROM_NAME }}
           APP_URL: ${{ secrets.APP_URL }}
+          # Optional: comma-separated fixed admin recipients. Leave the secret
+          # unset to auto-detect admins from user_roles (role='admin').
+          ADMIN_REPORT_EMAILS: ${{ secrets.ADMIN_REPORT_EMAILS }}
           REPORT_DATE: ${{ github.event.inputs.report_date }}
+          TEST_RECIPIENT: ${{ github.event.inputs.test_recipient }}
         run: node tools/send-daily-rep-reports.js
