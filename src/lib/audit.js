@@ -46,6 +46,12 @@ const getCurrentActor = async () => {
   };
 };
 
+// Throttle duplicate page_view events (e.g. rapid re-navigation) so the audit
+// table isn't flooded with near-identical rows.
+const PAGE_VIEW_THROTTLE_MS = 3000;
+let lastPageViewKey = null;
+let lastPageViewAt = 0;
+
 export const logAuditEvent = async ({
   eventType,
   pageKey = null,
@@ -55,11 +61,20 @@ export const logAuditEvent = async ({
 } = {}) => {
   if (!eventType) return;
 
+  if (eventType === 'page_view') {
+    const now = Date.now();
+    if (lastPageViewKey === pageKey && now - lastPageViewAt < PAGE_VIEW_THROTTLE_MS) return;
+    lastPageViewKey = pageKey;
+    lastPageViewAt = now;
+  }
+
   try {
     const actor = await getCurrentActor();
     if (!actor) return;
 
-    await supabase.from('audit_logs').insert({
+    // Capture the error explicitly (insert alone won't throw on RLS/constraint
+    // failure) so audit gaps are at least visible in the console.
+    const { error } = await supabase.from('audit_logs').insert({
       user_id: actor.userId,
       user_email: actor.email,
       user_role: actor.role,
@@ -72,6 +87,7 @@ export const logAuditEvent = async ({
       details,
       user_agent: window.navigator.userAgent,
     });
+    if (error) console.warn('Audit log failed:', error.message);
   } catch (error) {
     console.warn('Audit log skipped:', error?.message || error);
   }

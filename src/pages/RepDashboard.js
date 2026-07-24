@@ -101,8 +101,13 @@ export default function RepDashboard({ repId }) {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (repId) fetchRep(); }, [repId]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (repId) fetchDetails(); }, [repId, year, month]);
+  useEffect(() => {
+    if (!repId) return undefined;
+    let ignore = false;
+    fetchDetails(() => !ignore);
+    return () => { ignore = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repId, year, month]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (rep?.id) fetchRegionInsights(rep); }, [rep, year, month]);
 
@@ -116,7 +121,7 @@ export default function RepDashboard({ repId }) {
     }
   };
 
-  const fetchDetails = async () => {
+  const fetchDetails = async (isCurrent = () => true) => {
     setLoading(true);
     const historyWindow = getSixMonthWindow(year, month);
     const [entriesResult, targetsResult, historyResult] = await Promise.all([
@@ -130,6 +135,7 @@ export default function RepDashboard({ repId }) {
         .lte('entry_date', historyWindow.endDate)
         .order('entry_date'),
     ]);
+    if (!isCurrent()) return; // a newer month/rep selection superseded this response
     if (entriesResult.data) setEntries(entriesResult.data);
     const targetMap = buildEffectiveTargetsMap(targetsResult.data || [], year, month);
     setTarget(targetMap[repId] || null);

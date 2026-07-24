@@ -1,13 +1,13 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
+import ChangePassword from './ChangePassword';
+import { updatePassword } from '../lib/auth';
 
 // Mock the auth lib so the component doesn't pull in the Supabase client.
+// (jest.mock is hoisted above the imports by babel-jest.)
 jest.mock('../lib/auth', () => ({
   updatePassword: jest.fn().mockResolvedValue({ error: null }),
 }));
-
-import ChangePassword from './ChangePassword';
-import { updatePassword } from '../lib/auth';
 
 const typePasswords = (container, pw, confirm) => {
   const inputs = container.querySelectorAll('input');

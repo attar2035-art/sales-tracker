@@ -35,8 +35,13 @@ export default function RepDetails({ supervisorId }) {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchReps(); }, [supervisorId]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (selectedRep) fetchDetails(); }, [selectedRep, year, month]);
+  useEffect(() => {
+    if (!selectedRep) return undefined;
+    let ignore = false;
+    fetchDetails(() => !ignore);
+    return () => { ignore = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRep, year, month]);
 
   const fetchReps = async () => {
     let query = supabase.from('representatives')
@@ -46,7 +51,7 @@ export default function RepDetails({ supervisorId }) {
     if (data) setReps(data);
   };
 
-  const fetchDetails = async () => {
+  const fetchDetails = async (isCurrent = () => true) => {
     setLoading(true);
     const [e, t] = await Promise.all([
       supabase.from('daily_entries').select('*')
@@ -54,6 +59,7 @@ export default function RepDetails({ supervisorId }) {
       supabase.from('monthly_targets').select('*')
         .eq('rep_id', selectedRep).limit(10000),
     ]);
+    if (!isCurrent()) return; // a newer selection superseded this response
     if (e.data) setEntries(e.data);
     const targetMap = buildEffectiveTargetsMap(t.data || [], year, month);
     setTarget(targetMap[selectedRep] || null);
