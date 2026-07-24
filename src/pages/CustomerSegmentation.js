@@ -107,34 +107,62 @@ export default function CustomerSegmentation() {
     const file = e.target.files[0];
     if (!file) return;
     setImportMsg('');
+    setImportPreview(null);
+
+    // Guardrails around the (known-vulnerable) xlsx parser: restrict type/size and
+    // cap rows so a malicious/oversized file can't exhaust memory or trigger ReDoS.
+    // NOTE: the xlsx dependency (SheetJS 0.18.5) has open HIGH advisories with no npm
+    // fix (BUG-005). The real remediation is to upgrade to the SheetJS CDN build or
+    // parse server-side; these guardrails are defense-in-depth only.
+    const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+    const MAX_ROWS = 100000;
+    const nameOk = /\.(xlsx|xls|csv)$/i.test(file.name || '');
+    if (!nameOk) { setImportMsg('نوع الملف غير مدعوم. ارفع ملف Excel (.xlsx/.xls/.csv).'); return; }
+    if (file.size > MAX_BYTES) { setImportMsg('حجم الملف كبير جدًا (الحد 10 ميجابايت).'); return; }
+
     const reader = new FileReader();
+    reader.onerror = () => setImportMsg('تعذّر قراءة الملف. حاول مرة أخرى.');
     reader.onload = (evt) => {
-      const wb = XLSX.read(evt.target.result, { type: 'array' });
-      const allRows = [];
-      wb.SheetNames.forEach(sheetName => {
-        const ws = wb.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_json(ws);
-        rows.forEach(row => {
-          const code = String(row['رقم العميل'] || '').trim();
-          if (!code) return;
-          allRows.push({
-            customer_code: code,
-            customer_name: String(row['اسم العميل'] || '').trim(),
-            region_name: sheetName.trim(),
-            year: importYear,
-            net_sales: parseFloat(row['صافي المبيعات']) || 0,
-            collected: parseFloat(row['المبلغ المحصل']) || 0,
-            aging_0_30: parseFloat(row['0 - 30'] || row['0-30']) || 0,
-            aging_31_60: parseFloat(row['31 - 60'] || row['31-60']) || 0,
-            aging_61_90: parseFloat(row['61 - 90'] || row['61-90']) || 0,
-            aging_91_120: parseFloat(row['91 - 120'] || row['91-120']) || 0,
-            aging_120_plus: parseFloat(row['> 120'] || row['>120']) || 0,
-            debt_age: String(row['عمر الدين'] || row['عمر الدين '] || '').trim(),
-            monthly_avg_collection: parseFloat(row['المتوسط الشهري للتحصيل'] || row['المتوسط الشهري للتحصيل ']) || 0,
-          });
-        });
-      });
-      setImportPreview({ sheets: wb.SheetNames.length, total: allRows.length, rows: allRows });
+      try {
+        const wb = XLSX.read(evt.target.result, { type: 'array' });
+        const allRows = [];
+        let skipped = 0;
+        let capped = false;
+        for (const sheetName of wb.SheetNames) {
+          const ws = wb.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(ws);
+          for (const row of rows) {
+            const code = String(row['رقم العميل'] || '').trim();
+            if (!code) { skipped += 1; continue; }
+            if (allRows.length >= MAX_ROWS) { capped = true; break; }
+            allRows.push({
+              customer_code: code,
+              customer_name: String(row['اسم العميل'] || '').trim(),
+              region_name: sheetName.trim(),
+              year: importYear,
+              net_sales: parseFloat(row['صافي المبيعات']) || 0,
+              collected: parseFloat(row['المبلغ المحصل']) || 0,
+              aging_0_30: parseFloat(row['0 - 30'] || row['0-30']) || 0,
+              aging_31_60: parseFloat(row['31 - 60'] || row['31-60']) || 0,
+              aging_61_90: parseFloat(row['61 - 90'] || row['61-90']) || 0,
+              aging_91_120: parseFloat(row['91 - 120'] || row['91-120']) || 0,
+              aging_120_plus: parseFloat(row['> 120'] || row['>120']) || 0,
+              debt_age: String(row['عمر الدين'] || row['عمر الدين '] || '').trim(),
+              monthly_avg_collection: parseFloat(row['المتوسط الشهري للتحصيل'] || row['المتوسط الشهري للتحصيل ']) || 0,
+            });
+          }
+          if (capped) break;
+        }
+        if (!allRows.length) {
+          setImportMsg('لم يتم العثور على صفوف صالحة. تأكد أن الملف يحتوي عمود "رقم العميل" وشيتات بأسماء المناطق.');
+          return;
+        }
+        setImportMsg(capped ? `تم بلوغ الحد الأقصى (${MAX_ROWS} صف); سيتم استيراد أول ${allRows.length} فقط.` : '');
+        setImportPreview({ sheets: wb.SheetNames.length, total: allRows.length, skipped, rows: allRows });
+      } catch (err) {
+        console.error('Excel parse failed:', err);
+        setImportMsg('تعذّر قراءة ملف Excel. تأكد أن الملف سليم وغير تالف.');
+      }
     };
     reader.readAsArrayBuffer(file);
   };

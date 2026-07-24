@@ -121,7 +121,7 @@ export default function CustomerDetails({ customerId, onBack }) {
           <div className="stat-value">{formatNumber(totals.quantity)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">إجمالي المبيعات (يناير - مايو 2026)</div>
+          <div className="stat-label">إجمالي المبيعات (كل الفترات)</div>
           <div className="stat-value">{formatCurrency(totals.amount)} ر.س</div>
         </div>
       </div>

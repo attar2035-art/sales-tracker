@@ -228,7 +228,10 @@ export default function Setup() {
     }
 
     const targetMap = buildEffectiveTargetsMap(targetsResult.data || [], year, month);
-    const currentTarget = targetMap[editingRep.id] || null;
+    const effectiveTarget = targetMap[editingRep.id] || null;
+    // Only split a target that truly belongs to THIS month. An inherited target
+    // (from a prior month) must not be materialized/split here (BUG-024).
+    const monthTarget = effectiveTarget && !effectiveTarget._isInherited ? effectiveTarget : null;
     const entries = entriesResult.data || [];
     const achieved = TARGET_FIELDS.reduce((acc, field) => {
       const entryField = ACHIEVEMENT_FIELD_BY_TARGET[field];
@@ -236,6 +239,7 @@ export default function Setup() {
       return acc;
     }, {});
 
+    // Step 1: create the new rep.
     const { data: newRep, error: insertError } = await supabase.from('representatives').insert({
       name: editRepName.trim(),
       supervisor_id: editRepSup || null,
@@ -248,11 +252,25 @@ export default function Setup() {
       return;
     }
 
-    if (currentTarget) {
+    // Step 2: deactivate the OLD rep first (the ownership transfer). If this fails,
+    // undo step 1 so we never end with two active reps.
+    const { error: deactivateError } = await supabase.from('representatives')
+      .update({ is_active: false })
+      .eq('id', editingRep.id);
+    if (deactivateError) {
+      await supabase.from('representatives').delete().eq('id', newRep.id);
+      showMsg('لم يتم التسليم بسبب خطأ في تعطيل المندوب القديم: ' + deactivateError.message, 'error');
+      setLoading(false);
+      return;
+    }
+
+    // Step 3: split this month's target (only if a real month target exists). On
+    // failure, compensate fully: reactivate the old rep and delete the new one.
+    if (monthTarget) {
       const oldTargetPayload = { rep_id: editingRep.id, year, month };
       const newTargetPayload = { rep_id: newRep.id, year, month };
       TARGET_FIELDS.forEach(field => {
-        const total = parseFloat(currentTarget[field]) || 0;
+        const total = parseFloat(monthTarget[field]) || 0;
         const oldShare = Math.min(parseFloat(achieved[field]) || 0, total);
         oldTargetPayload[field] = oldShare;
         newTargetPayload[field] = Math.max(0, total - oldShare);
@@ -262,27 +280,26 @@ export default function Setup() {
         .upsert([oldTargetPayload, newTargetPayload], { onConflict: 'rep_id,year,month' });
 
       if (targetError) {
+        await supabase.from('representatives').update({ is_active: true }).eq('id', editingRep.id);
         await supabase.from('representatives').delete().eq('id', newRep.id);
-        showMsg('لم يتم التسليم بسبب خطأ في تقسيم الأهداف: ' + targetError.message, 'error');
+        showMsg('لم يتم التسليم بسبب خطأ في تقسيم الأهداف (تم التراجع): ' + targetError.message, 'error');
         setLoading(false);
         return;
       }
     }
 
-    const { error: updateError } = await supabase.from('representatives')
-      .update({ is_active: false })
-      .eq('id', editingRep.id);
-    if (updateError) showMsg('تم إنشاء المندوب الجديد لكن حدث خطأ في تعطيل القديم: ' + updateError.message, 'error');
-    else {
-      await logAuditEvent({
-        eventType: 'handover',
-        pageKey: 'setup',
-        entityType: 'representatives',
-        entityId: editingRep.id,
-        details: { from: editingRep.name, to: editRepName.trim(), new_rep_id: newRep.id },
-      });
-      showMsg(currentTarget ? 'تم التسليم وتقسيم هدف الشهر على القديم والجديد' : 'تم التسليم بدون تقسيم أهداف لعدم وجود هدف سابق'); cancelEditRep(); fetchAll();
-    }
+    await logAuditEvent({
+      eventType: 'handover',
+      pageKey: 'setup',
+      entityType: 'representatives',
+      entityId: editingRep.id,
+      details: { from: editingRep.name, to: editRepName.trim(), new_rep_id: newRep.id, split_target: !!monthTarget },
+    });
+    showMsg(monthTarget
+      ? 'تم التسليم وتقسيم هدف الشهر على القديم والجديد'
+      : 'تم التسليم بدون تقسيم أهداف (لا يوجد هدف مخصّص لهذا الشهر)');
+    cancelEditRep();
+    fetchAll();
     setLoading(false);
   };
 
