@@ -57,33 +57,31 @@ export default function CustomerSegmentation() {
   };
 
   const runImport = async () => {
+    // Non-destructive & idempotent: upsert on (customer_code, year, region_name).
+    // Existing rows are updated in place; nothing is deleted. Re-running is safe.
+    const confirmed = window.confirm(
+      'سيتم تحديث/إضافة بيانات العملاء المحضرة (بدون حذف أي بيانات موجودة). '
+      + 'السجلات المطابقة (نفس رقم العميل/السنة/المنطقة) سيتم تحديثها. هل تريد المتابعة؟'
+    );
+    if (!confirmed) return;
+
     setImporting(true);
     setImportProgress('جاري تحميل البيانات...');
     try {
       const mod = await import('../data/customers_import.json');
       const jsonData = mod.default || mod;
 
-      // 1) امسح أي بيانات قديمة/ناقصة أولاً لضمان نتيجة نظيفة
-      setImportProgress('جاري مسح البيانات القديمة...');
-      const { error: delErr } = await supabase
-        .from('customer_yearly_sales')
-        .delete()
-        .gte('id', 0);
-      if (delErr) {
-        setImportProgress('خطأ في مسح البيانات القديمة: ' + delErr.message);
-        setImporting(false);
-        return;
-      }
-
-      // 2) أدخل كل السجلات (إدخال مباشر لا يعتمد على قيد التفرد)
-      setImportProgress('تم المسح. جاري إدخال ' + jsonData.length + ' سجل...');
+      // Upsert in batches — no delete step, so a mid-run failure never loses data.
+      setImportProgress('جاري تحديث/إدخال ' + jsonData.length + ' سجل...');
       const batch = 200;
       let imported = 0;
       let errors = 0;
       let lastError = '';
       for (let i = 0; i < jsonData.length; i += batch) {
         const chunk = jsonData.slice(i, i + batch);
-        const { error } = await supabase.from('customer_yearly_sales').insert(chunk);
+        const { error } = await supabase
+          .from('customer_yearly_sales')
+          .upsert(chunk, { onConflict: 'customer_code,year,region_name' });
         if (error) {
           console.error('Batch error:', error);
           errors++;
@@ -91,12 +89,12 @@ export default function CustomerSegmentation() {
         } else {
           imported += chunk.length;
         }
-        setImportProgress('تم إدخال ' + imported + ' من ' + jsonData.length + (errors > 0 ? ' (' + errors + ' أخطاء: ' + lastError + ')' : ''));
+        setImportProgress('تم تحديث/إدخال ' + imported + ' من ' + jsonData.length + (errors > 0 ? ' (' + errors + ' أخطاء: ' + lastError + ')' : ''));
       }
       if (errors > 0 && imported === 0) {
-        setImportProgress('خطأ في الإدخال: ' + lastError);
+        setImportProgress('خطأ في الاستيراد: ' + lastError);
       } else {
-        setImportProgress('اكتمل! تم استيراد ' + imported + ' سجل' + (errors > 0 ? ' (مع ' + errors + ' دفعات بها أخطاء: ' + lastError + ')' : ''));
+        setImportProgress('اكتمل! تم تحديث/استيراد ' + imported + ' سجل' + (errors > 0 ? ' (مع ' + errors + ' دفعات بها أخطاء: ' + lastError + ')' : ''));
       }
       await fetchData();
     } catch (e) {

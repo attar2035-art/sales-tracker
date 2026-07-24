@@ -50,6 +50,31 @@ const NAV_REP = [
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
 ];
 
+function NoAccess({ email, onLogout }) {
+  return (
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', background: '#0f172a', padding: '1rem',
+    }}>
+      <div style={{
+        background: '#1e293b', border: '1px solid #334155', borderRadius: 16,
+        padding: '2.5rem', width: '100%', maxWidth: 440, textAlign: 'center',
+      }}>
+        <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🔒</div>
+        <h1 style={{ color: '#f1f5f9', fontSize: '1.35rem', fontWeight: 800 }}>لا توجد صلاحية للوصول</h1>
+        <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: '0.75rem', lineHeight: 1.9 }}>
+          حسابك ({email}) غير مرتبط بأي دور في النظام.<br />
+          تواصل مع مدير النظام لتفعيل الصلاحيات.
+        </p>
+        <button className="btn btn-primary" onClick={onLogout}
+          style={{ width: '100%', padding: '0.75rem', marginTop: '1.5rem' }}>
+          🚪 تسجيل الخروج
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -99,7 +124,8 @@ export default function App() {
     if (user.role === 'supervisor') return NAV_SUPERVISOR;
     if (user.role === 'data_entry') return NAV_DATA_ENTRY;
     if (user.role === 'rep') return NAV_REP;
-    return NAV_ADMIN;
+    // Fail closed: an unknown or missing role gets no navigation, not admin.
+    return [];
   };
 
   const renderPage = () => {
@@ -125,19 +151,23 @@ export default function App() {
       if (page === 'segmentation') return <CustomerSegmentation />;
       return <Dashboard supervisorId={user.supervisor_id} />;
     }
-    switch (page) {
-      case 'dashboard': return <Dashboard />;
-      case 'daily': return <DailyEntry />;
-      case 'targets': return <Targets />;
-      case 'repdetails': return <RepDetails />;
-      case 'customers': return <Customers user={user} />;
-      case 'analytics': return <CustomerAnalytics />;
-      case 'segmentation': return <CustomerSegmentation />;
-      case 'audit': return <ActivityLog />;
-      case 'setup': return <Setup />;
-      case 'password': return <ChangePassword />;
-      default: return <Dashboard />;
+    if (user.role === 'admin') {
+      switch (page) {
+        case 'dashboard': return <Dashboard />;
+        case 'daily': return <DailyEntry />;
+        case 'targets': return <Targets />;
+        case 'repdetails': return <RepDetails />;
+        case 'customers': return <Customers user={user} />;
+        case 'analytics': return <CustomerAnalytics />;
+        case 'segmentation': return <CustomerSegmentation />;
+        case 'audit': return <ActivityLog />;
+        case 'setup': return <Setup />;
+        case 'password': return <ChangePassword />;
+        default: return <Dashboard />;
+      }
     }
+    // Fail closed: unknown/missing role gets no access, never the admin pages.
+    return <NoAccess email={user.email} onLogout={handleLogout} />;
   };
 
   const nav = getNav();

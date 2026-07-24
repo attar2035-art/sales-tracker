@@ -23,9 +23,19 @@ session, already reviewed/approved separately). The QA phase only **added** arti
 | `_generate_xlsx.js` | Regenerates the two .xlsx from the JSON |
 
 ## Application code changes during QA
-**None.** No source files under `src/`, `tools/`, `supabase/`, or `.github/` were
-changed while producing these reports. No trivial "blocker" fixes were required to run
-the tests — the existing test suite, lint, and build all ran as-is.
+**Reporting phase:** none — the reports above were produced without touching source.
+
+**Approved fixes phase (after sign-off):** the user approved fixing BUG-001 and
+BUG-004. These source changes were then made:
+
+| Date | Bug | File(s) | Change |
+|---|---|---|---|
+| 2026-07-24 | BUG-001 | `src/pages/CustomerSegmentation.js` | `runImport` no longer deletes the whole `customer_yearly_sales` table. Removed the `DELETE .gte('id',0)` step; import now uses idempotent `upsert` on `(customer_code, year, region_name)`, and prompts for confirmation first. A mid-run failure can no longer lose data. |
+| 2026-07-24 | BUG-004 | `src/App.js` | Fail-closed authorization: `getNav()` returns `[]` (not `NAV_ADMIN`) for an unknown/missing role, and `renderPage()` gates the admin page switch behind `role === 'admin'`, returning a new `NoAccess` screen for any unknown/null role. |
+
+Verification after the fixes: ESLint (0 new warnings), `react-scripts test` (79/79
+pass), `react-scripts build` (compiles). No other bugs from the report were touched;
+the remaining fix plan (10-recommended-fixes.md) still awaits approval.
 
 ## Commands executed (read-only / non-destructive)
 - `react-scripts test --coverage`, `eslint src`, `react-scripts build` (build output was
