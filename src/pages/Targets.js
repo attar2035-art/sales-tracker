@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { MONTHS_AR } from '../lib/helpers';
 import { buildEffectiveTargetsMap, targetToForm } from '../lib/targets';
@@ -14,6 +14,23 @@ export default function Targets() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
   const [selectedRep, setSelectedRep] = useState(null);
+  const [errors, setErrors] = useState({});
+  const containerRef = useRef(null);
+
+  // Auto-advance: Enter (or the phone keyboard's "next") moves focus to the
+  // next enabled, visible field within the open target form.
+  const handleKeyDown = (e) => {
+    if (e.key !== 'Enter' || e.target.tagName === 'TEXTAREA') return;
+    const root = containerRef.current;
+    if (!root) return;
+    const f = Array.from(
+      root.querySelectorAll('input:not([disabled]), select:not([disabled])')
+    ).filter(el => el.type !== 'hidden' && el.offsetParent !== null);
+    const i = f.indexOf(e.target);
+    if (i > -1 && i < f.length - 1) { e.preventDefault(); f[i + 1].focus(); }
+  };
+
+  const errCls = (base, key) => `${base}${errors[key] ? ' has-error' : ''}`;
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchReps(); }, []);
@@ -55,6 +72,12 @@ export default function Targets() {
 
   const updateForm = (repId, field, value) => {
     setForms(prev => ({ ...prev, [repId]: { ...prev[repId], [field]: value } }));
+    setErrors(prev => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
   };
 
   const saveTarget = async (repId) => {
@@ -74,10 +97,20 @@ export default function Targets() {
       target_km: parseFloat(form.target_km) || 0,
       overdue_total: parseFloat(form.overdue_total) || 0,
     };
-    // Reject negative targets (would break downstream percentage math).
-    if (Object.entries(payload).some(([k, v]) => k.startsWith('target_') || k === 'overdue_total' ? v < 0 : false)) {
-      showMsg('لا يمكن إدخال أهداف سالبة', 'error'); return;
+    // Reject negative targets (would break downstream percentage math). Attach
+    // the error to the specific field so it renders directly under that input.
+    const fieldErrors = {};
+    Object.entries(payload).forEach(([k, v]) => {
+      if ((k.startsWith('target_') || k === 'overdue_total') && v < 0) {
+        fieldErrors[k] = 'لا يمكن إدخال قيمة سالبة';
+      }
+    });
+    if (Object.keys(fieldErrors).length > 0) {
+      setErrors(fieldErrors);
+      showMsg('صحّح الحقول المميّزة بالأحمر', 'error');
+      return;
     }
+    setErrors({});
     setLoading(true);
     // Log create only when there is no target that truly belongs to this month
     // (an inherited target must not be treated as an existing one — BUG-023).
@@ -122,7 +155,7 @@ export default function Targets() {
   ];
 
   return (
-    <div>
+    <div ref={containerRef} onKeyDown={handleKeyDown}>
       <div className="page-header">
         <h1 className="page-title">🎯 الأهداف الشهرية</h1>
         <div className="month-selector">
@@ -176,10 +209,12 @@ export default function Targets() {
                             {fields.map(f => (
                               <div className="form-group" key={f.key}>
                                 <label className="form-label">{f.label}</label>
-                                <input className="form-input" type="number" min="0"
+                                <input className={errCls('form-input', f.key)} type="number" min="0"
+                                  enterKeyHint="next"
                                   value={forms[rep.id][f.key]}
                                   onChange={e => updateForm(rep.id, f.key, e.target.value)}
                                   placeholder={f.placeholder} />
+                                {errors[f.key] && <div className="form-error">{errors[f.key]}</div>}
                               </div>
                             ))}
                           </div>
