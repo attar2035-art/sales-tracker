@@ -177,7 +177,7 @@ export default function CustomerParetoAnalysis({ year = 2022 }) {
               </tr>
             </thead>
             <tbody>
-              {analysis.customersFor80.map((c, idx) => (
+              {analysis.customersFor80.slice(0, 200).map((c, idx) => (
                 <tr key={idx}>
                   <td>{idx + 1}</td>
                   <td>{c.customer_code}</td>
@@ -188,6 +188,11 @@ export default function CustomerParetoAnalysis({ year = 2022 }) {
               ))}
             </tbody>
           </table>
+          {analysis.customersFor80.length > 200 && (
+            <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              عرض أول 200 من {analysis.customersFor80.length} عميل
+            </div>
+          )}
         </div>
       </div>
 

@@ -59,12 +59,20 @@ infra + first ChangePassword test).
 cancellation in RepDashboard/RepDetails), BUG-033 (data-aligned analytics years),
 BUG-031 (build/ removed from VCS + gitignored).
 
-**Deferred (need input, not silently changed):**
-- BUG-020 (large client-side aggregation → move to SQL views/RPC + pagination) — a
-  larger performance refactor; Targets over-fetch was fixed, Customers/Segmentation
-  remain client-side.
-- BUG-022 (three inconsistent ABC/grading definitions) — needs a product decision on
-  the single canonical method before code is unified.
+**Formerly-deferred items — now completed (user approved):**
+- BUG-022 (grading unified): added `src/lib/analytics.js` with one canonical
+  cumulative-sales classifier (`classifyByCumulativeSales`) + unit tests, and wired
+  both the ABC analysis tab (3-tier A/B/C) and the segmentation grading tab (4-tier
+  A/B/C/D) to it. Segmentation no longer uses positional-rank grading, so a customer
+  is graded the same way everywhere.
+- BUG-020 (performance): added a `customer_sales_totals` Postgres function
+  (migration `20260724120000`) that aggregates per-customer sales server-side with
+  `SECURITY INVOKER` (RLS preserved) and type-agnostic text casts (works for
+  bigint/uuid ids). Customers.js calls it first and **falls back** to the previous
+  client-side batched aggregation if the function isn't deployed — safe before and
+  after deploy. Also capped/paginated the ABC and Pareto tables to 200 rendered rows.
+  NOTE: the RPC path activates once the migration is deployed; it could not be
+  executed in this review (no test database).
 
 **Files changed across all sprints:** src/App.js, src/lib/audit.js,
 src/pages/{CustomerSegmentation,Customers,CustomerDetails,DailyEntry,Setup,Login,

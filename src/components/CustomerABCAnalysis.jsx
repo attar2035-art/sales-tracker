@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { formatCurrency, formatNumber } from '../lib/helpers';
+import { classifyByCumulativeSales, ABC_BOUNDARIES } from '../lib/analytics';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 export default function CustomerABCAnalysis({ year = 2022 }) {
@@ -40,25 +41,12 @@ export default function CustomerABCAnalysis({ year = 2022 }) {
   const analysis = useMemo(() => {
     if (data.length === 0) return null;
 
-    // ترتيب العملاء حسب المبيعات (تنازلي)
-    const sorted = [...data].sort((a, b) => b.yearly_sales - a.yearly_sales);
-    
-    // حساب الإجمالي
-    const totalSales = sorted.reduce((sum, c) => sum + c.yearly_sales, 0);
+    const totalSales = data.reduce((sum, c) => sum + (Number(c.yearly_sales) || 0), 0);
     if (totalSales <= 0) return null;
-    
-    // تصنيف ABC
-    let cumulative = 0;
-    const classified = sorted.map(c => {
-      cumulative += c.yearly_sales;
-      const percentage = (cumulative / totalSales) * 100;
-      
-      let category = 'A';
-      if (percentage > 80) category = 'B';
-      if (percentage > 95) category = 'C';
-      
-      return { ...c, percentage, category };
-    });
+
+    // Canonical cumulative-sales ABC (shared with the segmentation grading — BUG-022).
+    const classified = classifyByCumulativeSales(data, { valueKey: 'yearly_sales', boundaries: ABC_BOUNDARIES })
+      .map(c => ({ ...c, category: c.grade, percentage: c.cumulativePercent }));
 
     // حساب الإحصائيات
     const categories = { A: [], B: [], C: [] };
@@ -204,7 +192,7 @@ export default function CustomerABCAnalysis({ year = 2022 }) {
               </tr>
             </thead>
             <tbody>
-              {analysis.customers.map((c, idx) => (
+              {analysis.customers.slice(0, 200).map((c, idx) => (
                 <tr key={idx}>
                   <td>
                     <span style={{
@@ -226,6 +214,11 @@ export default function CustomerABCAnalysis({ year = 2022 }) {
               ))}
             </tbody>
           </table>
+          {analysis.customers.length > 200 && (
+            <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              عرض أول 200 من {formatNumber(analysis.customers.length)} عميل
+            </div>
+          )}
         </div>
       </div>
     </div>

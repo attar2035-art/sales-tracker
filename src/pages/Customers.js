@@ -83,48 +83,70 @@ export default function Customers({ user }) {
 
     const customerIds = (customersData || []).map(c => c.id);
 
-    // 4. تحميل سجلات المبيعات على دفعات مع فلترة في السيرفر
-    const salesTotals = {};
-    const batchSize = 200;
-    const batches = [];
-    for (let i = 0; i < customerIds.length; i += batchSize) {
-      batches.push(customerIds.slice(i, i + batchSize));
+    // 4. حساب إجماليات المبيعات لكل عميل.
+    //    الأفضل: دالة تجميع على السيرفر (RPC) — تُرجع الإجماليات مباشرة بدل جلب
+    //    كل صفوف المبيعات للمتصفح. مع تراجع آمن للحساب على العميل إن لم تكن الدالة
+    //    منشورة بعد (BUG-020).
+    let totalsById = null;
+
+    const rpc = await supabase.rpc('customer_sales_totals', {
+      p_region_ids: regionIds ? regionIds.map(String) : null,
+    });
+    if (!rpc.error && Array.isArray(rpc.data)) {
+      totalsById = {};
+      rpc.data.forEach(row => {
+        totalsById[String(row.customer_id)] = {
+          amount: Number(row.total_amount) || 0,
+          quantity: Number(row.total_quantity) || 0,
+          skuCount: Number(row.sku_count) || 0,
+        };
+      });
+    } else {
+      // Fallback: batched client-side aggregation (previous behavior).
+      const salesTotals = {};
+      const batchSize = 200;
+      const batches = [];
+      for (let i = 0; i < customerIds.length; i += batchSize) {
+        batches.push(customerIds.slice(i, i + batchSize));
+      }
+      await Promise.all(batches.map(async (batch) => {
+        let from = 0;
+        const pageSize = 1000;
+        let keepGoing = true;
+        while (keepGoing) {
+          const { data: salesPage, error: salesError } = await supabase
+            .from('customer_product_sales')
+            .select('customer_id, amount, quantity, product_id')
+            .in('customer_id', batch)
+            .range(from, from + pageSize - 1);
+
+          if (salesError) { console.error(salesError); break; }
+
+          (salesPage || []).forEach(row => {
+            const key = String(row.customer_id);
+            if (!salesTotals[key]) salesTotals[key] = { amount: 0, quantity: 0, products: new Set() };
+            salesTotals[key].amount += Number(row.amount) || 0;
+            salesTotals[key].quantity += Number(row.quantity) || 0;
+            salesTotals[key].products.add(row.product_id);
+          });
+
+          keepGoing = (salesPage || []).length === pageSize;
+          from += pageSize;
+        }
+      }));
+      totalsById = {};
+      Object.entries(salesTotals).forEach(([key, t]) => {
+        totalsById[key] = { amount: t.amount, quantity: t.quantity, skuCount: t.products.size };
+      });
     }
 
-    await Promise.all(batches.map(async (batch) => {
-      let from = 0;
-      const pageSize = 1000;
-      let keepGoing = true;
-      while (keepGoing) {
-        const { data: salesPage, error: salesError } = await supabase
-          .from('customer_product_sales')
-          .select('customer_id, amount, quantity, product_id')
-          .in('customer_id', batch)
-          .range(from, from + pageSize - 1);
-
-        if (salesError) { console.error(salesError); break; }
-
-        (salesPage || []).forEach(row => {
-          if (!salesTotals[row.customer_id]) {
-            salesTotals[row.customer_id] = { amount: 0, quantity: 0, products: new Set() };
-          }
-          salesTotals[row.customer_id].amount += Number(row.amount) || 0;
-          salesTotals[row.customer_id].quantity += Number(row.quantity) || 0;
-          salesTotals[row.customer_id].products.add(row.product_id);
-        });
-
-        keepGoing = (salesPage || []).length === pageSize;
-        from += pageSize;
-      }
-    }));
-
     const merged = (customersData || []).map(c => {
-      const totals = salesTotals[c.id] || { amount: 0, quantity: 0, products: new Set() };
+      const totals = totalsById[String(c.id)] || { amount: 0, quantity: 0, skuCount: 0 };
       return {
         ...c,
         total_amount: totals.amount,
         total_quantity: totals.quantity,
-        sku_count: totals.products.size,
+        sku_count: totals.skuCount,
       };
     });
 

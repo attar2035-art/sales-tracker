@@ -1,23 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { formatCurrency, formatNumber } from '../lib/helpers';
+import { classifyByCumulativeSales, ABCD_BOUNDARIES } from '../lib/analytics';
 import * as XLSX from 'xlsx';
 
 const YEARS = [2022, 2023, 2024, 2025, 2026];
 
+// Canonical cumulative-sales ABC/D grading, shared with the ABC analysis tab
+// so a customer is graded the same way everywhere (BUG-022).
 function classifyABCD(customers) {
   if (!customers.length) return [];
-  const sorted = [...customers].sort((a, b) => b.net_sales - a.net_sales);
-  const total = sorted.length;
-  return sorted.map((c, i) => {
-    const pct = (i + 1) / total;
-    let grade;
-    if (pct <= 0.2) grade = 'A';
-    else if (pct <= 0.5) grade = 'B';
-    else if (pct <= 0.8) grade = 'C';
-    else grade = 'D';
-    return { ...c, grade };
-  });
+  return classifyByCumulativeSales(customers, { valueKey: 'net_sales', boundaries: ABCD_BOUNDARIES });
 }
 
 const GRADE_COLORS = { A: '#10b981', B: '#3b82f6', C: '#f59e0b', D: '#ef4444' };
