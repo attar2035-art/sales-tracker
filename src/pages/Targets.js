@@ -26,8 +26,11 @@ export default function Targets() {
   };
 
   const fetchTargets = async () => {
+    // Only fetch targets on-or-before the selected month (what inheritance needs),
+    // instead of the whole table — avoids over-fetch and leaking future targets.
     const { data } = await supabase.from('monthly_targets')
       .select('*')
+      .or(`year.lt.${year},and(year.eq.${year},month.lte.${month})`)
       .limit(10000);
     if (data) {
       setTargets(buildEffectiveTargetsMap(data, year, month));
@@ -55,7 +58,6 @@ export default function Targets() {
   const saveTarget = async (repId) => {
     const form = forms[repId];
     if (!form) return;
-    setLoading(true);
     const payload = {
       rep_id: repId, year, month,
       target_sales: parseFloat(form.target_sales) || 0,
@@ -70,13 +72,21 @@ export default function Targets() {
       target_km: parseFloat(form.target_km) || 0,
       overdue_total: parseFloat(form.overdue_total) || 0,
     };
+    // Reject negative targets (would break downstream percentage math).
+    if (Object.entries(payload).some(([k, v]) => k.startsWith('target_') || k === 'overdue_total' ? v < 0 : false)) {
+      showMsg('لا يمكن إدخال أهداف سالبة', 'error'); return;
+    }
+    setLoading(true);
+    // Log create only when there is no target that truly belongs to this month
+    // (an inherited target must not be treated as an existing one — BUG-023).
+    const hasMonthTarget = targets[repId] && !targets[repId]._isInherited;
     const { error } = await supabase.from('monthly_targets')
       .upsert(payload, { onConflict: 'rep_id,year,month' });
     if (error) showMsg('خطأ: ' + error.message, 'error');
     else {
       const rep = reps.find(item => item.id === repId);
       await logAuditEvent({
-        eventType: targets[repId] ? 'update' : 'create',
+        eventType: hasMonthTarget ? 'update' : 'create',
         pageKey: 'targets',
         entityType: 'monthly_targets',
         entityId: `${repId}:${year}-${month}`,

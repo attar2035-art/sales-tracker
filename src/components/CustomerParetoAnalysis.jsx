@@ -1,27 +1,31 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { formatCurrency, formatNumber } from '../lib/helpers';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { formatCurrency } from '../lib/helpers';
+import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, Bar, Line } from 'recharts';
 
 export default function CustomerParetoAnalysis({ year = 2022 }) {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [data, setData] = useState([]);
-  const [paretoData, setParetoData] = useState(null);
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year]);
 
   const loadData = async () => {
     setLoading(true);
-    const { data: customersData, error } = await supabase
+    setError('');
+    const { data: customersData, error: loadError } = await supabase
       .from('customer_yearly_sales')
       .select('customer_code, customer_name, net_sales, year')
       .eq('year', year)
       .order('net_sales', { ascending: false });
 
-    if (error) {
-      console.error(error);
+    if (loadError) {
+      console.error(loadError);
+      setError('تعذّر تحميل البيانات. حاول مرة أخرى.');
+      setData([]); // clear stale data so we don't show the previous year's numbers
       setLoading(false);
       return;
     }
@@ -56,7 +60,7 @@ export default function CustomerParetoAnalysis({ year = 2022 }) {
       if (percentage <= 100) {
         chartData.push({
           index: i + 1,
-          name: sorted[i].customer_name.substring(0, 15),
+          name: (sorted[i].customer_name || '—').substring(0, 15),
           sales: sorted[i].yearly_sales,
           cumulative: percentage
         });
@@ -85,6 +89,10 @@ export default function CustomerParetoAnalysis({ year = 2022 }) {
         جاري تحميل البيانات...
       </div>
     );
+  }
+
+  if (error) {
+    return <div className="alert alert-error" style={{ margin: '1rem 0' }}>{error}</div>;
   }
 
   if (!analysis) {
@@ -125,7 +133,7 @@ export default function CustomerParetoAnalysis({ year = 2022 }) {
       <div className="card" style={{ marginTop: '1.5rem' }}>
         <h3 style={{ marginBottom: '1rem', fontSize: '1rem', fontWeight: 600 }}>منحنى باريتو (أول 50 عميل)</h3>
         <ResponsiveContainer width="100%" height={400}>
-          <BarChart data={analysis.chartData} margin={{ top: 20, right: 30, left: 0, bottom: 60 }}>
+          <ComposedChart data={analysis.chartData} margin={{ top: 20, right: 30, left: 0, bottom: 60 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis 
               dataKey="index" 
@@ -150,7 +158,7 @@ export default function CustomerParetoAnalysis({ year = 2022 }) {
               isAnimationActive={false}
             />
             <Legend />
-          </BarChart>
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
 

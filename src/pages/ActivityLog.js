@@ -13,11 +13,21 @@ const ACTION_EVENTS = ['create', 'update', 'delete', 'status_change', 'handover'
 
 const formatDateTime = (value) => {
   if (!value) return '-';
-  return new Intl.DateTimeFormat('ar-SA', {
+  // Force the Gregorian calendar (ar-SA defaults to Hijri) for operator clarity.
+  return new Intl.DateTimeFormat('ar-SA-u-ca-gregory', {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value));
 };
+
+const EMPTY_TODAY_STATS = { logins: 0, pageViews: 0, actions: 0, users: 0 };
+
+const computeTodayStats = (rows) => ({
+  logins: rows.filter(log => log.event_type === 'login').length,
+  pageViews: rows.filter(log => log.event_type === 'page_view').length,
+  actions: rows.filter(log => ACTION_EVENTS.includes(log.event_type)).length,
+  users: new Set(rows.map(log => log.user_id).filter(Boolean)).size,
+});
 
 const getDetailsText = (details) => {
   if (!details || typeof details !== 'object') return '-';
@@ -35,24 +45,33 @@ export default function ActivityLog() {
   const [eventFilter, setEventFilter] = useState('');
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
+  const [todayStats, setTodayStats] = useState(EMPTY_TODAY_STATS);
 
   useEffect(() => { fetchLogs(); }, []);
 
   const fetchLogs = async () => {
     setLoading(true);
     setError('');
-    const { data, error: fetchError } = await supabase
-      .from('audit_logs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(500);
 
-    if (fetchError) {
-      setError(fetchError.message);
+    // Today's stats come from a dedicated today-scoped query, not the newest-500
+    // list — otherwise a busy day (>500 rows) would undercount (BUG-018).
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const [listRes, todayRes] = await Promise.all([
+      supabase.from('audit_logs').select('*')
+        .order('created_at', { ascending: false }).limit(500),
+      supabase.from('audit_logs').select('event_type,user_id')
+        .gte('created_at', todayStart.toISOString()).limit(50000),
+    ]);
+
+    if (listRes.error) {
+      setError(listRes.error.message);
       setLogs([]);
     } else {
-      setLogs(data || []);
+      setLogs(listRes.data || []);
     }
+    setTodayStats(todayRes.error ? EMPTY_TODAY_STATS : computeTodayStats(todayRes.data || []));
     setLoading(false);
   };
 
@@ -72,17 +91,6 @@ export default function ActivityLog() {
       return haystack.includes(term);
     });
   }, [logs, eventFilter, search]);
-
-  const todayStats = useMemo(() => {
-    const today = new Date().toDateString();
-    const todayLogs = logs.filter(log => new Date(log.created_at).toDateString() === today);
-    return {
-      logins: todayLogs.filter(log => log.event_type === 'login').length,
-      pageViews: todayLogs.filter(log => log.event_type === 'page_view').length,
-      actions: todayLogs.filter(log => ACTION_EVENTS.includes(log.event_type)).length,
-      users: new Set(todayLogs.map(log => log.user_id).filter(Boolean)).size,
-    };
-  }, [logs]);
 
   return (
     <div>

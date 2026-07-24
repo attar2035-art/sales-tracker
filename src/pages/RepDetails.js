@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { MONTHS_AR, formatCurrency, formatNumber, getRemainingWorkingDays, getTotalWorkingDaysInMonth } from '../lib/helpers';
+import { MONTHS_AR, formatCurrency, formatNumber, getRemainingWorkingDays, getTotalWorkingDaysInMonth, getMonthPhase } from '../lib/helpers';
 import { buildEffectiveTargetsMap } from '../lib/targets';
+import { getDailyRequirement } from '../lib/repMetrics';
 
 const calcPercent = (achieved, target) => target > 0 ? Math.min(100, Math.round((achieved / target) * 100)) : 0;
 
@@ -61,6 +62,7 @@ export default function RepDetails({ supervisorId }) {
   const rep = reps.find(r => r.id === selectedRep);
   const remainingDays = getRemainingWorkingDays(year, month);
   const totalDays = getTotalWorkingDaysInMonth(year, month);
+  const monthPhase = getMonthPhase(year, month);
   const sum = (field) => entries.reduce((a, e) => a + (parseFloat(e[field]) || 0), 0);
   const totals = {
     sales: sum('daily_sales'), collection: sum('daily_collection'),
@@ -148,7 +150,7 @@ export default function RepDetails({ supervisorId }) {
                   { label: 'الكيلومترات', t: target.target_km, a: totals.km },
                 ].map(row => {
                   const remaining = Math.max(0, row.t - row.a);
-                  const daily = remainingDays > 0 ? remaining / remainingDays : remaining;
+                  const daily = getDailyRequirement(remaining, remainingDays, monthPhase, totalDays);
                   const pct = row.t > 0 ? Math.round((row.a / row.t) * 100) : 0;
                   const fmt = row.currency ? formatCurrency : formatNumber;
                   return (
@@ -157,7 +159,7 @@ export default function RepDetails({ supervisorId }) {
                       <td>{fmt(row.t)}</td>
                       <td style={{ color: '#10b981', fontWeight: 700 }}>{fmt(row.a)}</td>
                       <td style={{ color: '#ef4444' }}>{fmt(remaining)}</td>
-                      <td style={{ color: '#f59e0b' }}>{fmt(daily)}</td>
+                      <td style={{ color: '#f59e0b' }}>{daily == null ? '-' : fmt(daily)}</td>
                       <td>
                         <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{pct}%</span>
                         <div className="progress-bar"><div className="progress-fill" style={{ width: `${Math.min(100, pct)}%`, background: pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444' }} /></div>

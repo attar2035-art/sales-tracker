@@ -5,23 +5,27 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recha
 
 export default function CustomerABCAnalysis({ year = 2022 }) {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [data, setData] = useState([]);
-  const [abcData, setAbcData] = useState(null);
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year]);
 
   const loadData = async () => {
     setLoading(true);
-    const { data: customersData, error } = await supabase
+    setError('');
+    const { data: customersData, error: loadError } = await supabase
       .from('customer_yearly_sales')
       .select('customer_code, customer_name, net_sales, year')
       .eq('year', year)
       .order('net_sales', { ascending: false });
 
-    if (error) {
-      console.error(error);
+    if (loadError) {
+      console.error(loadError);
+      setError('تعذّر تحميل البيانات. حاول مرة أخرى.');
+      setData([]); // clear stale data so a failed fetch doesn't show the previous year
       setLoading(false);
       return;
     }
@@ -93,6 +97,10 @@ export default function CustomerABCAnalysis({ year = 2022 }) {
         جاري تحميل البيانات...
       </div>
     );
+  }
+
+  if (error) {
+    return <div className="alert alert-error" style={{ margin: '1rem 0' }}>{error}</div>;
   }
 
   if (!analysis) {
