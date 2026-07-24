@@ -84,6 +84,21 @@ package.json, package-lock.json, .gitignore.
 **Final verification:** 83/83 unit/component tests pass, `eslint src` clean,
 `CI=true react-scripts build` compiles successfully.
 
+### Post-fix follow-ups (verified against real Supabase + deployed)
+- **BUG-005 fully fixed:** aliased the dependency to the patched SheetJS mirror
+  (`"xlsx": "npm:@e965/xlsx@^0.20.3"`) — `import 'xlsx'` unchanged, `npm audit` no
+  longer reports the prototype-pollution/ReDoS advisories, 88 tests pass, build
+  compiles. (SheetJS's own CDN was unreachable from the sandbox; `@e965/xlsx` is the
+  same 0.20.3 on the npm registry. Parser hardening remains as defense-in-depth.)
+- **BUG-003 confirmed resolved:** production `daily_entries` has `year`/`month` integer
+  columns — the explicit write is compatible; no schema change needed.
+- **BUG-020 RPC deployed to production:** `customer_sales_totals` created (verified:
+  function exists, returns 1,375 customer rows, SECURITY INVOKER honors RLS).
+- **RLS validated end-to-end on a real Supabase staging project** (created + seeded +
+  torn down/paused): every role's read scope matched expectations; rep INSERT denied,
+  rep DELETE = 0; RPC RLS-scoped; production policy audit found 0 leaked allow-all
+  policies and RLS enabled on all sensitive tables.
+
 ## Commands executed (read-only / non-destructive)
 - `react-scripts test --coverage`, `eslint src`, `react-scripts build` (build output was
   reverted via `git checkout -- build/`), `npm audit`, `npm outdated`.
