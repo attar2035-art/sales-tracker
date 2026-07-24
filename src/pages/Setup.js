@@ -333,7 +333,7 @@ export default function Setup() {
         <div>
           <div className="card">
             <div className="card-title">➕ إضافة منطقة</div>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
               <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
                 <label className="form-label">اسم المنطقة</label>
                 <input className="form-input" value={regionName} onChange={e => setRegionName(e.target.value)}
@@ -348,12 +348,12 @@ export default function Setup() {
               <div className="empty-state"><div className="empty-state-icon">🗺️</div><div className="empty-state-text">لا توجد مناطق بعد</div></div>
             ) : (
               <div className="table-wrapper">
-                <table>
+                <table className="responsive-cards">
                   <thead><tr><th>#</th><th>اسم المنطقة</th><th>الإجراءات</th></tr></thead>
                   <tbody>
                     {regions.map((r, i) => (
-                      <tr key={r.id}><td>{i + 1}</td><td>{r.name}</td>
-                        <td><button className="btn btn-danger btn-sm" onClick={() => deleteItem('regions', r.id)}>حذف</button></td>
+                      <tr key={r.id}><td data-label="#">{i + 1}</td><td data-label="اسم المنطقة">{r.name}</td>
+                        <td className="no-label"><button className="btn btn-danger btn-sm" onClick={() => deleteItem('regions', r.id)}>حذف</button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -388,12 +388,12 @@ export default function Setup() {
               <div className="empty-state"><div className="empty-state-icon">👔</div><div className="empty-state-text">لا يوجد مشرفون بعد</div></div>
             ) : (
               <div className="table-wrapper">
-                <table>
+                <table className="responsive-cards">
                   <thead><tr><th>#</th><th>الاسم</th><th>المنطقة</th><th>الإجراءات</th></tr></thead>
                   <tbody>
                     {supervisors.map((s, i) => (
-                      <tr key={s.id}><td>{i + 1}</td><td>{s.name}</td><td>{s.regions?.name || '-'}</td>
-                        <td><button className="btn btn-danger btn-sm" onClick={() => deleteItem('supervisors', s.id)}>حذف</button></td>
+                      <tr key={s.id}><td data-label="#">{i + 1}</td><td data-label="الاسم">{s.name}</td><td data-label="المنطقة">{s.regions?.name || '-'}</td>
+                        <td className="no-label"><button className="btn btn-danger btn-sm" onClick={() => deleteItem('supervisors', s.id)}>حذف</button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -468,16 +468,16 @@ export default function Setup() {
               <div className="empty-state"><div className="empty-state-icon">👤</div><div className="empty-state-text">لا يوجد مندوبون بعد</div></div>
             ) : (
               <div className="table-wrapper">
-                <table>
+                <table className="responsive-cards">
                   <thead><tr><th>#</th><th>الاسم</th><th>المشرف</th><th>المنطقة</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
                   <tbody>
                     {reps.map((r, i) => (
                       <tr key={r.id}>
-                        <td>{i + 1}</td><td>{r.name}</td>
-                        <td>{r.supervisors?.name || 'بدون مشرف'}</td>
-                        <td>{r.regions?.name || '-'}</td>
-                        <td><span className={`badge ${r.is_active ? 'badge-success' : 'badge-danger'}`}>{r.is_active ? 'نشط' : 'غير نشط'}</span></td>
-                        <td style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <td data-label="#">{i + 1}</td><td data-label="الاسم">{r.name}</td>
+                        <td data-label="المشرف">{r.supervisors?.name || 'بدون مشرف'}</td>
+                        <td data-label="المنطقة">{r.regions?.name || '-'}</td>
+                        <td data-label="الحالة"><span className={`badge ${r.is_active ? 'badge-success' : 'badge-danger'}`}>{r.is_active ? 'نشط' : 'غير نشط'}</span></td>
+                        <td className="no-label" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                           <button className="btn btn-primary btn-sm" onClick={() => startEditRep(r)}>تعديل</button>
                           <button className="btn btn-success btn-sm" onClick={() => startAccountForRep(r)}>حساب دخول</button>
                           <button className="btn btn-ghost btn-sm" onClick={() => toggleRepActive(r)}>{r.is_active ? 'تعطيل' : 'تفعيل'}</button>
@@ -516,7 +516,7 @@ export default function Setup() {
               </div>
               <div className="form-group">
                 <label className="form-label">كلمة السر المؤقتة</label>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <input className="form-input" type="text" value={accountPassword}
                     onChange={e => setAccountPassword(e.target.value)}
                     placeholder="كلمة سر مؤقتة" />

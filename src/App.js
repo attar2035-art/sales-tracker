@@ -79,6 +79,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState('dashboard');
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     checkUser();
@@ -172,77 +173,70 @@ export default function App() {
   };
 
   const nav = getNav();
+  const navigate = (key) => { setPage(key); setMenuOpen(false); };
+  const roleBadge = () => {
+    if (user.role === 'admin') return <span className="badge badge-info">مدير</span>;
+    if (user.role === 'supervisor') return <span className="badge badge-success">مشرف — {user.supervisor?.name}</span>;
+    if (user.role === 'data_entry') return <span className="badge badge-warning">مدخل بيانات</span>;
+    if (user.role === 'rep') return <span className="badge badge-info">مندوب</span>;
+    return null;
+  };
+  const activeLabel = nav.find(item => item.key === page)?.label || 'نظام متابعة المبيعات';
+
+  const navList = (
+    <>
+      {nav.map(item => (
+        <button key={item.key}
+          className={`nav-item ${page === item.key ? 'active' : ''}`}
+          onClick={() => navigate(item.key)}>
+          <span className="nav-icon">{item.icon}</span>
+          {item.label}
+        </button>
+      ))}
+      <button className="nav-item" onClick={handleLogout}
+        style={{ marginTop: 'auto', color: '#ef4444' }}>
+        <span className="nav-icon">🚪</span>
+        تسجيل الخروج
+      </button>
+    </>
+  );
+
+  const userStrip = (
+    <div style={{ fontSize: '0.75rem', color: '#64748b', padding: '0 0.5rem 1rem', borderBottom: '1px solid #334155', marginBottom: '1rem' }}>
+      <div style={{ color: '#94a3b8', fontWeight: 600, overflowWrap: 'anywhere' }}>{user.email}</div>
+      <div style={{ marginTop: '0.25rem' }}>{roleBadge()}</div>
+    </div>
+  );
 
   return (
     <div className="app-container">
-      <nav className="sidebar">
-        <div className="sidebar-logo">
-          🏭 نظام متابعة<br />المبيعات
-        </div>
-        <div style={{ fontSize: '0.75rem', color: '#64748b', padding: '0 0.5rem 1rem', borderBottom: '1px solid #334155', marginBottom: '1rem' }}>
-          <div style={{ color: '#94a3b8', fontWeight: 600 }}>{user.email}</div>
-          <div style={{ marginTop: '0.25rem' }}>
-            {user.role === 'admin' && <span className="badge badge-info">مدير</span>}
-            {user.role === 'supervisor' && <span className="badge badge-success">مشرف — {user.supervisor?.name}</span>}
-            {user.role === 'data_entry' && <span className="badge badge-warning">مدخل بيانات</span>}
-            {user.role === 'rep' && <span className="badge badge-info">مندوب</span>}
-          </div>
-        </div>
-        {nav.map(item => (
-          <button key={item.key}
-            className={`nav-item ${page === item.key ? 'active' : ''}`}
-            onClick={() => setPage(item.key)}>
-            <span className="nav-icon">{item.icon}</span>
-            {item.label}
-          </button>
-        ))}
-        <button className="nav-item" onClick={handleLogout}
-          style={{ marginTop: 'auto', color: '#ef4444' }}>
-          <span className="nav-icon">🚪</span>
-          تسجيل الخروج
-        </button>
+      {/* Mobile top bar (phones & tablets) */}
+      <header className="mobile-topbar">
+        <button className="menu-btn" aria-label="القائمة" aria-expanded={menuOpen}
+          onClick={() => setMenuOpen(true)}>☰</button>
+        <span className="topbar-logo">🏭</span>
+        <span className="topbar-title">{activeLabel}</span>
+      </header>
+
+      {/* Slide-in drawer + overlay (mobile nav) */}
+      <div className={`drawer-overlay ${menuOpen ? 'open' : ''}`}
+        onClick={() => setMenuOpen(false)} aria-hidden={!menuOpen} />
+      <nav className={`drawer ${menuOpen ? 'open' : ''}`} aria-label="التنقل">
+        <div className="sidebar-logo">🏭 نظام متابعة<br />المبيعات</div>
+        {userStrip}
+        {navList}
       </nav>
 
-      <div style={{
-        display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0,
-        background: '#1e293b', borderTop: '1px solid #334155',
-        zIndex: 200, padding: '0.5rem 0',
-      }} className="mobile-nav">
-        {nav.map(item => (
-          <button key={item.key} onClick={() => setPage(item.key)}
-            style={{
-              flex: 1, background: 'none', border: 'none',
-              color: page === item.key ? '#3b82f6' : '#64748b',
-              display: 'flex', flexDirection: 'column',
-              alignItems: 'center', gap: '2px',
-              fontSize: '0.65rem', cursor: 'pointer',
-              fontFamily: 'Cairo, sans-serif',
-            }}>
-            <span style={{ fontSize: '1.2rem' }}>{item.icon}</span>
-            {item.label.split(' ')[0]}
-          </button>
-        ))}
-        <button onClick={handleLogout}
-          style={{
-            flex: 1, background: 'none', border: 'none', color: '#ef4444',
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            gap: '2px', fontSize: '0.65rem', cursor: 'pointer', fontFamily: 'Cairo, sans-serif',
-          }}>
-          <span style={{ fontSize: '1.2rem' }}>🚪</span>
-          خروج
-        </button>
-      </div>
+      {/* Desktop sidebar */}
+      <nav className="sidebar">
+        <div className="sidebar-logo">🏭 نظام متابعة<br />المبيعات</div>
+        {userStrip}
+        {navList}
+      </nav>
 
       <main className="main-content">
         {renderPage()}
       </main>
-
-      <style>{`
-        @media (max-width: 600px) {
-          .mobile-nav { display: flex !important; }
-          .main-content { padding-bottom: 70px !important; }
-        }
-      `}</style>
     </div>
   );
 }

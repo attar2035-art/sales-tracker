@@ -155,7 +155,7 @@ export default function CustomerDetails({ customerId, onBack }) {
         </div>
 
         <div className="table-wrapper">
-          <table>
+          <table className="responsive-cards">
             <thead>
               <tr>
                 <th>كود الصنف</th>
@@ -168,18 +168,18 @@ export default function CustomerDetails({ customerId, onBack }) {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <td className="no-label" colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
                     لا توجد أصناف مطابقة
                   </td>
                 </tr>
               ) : (
                 filtered.map(p => (
                   <tr key={p.product_id}>
-                    <td>{p.product_code}</td>
-                    <td>{p.product_name}</td>
-                    <td>{p.unit}</td>
-                    <td>{formatNumber(p.quantity)}</td>
-                    <td>{formatCurrency(p.amount)} ر.س</td>
+                    <td data-label="كود الصنف">{p.product_code}</td>
+                    <td data-label="اسم الصنف">{p.product_name}</td>
+                    <td data-label="الوحدة">{p.unit}</td>
+                    <td data-label="الكمية">{formatNumber(p.quantity)}</td>
+                    <td data-label="القيمة الإجمالية">{formatCurrency(p.amount)} ر.س</td>
                   </tr>
                 ))
               )}

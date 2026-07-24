@@ -279,7 +279,7 @@ export default function Customers({ user }) {
         </div>
 
         <div className="table-wrapper">
-          <table>
+          <table className="responsive-cards">
             <thead>
               <tr>
                 <th>الكود</th>
@@ -293,7 +293,7 @@ export default function Customers({ user }) {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <td className="no-label" colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
                     لا يوجد عملاء مطابقين
                   </td>
                 </tr>
@@ -304,12 +304,12 @@ export default function Customers({ user }) {
                     style={{ cursor: 'pointer' }}
                     onClick={() => setSelectedCustomerId(c.id)}
                   >
-                    <td>{c.customer_code}</td>
-                    <td>{c.customer_name}</td>
-                    <td>{c.regions?.name || '-'}</td>
-                    <td>{formatNumber(c.sku_count)}</td>
-                    <td>{formatNumber(c.total_quantity)}</td>
-                    <td>{formatCurrency(c.total_amount)} ر.س</td>
+                    <td data-label="الكود">{c.customer_code}</td>
+                    <td data-label="اسم العميل">{c.customer_name}</td>
+                    <td data-label="المنطقة">{c.regions?.name || '-'}</td>
+                    <td data-label="عدد الأصناف">{formatNumber(c.sku_count)}</td>
+                    <td data-label="الكمية">{formatNumber(c.total_quantity)}</td>
+                    <td data-label="إجمالي المبيعات">{formatCurrency(c.total_amount)} ر.س</td>
                   </tr>
                 ))
               )}
