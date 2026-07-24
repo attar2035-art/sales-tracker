@@ -144,7 +144,7 @@ export default function Targets() {
           </div>
         ) : (
           <div className="table-wrapper">
-            <table>
+            <table className="responsive-cards">
               <thead>
                 <tr><th>المندوب</th><th>المشرف</th><th>المنطقة</th><th>الأهداف</th><th>الإجراءات</th></tr>
               </thead>
@@ -152,17 +152,17 @@ export default function Targets() {
                 {reps.map(rep => (
                   <React.Fragment key={rep.id}>
                     <tr>
-                      <td><strong>{rep.name}</strong></td>
-                      <td>{rep.supervisors?.name || 'بدون مشرف'}</td>
-                      <td>{rep.regions?.name || '-'}</td>
-                      <td>
+                      <td data-label="المندوب"><strong>{rep.name}</strong></td>
+                      <td data-label="المشرف">{rep.supervisors?.name || 'بدون مشرف'}</td>
+                      <td data-label="المنطقة">{rep.regions?.name || '-'}</td>
+                      <td data-label="الأهداف">
                         {targets[rep.id]
                           ? targets[rep.id]._isInherited
                             ? <span className="badge badge-info">متكررة من {MONTHS_AR[targets[rep.id]._sourceMonth - 1]} {targets[rep.id]._sourceYear}</span>
                             : <span className="badge badge-success">محددة ✓</span>
                           : <span className="badge badge-warning">غير محددة</span>}
                       </td>
-                      <td>
+                      <td className="no-label">
                         <button className="btn btn-primary btn-sm"
                           onClick={() => selectedRep === rep.id ? setSelectedRep(null) : openForm(rep)}>
                           {selectedRep === rep.id ? 'إغلاق' : targets[rep.id] ? 'تعديل الأهداف' : 'تحديد الأهداف'}
@@ -171,7 +171,7 @@ export default function Targets() {
                     </tr>
                     {selectedRep === rep.id && forms[rep.id] && (
                       <tr>
-                        <td colSpan={5} style={{ padding: '1.5rem', background: '#0f172a' }}>
+                        <td className="no-label" colSpan={5} style={{ padding: '1.5rem', background: '#0f172a' }}>
                           <div className="form-grid">
                             {fields.map(f => (
                               <div className="form-group" key={f.key}>
@@ -183,7 +183,7 @@ export default function Targets() {
                               </div>
                             ))}
                           </div>
-                          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.5rem' }}>
                             <button className="btn btn-success" onClick={() => saveTarget(rep.id)} disabled={loading}>💾 حفظ الأهداف</button>
                             <button className="btn btn-ghost" onClick={() => setSelectedRep(null)}>إلغاء</button>
                           </div>

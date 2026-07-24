@@ -239,7 +239,7 @@ export default function DailyEntry() {
                 {section.fields.map(f => (
                   <div className="form-group" key={f.key}>
                     <label className="form-label">{f.label}</label>
-                    <input className="form-input" type="number" min="0"
+                    <input className="form-input" type="number" min="0" inputMode="decimal"
                       value={form[f.key]}
                       onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
                       placeholder={f.placeholder} />
@@ -320,7 +320,7 @@ export default function DailyEntry() {
               placeholder="ملاحظات اليوم..." style={{ resize: 'vertical' }} />
           </div>
 
-          <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
             <button className="btn btn-success" onClick={handleSave} disabled={loading}
               style={{ fontSize: '1rem', padding: '0.75rem 2rem' }}>
               {loading ? '⏳ جاري الحفظ...' : '💾 حفظ بيانات اليوم'}

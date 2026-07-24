@@ -1,0 +1,2328 @@
+[
+  {
+    "role": "admin",
+    "page": "dashboard",
+    "width": 320,
+    "status": "OK",
+    "vw": 320,
+    "scrollW": 320,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -68,
+        "right": 44,
+        "w": 112
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -197,
+        "right": -98,
+        "w": 99
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -296,
+        "right": -197,
+        "w": 99
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -579,
+        "right": -480,
+        "w": 98
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -393,
+        "right": -296,
+        "w": 97
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -480,
+        "right": -393,
+        "w": 88
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "daily",
+    "width": 320,
+    "status": "OK",
+    "vw": 320,
+    "scrollW": 320,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "targets",
+    "width": 320,
+    "status": "OK",
+    "vw": 320,
+    "scrollW": 320,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "repdetails",
+    "width": 320,
+    "status": "OK",
+    "vw": 320,
+    "scrollW": 320,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "customers",
+    "width": 320,
+    "status": "OK",
+    "vw": 320,
+    "scrollW": 320,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -271,
+        "right": -143,
+        "w": 128
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -74,
+        "right": 32,
+        "w": 107
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -143,
+        "right": -74,
+        "w": 69
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "analytics",
+    "width": 320,
+    "status": "OK",
+    "vw": 320,
+    "scrollW": 320,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "segmentation",
+    "width": 320,
+    "status": "OK",
+    "vw": 320,
+    "scrollW": 320,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -264,
+        "right": -142,
+        "w": 122
+      },
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -45,
+        "right": 65,
+        "w": 110
+      },
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -134,
+        "right": -53,
+        "w": 81
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "audit",
+    "width": 320,
+    "status": "OK",
+    "vw": 320,
+    "scrollW": 320,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "setup",
+    "width": 320,
+    "status": "OK",
+    "vw": 320,
+    "scrollW": 320,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -197,
+        "right": -49,
+        "w": 149
+      },
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -41,
+        "right": 71,
+        "w": 112
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "password",
+    "width": 320,
+    "status": "OK",
+    "vw": 320,
+    "scrollW": 320,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "dashboard",
+    "width": 360,
+    "status": "OK",
+    "vw": 360,
+    "scrollW": 360,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -28,
+        "right": 84,
+        "w": 112
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -157,
+        "right": -58,
+        "w": 99
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -256,
+        "right": -157,
+        "w": 99
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -539,
+        "right": -440,
+        "w": 98
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -353,
+        "right": -256,
+        "w": 97
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -440,
+        "right": -353,
+        "w": 88
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "daily",
+    "width": 360,
+    "status": "OK",
+    "vw": 360,
+    "scrollW": 360,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "targets",
+    "width": 360,
+    "status": "OK",
+    "vw": 360,
+    "scrollW": 360,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "repdetails",
+    "width": 360,
+    "status": "OK",
+    "vw": 360,
+    "scrollW": 360,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "customers",
+    "width": 360,
+    "status": "OK",
+    "vw": 360,
+    "scrollW": 360,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -231,
+        "right": -103,
+        "w": 128
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -34,
+        "right": 72,
+        "w": 107
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -103,
+        "right": -34,
+        "w": 69
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "analytics",
+    "width": 360,
+    "status": "OK",
+    "vw": 360,
+    "scrollW": 360,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "segmentation",
+    "width": 360,
+    "status": "OK",
+    "vw": 360,
+    "scrollW": 360,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -224,
+        "right": -102,
+        "w": 122
+      },
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -5,
+        "right": 105,
+        "w": 110
+      },
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -94,
+        "right": -13,
+        "w": 81
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "audit",
+    "width": 360,
+    "status": "OK",
+    "vw": 360,
+    "scrollW": 360,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "setup",
+    "width": 360,
+    "status": "OK",
+    "vw": 360,
+    "scrollW": 360,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -157,
+        "right": -9,
+        "w": 149
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "password",
+    "width": 360,
+    "status": "OK",
+    "vw": 360,
+    "scrollW": 360,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "dashboard",
+    "width": 375,
+    "status": "OK",
+    "vw": 375,
+    "scrollW": 375,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -13,
+        "right": 99,
+        "w": 112
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -142,
+        "right": -43,
+        "w": 99
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -241,
+        "right": -142,
+        "w": 99
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -524,
+        "right": -425,
+        "w": 98
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -338,
+        "right": -241,
+        "w": 97
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -425,
+        "right": -338,
+        "w": 88
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "daily",
+    "width": 375,
+    "status": "OK",
+    "vw": 375,
+    "scrollW": 375,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "targets",
+    "width": 375,
+    "status": "OK",
+    "vw": 375,
+    "scrollW": 375,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "repdetails",
+    "width": 375,
+    "status": "OK",
+    "vw": 375,
+    "scrollW": 375,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "customers",
+    "width": 375,
+    "status": "OK",
+    "vw": 375,
+    "scrollW": 375,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -216,
+        "right": -88,
+        "w": 128
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -19,
+        "right": 87,
+        "w": 107
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -88,
+        "right": -19,
+        "w": 69
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "analytics",
+    "width": 375,
+    "status": "OK",
+    "vw": 375,
+    "scrollW": 375,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "segmentation",
+    "width": 375,
+    "status": "OK",
+    "vw": 375,
+    "scrollW": 375,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -209,
+        "right": -87,
+        "w": 122
+      },
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -79,
+        "right": 2,
+        "w": 81
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "audit",
+    "width": 375,
+    "status": "OK",
+    "vw": 375,
+    "scrollW": 375,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "setup",
+    "width": 375,
+    "status": "OK",
+    "vw": 375,
+    "scrollW": 375,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -142,
+        "right": 6,
+        "w": 149
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "password",
+    "width": 375,
+    "status": "OK",
+    "vw": 375,
+    "scrollW": 375,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "dashboard",
+    "width": 390,
+    "status": "OK",
+    "vw": 390,
+    "scrollW": 390,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -127,
+        "right": -28,
+        "w": 99
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -226,
+        "right": -127,
+        "w": 99
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -509,
+        "right": -410,
+        "w": 98
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -323,
+        "right": -226,
+        "w": 97
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -410,
+        "right": -323,
+        "w": 88
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -28,
+        "right": 41,
+        "w": 70
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "daily",
+    "width": 390,
+    "status": "OK",
+    "vw": 390,
+    "scrollW": 390,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "targets",
+    "width": 390,
+    "status": "OK",
+    "vw": 390,
+    "scrollW": 390,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "repdetails",
+    "width": 390,
+    "status": "OK",
+    "vw": 390,
+    "scrollW": 390,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "customers",
+    "width": 390,
+    "status": "OK",
+    "vw": 390,
+    "scrollW": 390,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -201,
+        "right": -73,
+        "w": 128
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -4,
+        "right": 102,
+        "w": 107
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -73,
+        "right": -4,
+        "w": 69
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "analytics",
+    "width": 390,
+    "status": "OK",
+    "vw": 390,
+    "scrollW": 390,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "segmentation",
+    "width": 390,
+    "status": "OK",
+    "vw": 390,
+    "scrollW": 390,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -194,
+        "right": -72,
+        "w": 122
+      },
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -64,
+        "right": 17,
+        "w": 81
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "audit",
+    "width": 390,
+    "status": "OK",
+    "vw": 390,
+    "scrollW": 390,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "setup",
+    "width": 390,
+    "status": "OK",
+    "vw": 390,
+    "scrollW": 390,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -127,
+        "right": 21,
+        "w": 149
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "password",
+    "width": 390,
+    "status": "OK",
+    "vw": 390,
+    "scrollW": 390,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "dashboard",
+    "width": 412,
+    "status": "OK",
+    "vw": 412,
+    "scrollW": 412,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -105,
+        "right": -6,
+        "w": 99
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -204,
+        "right": -105,
+        "w": 99
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -487,
+        "right": -388,
+        "w": 98
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -301,
+        "right": -204,
+        "w": 97
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -388,
+        "right": -301,
+        "w": 88
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -6,
+        "right": 63,
+        "w": 70
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "daily",
+    "width": 412,
+    "status": "OK",
+    "vw": 412,
+    "scrollW": 412,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "targets",
+    "width": 412,
+    "status": "OK",
+    "vw": 412,
+    "scrollW": 412,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "repdetails",
+    "width": 412,
+    "status": "OK",
+    "vw": 412,
+    "scrollW": 412,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "customers",
+    "width": 412,
+    "status": "OK",
+    "vw": 412,
+    "scrollW": 412,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -179,
+        "right": -51,
+        "w": 128
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -51,
+        "right": 18,
+        "w": 69
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "analytics",
+    "width": 412,
+    "status": "OK",
+    "vw": 412,
+    "scrollW": 412,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "segmentation",
+    "width": 412,
+    "status": "OK",
+    "vw": 412,
+    "scrollW": 412,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -172,
+        "right": -50,
+        "w": 122
+      },
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -42,
+        "right": 39,
+        "w": 81
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "audit",
+    "width": 412,
+    "status": "OK",
+    "vw": 412,
+    "scrollW": 412,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "setup",
+    "width": 412,
+    "status": "OK",
+    "vw": 412,
+    "scrollW": 412,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -105,
+        "right": 43,
+        "w": 149
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "password",
+    "width": 412,
+    "status": "OK",
+    "vw": 412,
+    "scrollW": 412,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "dashboard",
+    "width": 430,
+    "status": "OK",
+    "vw": 430,
+    "scrollW": 430,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -87,
+        "right": 12,
+        "w": 99
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -186,
+        "right": -87,
+        "w": 99
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -469,
+        "right": -370,
+        "w": 98
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -283,
+        "right": -186,
+        "w": 97
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -370,
+        "right": -283,
+        "w": 88
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "daily",
+    "width": 430,
+    "status": "OK",
+    "vw": 430,
+    "scrollW": 430,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "targets",
+    "width": 430,
+    "status": "OK",
+    "vw": 430,
+    "scrollW": 430,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "repdetails",
+    "width": 430,
+    "status": "OK",
+    "vw": 430,
+    "scrollW": 430,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "customers",
+    "width": 430,
+    "status": "OK",
+    "vw": 430,
+    "scrollW": 430,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -161,
+        "right": -33,
+        "w": 128
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -33,
+        "right": 36,
+        "w": 69
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "analytics",
+    "width": 430,
+    "status": "OK",
+    "vw": 430,
+    "scrollW": 430,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "segmentation",
+    "width": 430,
+    "status": "OK",
+    "vw": 430,
+    "scrollW": 430,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -154,
+        "right": -32,
+        "w": 122
+      },
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -24,
+        "right": 57,
+        "w": 81
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "audit",
+    "width": 430,
+    "status": "OK",
+    "vw": 430,
+    "scrollW": 430,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "setup",
+    "width": 430,
+    "status": "OK",
+    "vw": 430,
+    "scrollW": 430,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -87,
+        "right": 61,
+        "w": 149
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "password",
+    "width": 430,
+    "status": "OK",
+    "vw": 430,
+    "scrollW": 430,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "dashboard",
+    "width": 480,
+    "status": "OK",
+    "vw": 480,
+    "scrollW": 480,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -37,
+        "right": 62,
+        "w": 99
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -136,
+        "right": -37,
+        "w": 99
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -419,
+        "right": -320,
+        "w": 98
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -233,
+        "right": -136,
+        "w": 97
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -320,
+        "right": -233,
+        "w": 88
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "daily",
+    "width": 480,
+    "status": "OK",
+    "vw": 480,
+    "scrollW": 480,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "targets",
+    "width": 480,
+    "status": "OK",
+    "vw": 480,
+    "scrollW": 480,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "repdetails",
+    "width": 480,
+    "status": "OK",
+    "vw": 480,
+    "scrollW": 480,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "customers",
+    "width": 480,
+    "status": "OK",
+    "vw": 480,
+    "scrollW": 480,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -111,
+        "right": 17,
+        "w": 128
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "analytics",
+    "width": 480,
+    "status": "OK",
+    "vw": 480,
+    "scrollW": 480,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "segmentation",
+    "width": 480,
+    "status": "OK",
+    "vw": 480,
+    "scrollW": 480,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -104,
+        "right": 18,
+        "w": 122
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "audit",
+    "width": 480,
+    "status": "OK",
+    "vw": 480,
+    "scrollW": 480,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "setup",
+    "width": 480,
+    "status": "OK",
+    "vw": 480,
+    "scrollW": 480,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "button",
+        "cls": "tab ",
+        "left": -37,
+        "right": 111,
+        "w": 149
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "password",
+    "width": 480,
+    "status": "OK",
+    "vw": 480,
+    "scrollW": 480,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "dashboard",
+    "width": 768,
+    "status": "OK",
+    "vw": 768,
+    "scrollW": 768,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "table",
+        "cls": "responsive-cards",
+        "left": -124,
+        "right": 747,
+        "w": 871
+      },
+      {
+        "tag": "thead",
+        "cls": "",
+        "left": -124,
+        "right": 747,
+        "w": 871
+      },
+      {
+        "tag": "tr",
+        "cls": "",
+        "left": -124,
+        "right": 747,
+        "w": 871
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -124,
+        "right": -25,
+        "w": 98
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -25,
+        "right": 62,
+        "w": 88
+      }
+    ]
+  },
+  {
+    "role": "admin",
+    "page": "daily",
+    "width": 768,
+    "status": "OK",
+    "vw": 768,
+    "scrollW": 768,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "targets",
+    "width": 768,
+    "status": "OK",
+    "vw": 768,
+    "scrollW": 768,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "repdetails",
+    "width": 768,
+    "status": "OK",
+    "vw": 768,
+    "scrollW": 768,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "customers",
+    "width": 768,
+    "status": "OK",
+    "vw": 768,
+    "scrollW": 768,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "analytics",
+    "width": 768,
+    "status": "OK",
+    "vw": 768,
+    "scrollW": 768,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "segmentation",
+    "width": 768,
+    "status": "OK",
+    "vw": 768,
+    "scrollW": 768,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "audit",
+    "width": 768,
+    "status": "OK",
+    "vw": 768,
+    "scrollW": 768,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "setup",
+    "width": 768,
+    "status": "OK",
+    "vw": 768,
+    "scrollW": 768,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "admin",
+    "page": "password",
+    "width": 768,
+    "status": "OK",
+    "vw": 768,
+    "scrollW": 768,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "rep",
+    "page": "repdashboard",
+    "width": 320,
+    "status": "OK",
+    "vw": 320,
+    "scrollW": 320,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -27,
+        "right": 89,
+        "w": 117
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -258,
+        "right": -142,
+        "w": 116
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -142,
+        "right": -27,
+        "w": 115
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -486,
+        "right": -372,
+        "w": 115
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -372,
+        "right": -258,
+        "w": 113
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -725,
+        "right": -634,
+        "w": 91
+      }
+    ]
+  },
+  {
+    "role": "rep",
+    "page": "customers",
+    "width": 320,
+    "status": "OK",
+    "vw": 320,
+    "scrollW": 320,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -271,
+        "right": -143,
+        "w": 128
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -74,
+        "right": 32,
+        "w": 107
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -143,
+        "right": -74,
+        "w": 69
+      }
+    ]
+  },
+  {
+    "role": "rep",
+    "page": "analytics",
+    "width": 320,
+    "status": "OK",
+    "vw": 320,
+    "scrollW": 320,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "rep",
+    "page": "password",
+    "width": 320,
+    "status": "OK",
+    "vw": 320,
+    "scrollW": 320,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "rep",
+    "page": "repdashboard",
+    "width": 360,
+    "status": "OK",
+    "vw": 360,
+    "scrollW": 360,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -218,
+        "right": -102,
+        "w": 116
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -102,
+        "right": 13,
+        "w": 115
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -446,
+        "right": -332,
+        "w": 115
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -332,
+        "right": -218,
+        "w": 113
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -685,
+        "right": -594,
+        "w": 91
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -527,
+        "right": -446,
+        "w": 81
+      }
+    ]
+  },
+  {
+    "role": "rep",
+    "page": "customers",
+    "width": 360,
+    "status": "OK",
+    "vw": 360,
+    "scrollW": 360,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -231,
+        "right": -103,
+        "w": 128
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -34,
+        "right": 72,
+        "w": 107
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -103,
+        "right": -34,
+        "w": 69
+      }
+    ]
+  },
+  {
+    "role": "rep",
+    "page": "analytics",
+    "width": 360,
+    "status": "OK",
+    "vw": 360,
+    "scrollW": 360,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "rep",
+    "page": "password",
+    "width": 360,
+    "status": "OK",
+    "vw": 360,
+    "scrollW": 360,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "rep",
+    "page": "repdashboard",
+    "width": 375,
+    "status": "OK",
+    "vw": 375,
+    "scrollW": 375,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -203,
+        "right": -87,
+        "w": 116
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -87,
+        "right": 28,
+        "w": 115
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -431,
+        "right": -317,
+        "w": 115
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -317,
+        "right": -203,
+        "w": 113
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -670,
+        "right": -579,
+        "w": 91
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -512,
+        "right": -431,
+        "w": 81
+      }
+    ]
+  },
+  {
+    "role": "rep",
+    "page": "customers",
+    "width": 375,
+    "status": "OK",
+    "vw": 375,
+    "scrollW": 375,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -216,
+        "right": -88,
+        "w": 128
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -19,
+        "right": 87,
+        "w": 107
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -88,
+        "right": -19,
+        "w": 69
+      }
+    ]
+  },
+  {
+    "role": "rep",
+    "page": "analytics",
+    "width": 375,
+    "status": "OK",
+    "vw": 375,
+    "scrollW": 375,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "rep",
+    "page": "password",
+    "width": 375,
+    "status": "OK",
+    "vw": 375,
+    "scrollW": 375,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "rep",
+    "page": "repdashboard",
+    "width": 390,
+    "status": "OK",
+    "vw": 390,
+    "scrollW": 390,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -188,
+        "right": -72,
+        "w": 116
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -72,
+        "right": 43,
+        "w": 115
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -416,
+        "right": -302,
+        "w": 115
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -302,
+        "right": -188,
+        "w": 113
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -655,
+        "right": -564,
+        "w": 91
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -497,
+        "right": -416,
+        "w": 81
+      }
+    ]
+  },
+  {
+    "role": "rep",
+    "page": "customers",
+    "width": 390,
+    "status": "OK",
+    "vw": 390,
+    "scrollW": 390,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -201,
+        "right": -73,
+        "w": 128
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -4,
+        "right": 102,
+        "w": 107
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -73,
+        "right": -4,
+        "w": 69
+      }
+    ]
+  },
+  {
+    "role": "rep",
+    "page": "analytics",
+    "width": 390,
+    "status": "OK",
+    "vw": 390,
+    "scrollW": 390,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "rep",
+    "page": "password",
+    "width": 390,
+    "status": "OK",
+    "vw": 390,
+    "scrollW": 390,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "rep",
+    "page": "repdashboard",
+    "width": 412,
+    "status": "OK",
+    "vw": 412,
+    "scrollW": 412,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -166,
+        "right": -50,
+        "w": 116
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -50,
+        "right": 65,
+        "w": 115
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -394,
+        "right": -280,
+        "w": 115
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -280,
+        "right": -166,
+        "w": 113
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -633,
+        "right": -542,
+        "w": 91
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -475,
+        "right": -394,
+        "w": 81
+      }
+    ]
+  },
+  {
+    "role": "rep",
+    "page": "customers",
+    "width": 412,
+    "status": "OK",
+    "vw": 412,
+    "scrollW": 412,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -179,
+        "right": -51,
+        "w": 128
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -51,
+        "right": 18,
+        "w": 69
+      }
+    ]
+  },
+  {
+    "role": "rep",
+    "page": "analytics",
+    "width": 412,
+    "status": "OK",
+    "vw": 412,
+    "scrollW": 412,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "rep",
+    "page": "password",
+    "width": 412,
+    "status": "OK",
+    "vw": 412,
+    "scrollW": 412,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "rep",
+    "page": "repdashboard",
+    "width": 430,
+    "status": "OK",
+    "vw": 430,
+    "scrollW": 430,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -148,
+        "right": -32,
+        "w": 116
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -32,
+        "right": 83,
+        "w": 115
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -376,
+        "right": -262,
+        "w": 115
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -262,
+        "right": -148,
+        "w": 113
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -615,
+        "right": -524,
+        "w": 91
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -457,
+        "right": -376,
+        "w": 81
+      }
+    ]
+  },
+  {
+    "role": "rep",
+    "page": "customers",
+    "width": 430,
+    "status": "OK",
+    "vw": 430,
+    "scrollW": 430,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -161,
+        "right": -33,
+        "w": 128
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -33,
+        "right": 36,
+        "w": 69
+      }
+    ]
+  },
+  {
+    "role": "rep",
+    "page": "analytics",
+    "width": 430,
+    "status": "OK",
+    "vw": 430,
+    "scrollW": 430,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "rep",
+    "page": "password",
+    "width": 430,
+    "status": "OK",
+    "vw": 430,
+    "scrollW": 430,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "rep",
+    "page": "repdashboard",
+    "width": 480,
+    "status": "OK",
+    "vw": 480,
+    "scrollW": 480,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -98,
+        "right": 18,
+        "w": 116
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -326,
+        "right": -212,
+        "w": 115
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -212,
+        "right": -98,
+        "w": 113
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -565,
+        "right": -474,
+        "w": 91
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -407,
+        "right": -326,
+        "w": 81
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -474,
+        "right": -407,
+        "w": 66
+      }
+    ]
+  },
+  {
+    "role": "rep",
+    "page": "customers",
+    "width": 480,
+    "status": "OK",
+    "vw": 480,
+    "scrollW": 480,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "th",
+        "cls": "",
+        "left": -111,
+        "right": 17,
+        "w": 128
+      }
+    ]
+  },
+  {
+    "role": "rep",
+    "page": "analytics",
+    "width": 480,
+    "status": "OK",
+    "vw": 480,
+    "scrollW": 480,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "rep",
+    "page": "password",
+    "width": 480,
+    "status": "OK",
+    "vw": 480,
+    "scrollW": 480,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "rep",
+    "page": "repdashboard",
+    "width": 768,
+    "status": "OK",
+    "vw": 768,
+    "scrollW": 768,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": [
+      {
+        "tag": "table",
+        "cls": "responsive-cards",
+        "left": -307,
+        "right": 728,
+        "w": 1035
+      },
+      {
+        "tag": "thead",
+        "cls": "",
+        "left": -307,
+        "right": 728,
+        "w": 1035
+      },
+      {
+        "tag": "tr",
+        "cls": "",
+        "left": -307,
+        "right": 728,
+        "w": 1035
+      },
+      {
+        "tag": "tbody",
+        "cls": "",
+        "left": -307,
+        "right": 728,
+        "w": 1035
+      },
+      {
+        "tag": "tr",
+        "cls": "",
+        "left": -307,
+        "right": 728,
+        "w": 1035
+      },
+      {
+        "tag": "tr",
+        "cls": "",
+        "left": -307,
+        "right": 728,
+        "w": 1035
+      }
+    ]
+  },
+  {
+    "role": "rep",
+    "page": "customers",
+    "width": 768,
+    "status": "OK",
+    "vw": 768,
+    "scrollW": 768,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "rep",
+    "page": "analytics",
+    "width": 768,
+    "status": "OK",
+    "vw": 768,
+    "scrollW": 768,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  },
+  {
+    "role": "rep",
+    "page": "password",
+    "width": 768,
+    "status": "OK",
+    "vw": 768,
+    "scrollW": 768,
+    "pageOverflow": 0,
+    "offenders": [],
+    "scrollWide": []
+  }
+]
