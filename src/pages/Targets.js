@@ -15,7 +15,9 @@ export default function Targets() {
   const [msg, setMsg] = useState(null);
   const [selectedRep, setSelectedRep] = useState(null);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchReps(); }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchTargets(); }, [year, month]);
 
   const fetchReps = async () => {

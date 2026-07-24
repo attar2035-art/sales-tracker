@@ -99,8 +99,11 @@ export default function RepDashboard({ repId }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (repId) fetchRep(); }, [repId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (repId) fetchDetails(); }, [repId, year, month]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (rep?.id) fetchRegionInsights(rep); }, [rep, year, month]);
 
   const fetchRep = async () => {

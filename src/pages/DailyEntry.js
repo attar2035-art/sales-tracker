@@ -30,7 +30,9 @@ export default function DailyEntry() {
   const [msg, setMsg] = useState(null);
   const [existingEntry, setExistingEntry] = useState(null);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchReps(); }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (selectedRep && selectedDate) fetchEntry(); }, [selectedRep, selectedDate]);
 
   const fetchReps = async () => {

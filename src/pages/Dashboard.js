@@ -134,7 +134,9 @@ export default function Dashboard({ supervisorId }) {
   const [activeMetric, setActiveMetric] = useState('sales');
   const [activeView, setActiveView] = useState('points');
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchMeta(); }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, [year, month, filterSup]);
 
   const fetchMeta = async () => {

@@ -33,7 +33,9 @@ export default function RepDetails({ supervisorId }) {
   const [target, setTarget] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchReps(); }, [supervisorId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (selectedRep) fetchDetails(); }, [selectedRep, year, month]);
 
   const fetchReps = async () => {

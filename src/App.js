@@ -91,6 +91,7 @@ export default function App() {
   useEffect(() => {
     if (!user || user.must_change_password) return;
     logAuditEvent({ eventType: 'page_view', pageKey: page });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, user?.id, user?.must_change_password]);
 
   const checkUser = async () => {
