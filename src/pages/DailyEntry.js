@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { MONTHS_AR, isWorkingDay } from '../lib/helpers';
 import { logAuditEvent } from '../lib/audit';
@@ -29,6 +29,37 @@ export default function DailyEntry() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
   const [existingEntry, setExistingEntry] = useState(null);
+  const [errors, setErrors] = useState({});
+  const containerRef = useRef(null);
+
+  // Update a field and clear its inline error as the user corrects it.
+  const changeField = (key, value) => {
+    setForm(prev => ({ ...prev, [key]: value }));
+    setErrors(prev => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  // Auto-advance: Enter (or the phone keyboard's "next") moves focus to the
+  // next enabled, visible field — speeds up one-handed data entry.
+  const handleKeyDown = (e) => {
+    if (e.key !== 'Enter' || e.target.tagName === 'TEXTAREA') return;
+    const root = containerRef.current;
+    if (!root) return;
+    const focusables = Array.from(
+      root.querySelectorAll('input:not([disabled]), select:not([disabled])')
+    ).filter(el => el.type !== 'hidden' && el.offsetParent !== null);
+    const idx = focusables.indexOf(e.target);
+    if (idx > -1 && idx < focusables.length - 1) {
+      e.preventDefault();
+      focusables[idx + 1].focus();
+    }
+  };
+
+  const errCls = (key) => `form-input${errors[key] ? ' has-error' : ''}`;
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchReps(); }, []);
@@ -84,19 +115,31 @@ export default function DailyEntry() {
     const availability = parseFloat(form.new_products_availability) || 0;
 
     // Validation (was UI-only min=0 before): reject negatives, out-of-range and
-    // illogical cross-field values before persisting.
+    // illogical cross-field values before persisting. Errors are attached to the
+    // specific field so they render directly under it.
     const numericKeys = [
       'daily_sales', 'daily_collection', 'new_customers', 'new_customers_value',
       'total_visits', 'shelf_photos', 'successful_visits', 'new_products_skus',
       'new_products_qty', 'new_products_availability', 'working_hours', 'km',
       'daily_expenses', 'overdue_total_input', 'overdue_collected',
     ];
-    if (numericKeys.some(k => (parseFloat(form[k]) || 0) < 0)) {
-      showMsg('لا يمكن إدخال قيم سالبة', 'error'); return;
+    const fieldErrors = {};
+    numericKeys.forEach(k => {
+      if ((parseFloat(form[k]) || 0) < 0) fieldErrors[k] = 'لا يمكن إدخال قيمة سالبة';
+    });
+    if (availability > 100) fieldErrors.new_products_availability = 'النسبة يجب أن تكون بين 0 و 100';
+    if (successfulVisits > totalVisits) fieldErrors.successful_visits = 'لا يمكن أن تتجاوز إجمالي الزيارات';
+    if (shelfPhotos > totalVisits) fieldErrors.shelf_photos = 'لا يمكن أن يتجاوز عدد الزيارات';
+    if (Object.keys(fieldErrors).length > 0) {
+      setErrors(fieldErrors);
+      showMsg('صحّح الحقول المميّزة بالأحمر', 'error');
+      // Scroll the first errored field into view and focus it.
+      const firstKey = numericKeys.find(k => fieldErrors[k]);
+      const el = containerRef.current?.querySelector(`[data-field="${firstKey}"]`);
+      if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.focus(); }
+      return;
     }
-    if (availability > 100) { showMsg('نسبة توفر المنتجات يجب أن تكون بين 0 و 100', 'error'); return; }
-    if (successfulVisits > totalVisits) { showMsg('الزيارات الناجحة لا يمكن أن تتجاوز إجمالي الزيارات', 'error'); return; }
-    if (shelfPhotos > totalVisits) { showMsg('عدد صور الرف لا يمكن أن يتجاوز عدد الزيارات', 'error'); return; }
+    setErrors({});
 
     if (existingEntry && !window.confirm('يوجد إدخال مسبق لهذا اليوم. سيتم استبداله بالقيم الجديدة. هل تريد المتابعة؟')) {
       return;
@@ -191,7 +234,7 @@ export default function DailyEntry() {
   ];
 
   return (
-    <div>
+    <div ref={containerRef} onKeyDown={handleKeyDown}>
       <div className="page-header">
         <h1 className="page-title">📝 الإدخال اليومي</h1>
       </div>
@@ -239,10 +282,12 @@ export default function DailyEntry() {
                 {section.fields.map(f => (
                   <div className="form-group" key={f.key}>
                     <label className="form-label">{f.label}</label>
-                    <input className="form-input" type="number" min="0" inputMode="decimal"
+                    <input className={errCls(f.key)} type="number" min="0" inputMode="decimal"
+                      enterKeyHint="next" data-field={f.key}
                       value={form[f.key]}
-                      onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                      onChange={e => changeField(f.key, e.target.value)}
                       placeholder={f.placeholder} />
+                    {errors[f.key] && <div className="form-error">{errors[f.key]}</div>}
                   </div>
                 ))}
               </div>
@@ -255,17 +300,21 @@ export default function DailyEntry() {
             <div className="form-grid">
               <div className="form-group">
                 <label className="form-label">زيارات إجمالي</label>
-                <input className="form-input" type="number" min="0"
+                <input className={errCls('total_visits')} type="number" min="0" inputMode="numeric"
+                  enterKeyHint="next" data-field="total_visits"
                   value={form.total_visits}
-                  onChange={e => setForm(prev => ({ ...prev, total_visits: e.target.value }))}
+                  onChange={e => changeField('total_visits', e.target.value)}
                   placeholder="عدد" />
+                {errors.total_visits && <div className="form-error">{errors.total_visits}</div>}
               </div>
               <div className="form-group">
                 <label className="form-label">صور الرف</label>
-                <input className="form-input" type="number" min="0"
+                <input className={errCls('shelf_photos')} type="number" min="0" inputMode="numeric"
+                  enterKeyHint="next" data-field="shelf_photos"
                   value={form.shelf_photos}
-                  onChange={e => setForm(prev => ({ ...prev, shelf_photos: e.target.value }))}
+                  onChange={e => changeField('shelf_photos', e.target.value)}
                   placeholder="عدد الصور" />
+                {errors.shelf_photos && <div className="form-error">{errors.shelf_photos}</div>}
               </div>
               <div className="form-group">
                 <label className="form-label">فاقد الصور</label>
@@ -278,10 +327,12 @@ export default function DailyEntry() {
               </div>
               <div className="form-group">
                 <label className="form-label">زيارات ناجحة</label>
-                <input className="form-input" type="number" min="0"
+                <input className={errCls('successful_visits')} type="number" min="0" inputMode="numeric"
+                  enterKeyHint="next" data-field="successful_visits"
                   value={form.successful_visits}
-                  onChange={e => setForm(prev => ({ ...prev, successful_visits: e.target.value }))}
+                  onChange={e => changeField('successful_visits', e.target.value)}
                   placeholder="عدد" />
+                {errors.successful_visits && <div className="form-error">{errors.successful_visits}</div>}
               </div>
             </div>
           </div>
@@ -292,17 +343,21 @@ export default function DailyEntry() {
             <div className="form-grid">
               <div className="form-group">
                 <label className="form-label">إجمالي المتأخرات فوق 60 يوم</label>
-                <input className="form-input" type="number" min="0"
+                <input className={errCls('overdue_total_input')} type="number" min="0" inputMode="decimal"
+                  enterKeyHint="next" data-field="overdue_total_input"
                   value={form.overdue_total_input}
-                  onChange={e => setForm(prev => ({ ...prev, overdue_total_input: e.target.value }))}
+                  onChange={e => changeField('overdue_total_input', e.target.value)}
                   placeholder="المبلغ" />
+                {errors.overdue_total_input && <div className="form-error">{errors.overdue_total_input}</div>}
               </div>
               <div className="form-group">
                 <label className="form-label">المحصل من المتأخرات اليوم</label>
-                <input className="form-input" type="number" min="0"
+                <input className={errCls('overdue_collected')} type="number" min="0" inputMode="decimal"
+                  enterKeyHint="done" data-field="overdue_collected"
                   value={form.overdue_collected}
-                  onChange={e => setForm(prev => ({ ...prev, overdue_collected: e.target.value }))}
+                  onChange={e => changeField('overdue_collected', e.target.value)}
                   placeholder="المبلغ" />
+                {errors.overdue_collected && <div className="form-error">{errors.overdue_collected}</div>}
               </div>
               <div className="form-group">
                 <label className="form-label">المتبقي من المتأخرات</label>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { signIn } from '../lib/auth';
 import { logAuditEvent } from '../lib/audit';
 
@@ -7,10 +7,45 @@ export default function Login({ onLogin }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [errors, setErrors] = useState({});
+  const containerRef = useRef(null);
+
+  // Update a field and clear its inline error as the user corrects it.
+  const changeField = (key, value, setter) => {
+    setter(value);
+    setErrors(prev => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  // Auto-advance: Enter (or the phone keyboard's "next") moves focus to the
+  // next enabled, visible field.
+  const handleKeyDown = (e) => {
+    if (e.key !== 'Enter' || e.target.tagName === 'TEXTAREA') return;
+    const root = containerRef.current;
+    if (!root) return;
+    const focusables = Array.from(
+      root.querySelectorAll('input:not([disabled]), select:not([disabled])')
+    ).filter(el => el.type !== 'hidden' && el.offsetParent !== null);
+    const idx = focusables.indexOf(e.target);
+    if (idx > -1 && idx < focusables.length - 1) {
+      e.preventDefault();
+      focusables[idx + 1].focus();
+    }
+  };
+
+  const errCls = (base, key) => `${base}${errors[key] ? ' has-error' : ''}`;
 
   const handleLogin = async () => {
-    if (!email || !password) { setError('أدخل الإيميل وكلمة السر'); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError('صيغة البريد الإلكتروني غير صحيحة'); return; }
+    const fieldErrors = {};
+    if (!email) fieldErrors.email = 'أدخل البريد الإلكتروني';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) fieldErrors.email = 'صيغة البريد الإلكتروني غير صحيحة';
+    if (!password) fieldErrors.password = 'أدخل كلمة السر';
+    if (Object.keys(fieldErrors).length > 0) { setErrors(fieldErrors); return; }
+    setErrors({});
     setLoading(true);
     setError('');
     const { error } = await signIn(email, password);
@@ -27,7 +62,7 @@ export default function Login({ onLogin }) {
       minHeight: '100vh', display: 'flex', alignItems: 'center',
       justifyContent: 'center', background: '#0f172a', padding: '1rem'
     }}>
-      <div style={{
+      <div ref={containerRef} onKeyDown={handleKeyDown} style={{
         background: '#1e293b', border: '1px solid #334155',
         borderRadius: 16, padding: '2.5rem', width: '100%', maxWidth: 420
       }}>
@@ -41,18 +76,21 @@ export default function Login({ onLogin }) {
 
         <div className="form-group">
           <label className="form-label">البريد الإلكتروني</label>
-          <input className="form-input" type="email" value={email}
-            onChange={e => setEmail(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
+          <input className={errCls('form-input', 'email')} type="email" value={email}
+            enterKeyHint="next"
+            onChange={e => changeField('email', e.target.value, setEmail)}
             placeholder="example@hawafel.com" />
+          {errors.email && <div className="form-error">{errors.email}</div>}
         </div>
 
         <div className="form-group">
           <label className="form-label">كلمة السر</label>
-          <input className="form-input" type="password" value={password}
-            onChange={e => setPassword(e.target.value)}
+          <input className={errCls('form-input', 'password')} type="password" value={password}
+            enterKeyHint="done"
+            onChange={e => changeField('password', e.target.value, setPassword)}
             onKeyDown={e => e.key === 'Enter' && handleLogin()}
             placeholder="••••••••" />
+          {errors.password && <div className="form-error">{errors.password}</div>}
         </div>
 
         <button className="btn btn-primary" onClick={handleLogin} disabled={loading}
