@@ -56,6 +56,9 @@ export default function Setup() {
       supabase.from('supervisors').select('*, regions(name)').order('name'),
       supabase.from('representatives').select('*, supervisors(name), regions(name)').order('name'),
     ]);
+    if (r.error || s.error || rp.error) {
+      showMsg('تعذّر تحميل بيانات الإعدادات: ' + (r.error?.message || s.error?.message || rp.error?.message), 'error');
+    }
     if (r.data) setRegions(r.data);
     if (s.data) setSupervisors(s.data);
     if (rp.data) setReps(rp.data);
@@ -67,7 +70,11 @@ export default function Setup() {
   };
 
   const generateTempPassword = () => {
-    const randomPart = Math.random().toString(36).slice(2, 8).toUpperCase();
+    // Cryptographically-strong random (not Math.random) for temp credentials.
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const bytes = new Uint8Array(6);
+    (window.crypto || window.msCrypto).getRandomValues(bytes);
+    const randomPart = Array.from(bytes, b => alphabet[b % alphabet.length]).join('');
     setAccountPassword(`Hwf-${randomPart}-${new Date().getFullYear()}`);
   };
 
@@ -112,14 +119,21 @@ export default function Setup() {
   };
 
   const deleteItem = async (table, id) => {
-    if (!window.confirm('هل أنت متأكد من الحذف؟')) return;
-    await supabase.from(table).delete().eq('id', id);
+    if (!window.confirm('هل أنت متأكد من الحذف؟ قد يؤثر ذلك على بيانات مرتبطة.')) return;
+    const { error } = await supabase.from(table).delete().eq('id', id);
+    if (error) {
+      // Most likely a foreign-key constraint (referenced by reps/entries/targets).
+      showMsg('تعذّر الحذف — قد يكون العنصر مرتبطًا ببيانات أخرى: ' + error.message, 'error');
+      return;
+    }
     await logAuditEvent({ eventType: 'delete', pageKey: 'setup', entityType: table, entityId: id, details: { table } });
+    showMsg('تم الحذف');
     fetchAll();
   };
 
   const toggleRepActive = async (rep) => {
-    await supabase.from('representatives').update({ is_active: !rep.is_active }).eq('id', rep.id);
+    const { error } = await supabase.from('representatives').update({ is_active: !rep.is_active }).eq('id', rep.id);
+    if (error) { showMsg('تعذّر تغيير الحالة: ' + error.message, 'error'); return; }
     await logAuditEvent({
       eventType: 'status_change',
       pageKey: 'setup',

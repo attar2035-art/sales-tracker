@@ -17,11 +17,12 @@ export default function CustomerDetails({ customerId, onBack }) {
   const loadData = async () => {
     setLoading(true);
 
-    const { data: customerData } = await supabase
+    const { data: customerData, error: customerError } = await supabase
       .from('customers')
       .select('id, customer_code, customer_name, region_id, regions(name)')
       .eq('id', customerId)
-      .single();
+      .maybeSingle();
+    if (customerError) console.error(customerError);
     setCustomer(customerData || null);
 
     const { data: salesData, error } = await supabase

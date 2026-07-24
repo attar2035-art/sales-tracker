@@ -5,9 +5,9 @@ import CustomerDetails from './CustomerDetails';
 
 export default function Customers({ user }) {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [customers, setCustomers] = useState([]);
   const [regions, setRegions] = useState([]);
-  const [allowedRegionIds, setAllowedRegionIds] = useState(null); // null = no restriction (admin)
   const [search, setSearch] = useState('');
   const [regionFilter, setRegionFilter] = useState('all');
   const [sortBy, setSortBy] = useState('amount_desc');
@@ -26,25 +26,37 @@ export default function Customers({ user }) {
 
   const loadData = async () => {
     setLoading(true);
+    setError('');
 
-    // 1. تحديد المناطق المسموح بها حسب الدور
-    let regionIds = null; // null = admin, يشوف الكل
-
-    if (user?.role === 'supervisor' && user?.supervisor_id) {
-      const { data: reps } = await supabase
-        .from('representatives')
-        .select('region_id')
-        .eq('supervisor_id', user.supervisor_id);
-      regionIds = [...new Set((reps || []).map(r => r.region_id))];
-    } else if (user?.role === 'rep' && user?.rep_id) {
-      const { data: rep } = await supabase
-        .from('representatives')
-        .select('region_id')
-        .eq('id', user.rep_id)
-        .single();
-      regionIds = rep ? [rep.region_id] : [];
+    // 1. تحديد المناطق المسموح بها حسب الدور (fail closed: أي دور غير admin بدون
+    //    معرّف صحيح يرى لا شيء بدل رؤية كل العملاء).
+    let regionIds = null; // null = admin only, يشوف الكل
+    if (user?.role === 'admin') {
+      regionIds = null;
+    } else if (user?.role === 'supervisor') {
+      if (user?.supervisor_id) {
+        const { data: reps } = await supabase
+          .from('representatives')
+          .select('region_id')
+          .eq('supervisor_id', user.supervisor_id);
+        regionIds = [...new Set((reps || []).map(r => r.region_id))];
+      } else {
+        regionIds = [];
+      }
+    } else if (user?.role === 'rep') {
+      if (user?.rep_id) {
+        const { data: rep } = await supabase
+          .from('representatives')
+          .select('region_id')
+          .eq('id', user.rep_id)
+          .maybeSingle();
+        regionIds = rep ? [rep.region_id] : [];
+      } else {
+        regionIds = [];
+      }
+    } else {
+      regionIds = []; // unknown role: see nothing
     }
-    setAllowedRegionIds(regionIds);
 
     // 2. تحميل المناطق (للفلتر) — فقط المسموح بها
     let regionsQuery = supabase.from('regions').select('id, name').order('name');
@@ -63,6 +75,7 @@ export default function Customers({ user }) {
 
     if (error) {
       console.error(error);
+      setError('تعذّر تحميل بيانات العملاء. حاول مرة أخرى.');
       setCustomers([]);
       setLoading(false);
       return;
@@ -172,6 +185,10 @@ export default function Customers({ user }) {
         جاري تحميل العملاء...
       </div>
     );
+  }
+
+  if (error) {
+    return <div className="alert alert-error" style={{ margin: '1rem 0' }}>{error}</div>;
   }
 
   return (
