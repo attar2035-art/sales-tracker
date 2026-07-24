@@ -155,7 +155,7 @@ export default function ActivityLog() {
           </div>
         ) : (
           <div className="table-wrapper">
-            <table>
+            <table className="responsive-cards">
               <thead>
                 <tr>
                   <th>الوقت</th>
@@ -170,13 +170,13 @@ export default function ActivityLog() {
               <tbody>
                 {filteredLogs.map(log => (
                   <tr key={log.id}>
-                    <td>{formatDateTime(log.created_at)}</td>
-                    <td>{log.user_email || '-'}</td>
-                    <td><span className="badge badge-info">{ROLE_LABELS[log.user_role] || log.user_role || '-'}</span></td>
-                    <td>{AUDIT_EVENT_LABELS[log.event_type] || log.event_type}</td>
-                    <td>{PAGE_LABELS[log.page_key] || log.page_key || '-'}</td>
-                    <td>{log.entity_type || '-'}</td>
-                    <td>{getDetailsText(log.details)}</td>
+                    <td data-label="الوقت">{formatDateTime(log.created_at)}</td>
+                    <td data-label="المستخدم">{log.user_email || '-'}</td>
+                    <td data-label="الدور"><span className="badge badge-info">{ROLE_LABELS[log.user_role] || log.user_role || '-'}</span></td>
+                    <td data-label="الحركة">{AUDIT_EVENT_LABELS[log.event_type] || log.event_type}</td>
+                    <td data-label="الصفحة">{PAGE_LABELS[log.page_key] || log.page_key || '-'}</td>
+                    <td data-label="الكيان">{log.entity_type || '-'}</td>
+                    <td data-label="التفاصيل">{getDetailsText(log.details)}</td>
                   </tr>
                 ))}
               </tbody>

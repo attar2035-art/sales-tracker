@@ -399,23 +399,23 @@ export default function Dashboard({ supervisorId }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: '1rem', marginBottom: '1rem' }}>
         <KPICard monthProgress={monthProg} icon="🎯" title="المبيعات" achieved={kpi.sales} target={kpi.targetSales} color="#3b82f6" />
         <KPICard monthProgress={monthProg} icon="💰" title="التحصيل" achieved={kpi.collection} target={kpi.targetCollection} color="#10b981" />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: '1rem', marginBottom: '1rem' }}>
         <KPICard monthProgress={monthProg} icon="📦" title="الأصناف الجديدة" achieved={kpi.newProductsSkus} target={kpi.targetNewProductsSkus} color="#f59e0b" unit=" صنف" />
         <KPICard monthProgress={monthProg} icon="📦" title="قطع المنتجات الجديدة" achieved={kpi.newProductsQty} target={kpi.targetNewProductsQty} color="#f59e0b" unit=" قطعة" />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: '1rem', marginBottom: '1rem' }}>
         <KPICard monthProgress={monthProg} icon="👥" title="العملاء الجدد" achieved={kpi.newCustomers} target={kpi.targetNewCustomers} color="#8b5cf6" unit=" عميل" />
         <KPICard monthProgress={monthProg} icon="🧾" title="قيمة فواتير العملاء الجدد" achieved={kpi.newCustomersValue} target={0} color="#8b5cf6" />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: '1rem', marginBottom: '1rem' }}>
         <KPICard monthProgress={monthProg} icon="📍" title="الزيارات الإجمالي" achieved={kpi.totalVisits} target={kpi.targetVisits} color="#06b6d4" unit=" زيارة" />
         <KPICard monthProgress={monthProg} icon="✅" title="الزيارات الناجحة" achieved={kpi.successfulVisits} target={kpi.targetSuccessfulVisits} color="#06b6d4" unit=" زيارة" />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         <KPICard monthProgress={monthProg} icon="🚗" title="الكيلومترات" achieved={kpi.km} target={0} color="#64748b" unit=" كم" />
         <KPICard monthProgress={monthProg} icon="💸" title="المصروفات" achieved={kpi.expenses} target={0} color="#64748b" />
         <KPICard monthProgress={monthProg} icon="⚠️" title="المحصل من المتأخرات" achieved={kpi.overdueCollected} target={kpi.overdueTotal} color="#ef4444" />
@@ -483,7 +483,7 @@ export default function Dashboard({ supervisorId }) {
 
       {activeView === 'points' && (
         <div className="table-wrapper">
-          <table>
+          <table className="responsive-cards">
             <thead>
               <tr>
                 <th>الترتيب</th><th>المندوب</th><th>المشرف</th><th>المنطقة</th><th>النقاط</th>
@@ -499,11 +499,11 @@ export default function Dashboard({ supervisorId }) {
                 const visitsPct = d.target.target_total_visits > 0 ? Math.round((d.achieved.total_visits / d.target.target_total_visits) * 100) : 0;
                 return (
                   <tr key={d.id} style={{ background: i === 0 ? '#1a2a1a' : i === 1 ? '#1a1a2a' : i === 2 ? '#2a1a0a' : '' }}>
-                    <td style={{ fontSize: '1.25rem', textAlign: 'center' }}>{getMedal(i + 1)}</td>
-                    <td><strong>{d.name}</strong></td>
-                    <td style={{ color: 'var(--text-secondary)' }}>{d.supervisors?.name || 'بدون مشرف'}</td>
-                    <td style={{ color: 'var(--text-secondary)' }}>{d.regions?.name || '-'}</td>
-                    <td>
+                    <td data-label="الترتيب" style={{ fontSize: '1.25rem', textAlign: 'center' }}>{getMedal(i + 1)}</td>
+                    <td data-label="المندوب"><strong>{d.name}</strong></td>
+                    <td data-label="المشرف" style={{ color: 'var(--text-secondary)' }}>{d.supervisors?.name || 'بدون مشرف'}</td>
+                    <td data-label="المنطقة" style={{ color: 'var(--text-secondary)' }}>{d.regions?.name || '-'}</td>
+                    <td data-label="النقاط">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <span style={{ fontSize: '1.25rem', fontWeight: 800, color: getPointsColor(d.points) }}>{d.points}</span>
                         <div style={{ flex: 1, minWidth: 60 }}>
@@ -513,11 +513,11 @@ export default function Dashboard({ supervisorId }) {
                         </div>
                       </div>
                     </td>
-                    <td style={{ color: getPointsColor(salesPct) }}>{salesPct}%</td>
-                    <td style={{ color: getPointsColor(colPct) }}>{colPct}%</td>
-                    <td style={{ color: getPointsColor(skusPct) }}>{skusPct}%</td>
-                    <td style={{ color: getPointsColor(custPct) }}>{custPct}%</td>
-                    <td style={{ color: getPointsColor(visitsPct) }}>{visitsPct}%</td>
+                    <td data-label="المبيعات %" style={{ color: getPointsColor(salesPct) }}>{salesPct}%</td>
+                    <td data-label="التحصيل %" style={{ color: getPointsColor(colPct) }}>{colPct}%</td>
+                    <td data-label="الأصناف %" style={{ color: getPointsColor(skusPct) }}>{skusPct}%</td>
+                    <td data-label="العملاء %" style={{ color: getPointsColor(custPct) }}>{custPct}%</td>
+                    <td data-label="الزيارات %" style={{ color: getPointsColor(visitsPct) }}>{visitsPct}%</td>
                   </tr>
                 );
               })}
@@ -528,7 +528,7 @@ export default function Dashboard({ supervisorId }) {
 
       {activeView === 'supervisors' && !supervisorId && (
         <div className="table-wrapper">
-          <table>
+          <table className="responsive-cards">
             <thead>
               <tr>
                 <th>الترتيب</th><th>المشرف</th><th>المناطق</th><th>المندوبين</th>
@@ -540,28 +540,28 @@ export default function Dashboard({ supervisorId }) {
             <tbody>
               {supervisorStats.map((sup, i) => (
                 <tr key={sup.id}>
-                  <td style={{ fontSize: '1.1rem', textAlign: 'center' }}>{getMedal(i + 1)}</td>
-                  <td><strong>{sup.name}</strong></td>
-                  <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{sup.regions}</td>
-                  <td style={{ textAlign: 'center' }}>{sup.supReps}</td>
-                  <td><span style={{ fontSize: '1.1rem', fontWeight: 800, color: getPointsColor(sup.totalPoints) }}>{sup.totalPoints}</span></td>
-                  <td>{formatCurrency(sup.totalTargetSales)}</td>
-                  <td style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(sup.totalSales)}</td>
-                  <td>
+                  <td data-label="الترتيب" style={{ fontSize: '1.1rem', textAlign: 'center' }}>{getMedal(i + 1)}</td>
+                  <td data-label="المشرف"><strong>{sup.name}</strong></td>
+                  <td data-label="المناطق" style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{sup.regions}</td>
+                  <td data-label="المندوبين" style={{ textAlign: 'center' }}>{sup.supReps}</td>
+                  <td data-label="متوسط النقاط"><span style={{ fontSize: '1.1rem', fontWeight: 800, color: getPointsColor(sup.totalPoints) }}>{sup.totalPoints}</span></td>
+                  <td data-label="هدف المبيعات">{formatCurrency(sup.totalTargetSales)}</td>
+                  <td data-label="المبيعات" style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(sup.totalSales)}</td>
+                  <td data-label="%">
                     <div style={{ minWidth: 60 }}>
                       <div style={{ fontSize: '0.8rem', fontWeight: 700, color: getStatusColor(sup.status) }}>{sup.salesPct}%</div>
                       <div className="progress-bar"><div className="progress-fill" style={{ width: `${Math.min(100, sup.salesPct)}%`, background: getStatusColor(sup.status) }} /></div>
                     </div>
                   </td>
-                  <td>{formatCurrency(sup.totalTargetCollection)}</td>
-                  <td style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(sup.totalCollection)}</td>
-                  <td>
+                  <td data-label="هدف التحصيل">{formatCurrency(sup.totalTargetCollection)}</td>
+                  <td data-label="التحصيل" style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(sup.totalCollection)}</td>
+                  <td data-label="%">
                     <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>{sup.colPct}%</div>
                     <div className="progress-bar"><div className="progress-fill" style={{ width: `${Math.min(100, sup.colPct)}%`, background: '#10b981' }} /></div>
                   </td>
-                  <td>{formatNumber(sup.totalVisits)}</td>
-                  <td>{formatNumber(sup.totalNewCustomers)}</td>
-                  <td><span className="badge" style={{ background: sup.status === 'ahead' ? '#064e3b' : sup.status === 'on-track' ? '#451a03' : '#450a0a', color: getStatusColor(sup.status) }}>{getStatusLabel(sup.status)}</span></td>
+                  <td data-label="الزيارات">{formatNumber(sup.totalVisits)}</td>
+                  <td data-label="عملاء جدد">{formatNumber(sup.totalNewCustomers)}</td>
+                  <td data-label="الحالة"><span className="badge" style={{ background: sup.status === 'ahead' ? '#064e3b' : sup.status === 'on-track' ? '#451a03' : '#450a0a', color: getStatusColor(sup.status) }}>{getStatusLabel(sup.status)}</span></td>
                 </tr>
               ))}
             </tbody>
@@ -583,7 +583,7 @@ export default function Dashboard({ supervisorId }) {
             <div className="empty-state"><div className="empty-state-icon">📊</div><div className="empty-state-text">لا توجد بيانات</div></div>
           ) : (
             <div className="table-wrapper">
-              <table>
+              <table className="responsive-cards">
                 <thead>
                   <tr>
                     <th>المندوب</th><th>المشرف</th><th>المنطقة</th><th>النقاط</th>
@@ -601,51 +601,51 @@ export default function Dashboard({ supervisorId }) {
                     const status = d.salesStatus;
                     return (
                       <tr key={d.id}>
-                        <td><strong>{d.name}</strong></td>
-                        <td style={{ color: 'var(--text-secondary)' }}>{d.supervisors?.name || 'بدون مشرف'}</td>
-                        <td style={{ color: 'var(--text-secondary)' }}>{d.regions?.name || '-'}</td>
-                        <td><span style={{ fontWeight: 800, color: getPointsColor(d.points) }}>{d.points}</span></td>
+                        <td data-label="المندوب"><strong>{d.name}</strong></td>
+                        <td data-label="المشرف" style={{ color: 'var(--text-secondary)' }}>{d.supervisors?.name || 'بدون مشرف'}</td>
+                        <td data-label="المنطقة" style={{ color: 'var(--text-secondary)' }}>{d.regions?.name || '-'}</td>
+                        <td data-label="النقاط"><span style={{ fontWeight: 800, color: getPointsColor(d.points) }}>{d.points}</span></td>
                         {activeMetric === 'sales' && <>
-                          <td>{formatCurrency(d.target.target_sales)}</td>
-                          <td style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(d.achieved.sales)}</td>
-                          <td style={{ color: '#ef4444' }}>{formatCurrency(d.remaining.sales)}</td>
-                          <td style={{ color: '#f59e0b' }}>{fmtDaily(d.dailyRequired.sales)}</td>
-                          <td>
+                          <td data-label="هدف البيع">{formatCurrency(d.target.target_sales)}</td>
+                          <td data-label="المنجز" style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(d.achieved.sales)}</td>
+                          <td data-label="المتبقي" style={{ color: '#ef4444' }}>{formatCurrency(d.remaining.sales)}</td>
+                          <td data-label="يومي مطلوب" style={{ color: '#f59e0b' }}>{fmtDaily(d.dailyRequired.sales)}</td>
+                          <td data-label="%">
                             <div style={{ minWidth: 80 }}>
                               <div style={{ fontSize: '0.8rem', fontWeight: 700, color: getStatusColor(status) }}>{salesPct}%</div>
                               <div className="progress-bar"><div className="progress-fill" style={{ width: `${Math.min(100, salesPct)}%`, background: getStatusColor(status) }} /></div>
                             </div>
                           </td>
-                          <td><span className="badge" style={{ background: status === 'ahead' ? '#064e3b' : status === 'on-track' ? '#451a03' : '#450a0a', color: getStatusColor(status) }}>{getStatusLabel(status)}</span></td>
+                          <td data-label="الحالة"><span className="badge" style={{ background: status === 'ahead' ? '#064e3b' : status === 'on-track' ? '#451a03' : '#450a0a', color: getStatusColor(status) }}>{getStatusLabel(status)}</span></td>
                         </>}
                         {activeMetric === 'collection' && <>
-                          <td>{formatCurrency(d.target.target_collection)}</td>
-                          <td style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(d.achieved.collection)}</td>
-                          <td style={{ color: '#ef4444' }}>{formatCurrency(d.remaining.collection)}</td>
-                          <td style={{ color: '#f59e0b' }}>{fmtDaily(d.dailyRequired.collection)}</td>
-                          <td><div style={{ fontSize: '0.8rem', fontWeight: 700 }}>{colPct}%</div><div className="progress-bar"><div className="progress-fill" style={{ width: `${Math.min(100, colPct)}%`, background: '#10b981' }} /></div></td>
+                          <td data-label="هدف التحصيل">{formatCurrency(d.target.target_collection)}</td>
+                          <td data-label="المحصل" style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(d.achieved.collection)}</td>
+                          <td data-label="المتبقي" style={{ color: '#ef4444' }}>{formatCurrency(d.remaining.collection)}</td>
+                          <td data-label="يومي مطلوب" style={{ color: '#f59e0b' }}>{fmtDaily(d.dailyRequired.collection)}</td>
+                          <td data-label="%"><div style={{ fontSize: '0.8rem', fontWeight: 700 }}>{colPct}%</div><div className="progress-bar"><div className="progress-fill" style={{ width: `${Math.min(100, colPct)}%`, background: '#10b981' }} /></div></td>
                         </>}
                         {activeMetric === 'visits' && <>
-                          <td>{formatNumber(d.target.target_total_visits)}</td>
-                          <td style={{ color: '#60a5fa', fontWeight: 700 }}>{formatNumber(d.achieved.total_visits)}</td>
-                          <td style={{ color: '#10b981' }}>{formatNumber(d.achieved.successful_visits)}</td>
-                          <td style={{ color: '#a78bfa' }}>{formatNumber(d.achieved.shelf_photos)}</td>
-                          <td style={{ color: '#ef4444' }}>{formatNumber(d.remaining.total_visits)}</td>
-                          <td style={{ color: '#f59e0b' }}>{d.dailyRequired.total_visits == null ? '-' : formatNumber(d.dailyRequired.total_visits).split('.')[0]}</td>
+                          <td data-label="هدف الزيارات">{formatNumber(d.target.target_total_visits)}</td>
+                          <td data-label="إجمالي" style={{ color: '#60a5fa', fontWeight: 700 }}>{formatNumber(d.achieved.total_visits)}</td>
+                          <td data-label="ناجحة" style={{ color: '#10b981' }}>{formatNumber(d.achieved.successful_visits)}</td>
+                          <td data-label="صور الرف" style={{ color: '#a78bfa' }}>{formatNumber(d.achieved.shelf_photos)}</td>
+                          <td data-label="متبقي" style={{ color: '#ef4444' }}>{formatNumber(d.remaining.total_visits)}</td>
+                          <td data-label="يومي مطلوب" style={{ color: '#f59e0b' }}>{d.dailyRequired.total_visits == null ? '-' : formatNumber(d.dailyRequired.total_visits).split('.')[0]}</td>
                         </>}
                         {activeMetric === 'products' && <>
-                          <td>{formatNumber(d.target.target_new_products_skus)}</td>
-                          <td style={{ color: '#10b981', fontWeight: 700 }}>{formatNumber(d.achieved.new_products_skus)}</td>
-                          <td>{formatNumber(d.target.target_new_products_qty)}</td>
-                          <td style={{ color: '#10b981', fontWeight: 700 }}>{formatNumber(d.achieved.new_products_qty)}</td>
-                          <td style={{ color: '#f59e0b', fontWeight: 700 }}>{Math.round(d.achieved.new_products_availability)}%</td>
+                          <td data-label="هدف الأصناف">{formatNumber(d.target.target_new_products_skus)}</td>
+                          <td data-label="أصناف منجزة" style={{ color: '#10b981', fontWeight: 700 }}>{formatNumber(d.achieved.new_products_skus)}</td>
+                          <td data-label="هدف القطع">{formatNumber(d.target.target_new_products_qty)}</td>
+                          <td data-label="قطع منجزة" style={{ color: '#10b981', fontWeight: 700 }}>{formatNumber(d.achieved.new_products_qty)}</td>
+                          <td data-label="نسبة التوفر" style={{ color: '#f59e0b', fontWeight: 700 }}>{Math.round(d.achieved.new_products_availability)}%</td>
                         </>}
                         {activeMetric === 'overdue' && <>
-                          <td style={{ color: '#ef4444' }}>{formatCurrency(d.target.overdue_total)}</td>
-                          <td style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(d.achieved.overdue_collected)}</td>
-                          <td style={{ color: '#ef4444', fontWeight: 700 }}>{formatCurrency(d.overdue_remaining)}</td>
-                          <td>{formatCurrency(d.achieved.expenses)}</td>
-                          <td>{formatNumber(d.achieved.km)} كم</td>
+                          <td data-label="إجمالي المتأخرات" style={{ color: '#ef4444' }}>{formatCurrency(d.target.overdue_total)}</td>
+                          <td data-label="المحصل" style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(d.achieved.overdue_collected)}</td>
+                          <td data-label="المتبقي" style={{ color: '#ef4444', fontWeight: 700 }}>{formatCurrency(d.overdue_remaining)}</td>
+                          <td data-label="مصروفات الشهر">{formatCurrency(d.achieved.expenses)}</td>
+                          <td data-label="الكم">{formatNumber(d.achieved.km)} كم</td>
                         </>}
                       </tr>
                     );

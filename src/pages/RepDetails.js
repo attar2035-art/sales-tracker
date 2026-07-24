@@ -142,7 +142,7 @@ export default function RepDetails({ supervisorId }) {
         <div className="card">
           <div className="card-title">📊 ملخص الشهر</div>
           <div className="table-wrapper">
-            <table>
+            <table className="responsive-cards">
               <thead><tr><th>البند</th><th>الهدف</th><th>المنجز</th><th>المتبقي</th><th>يومي مطلوب</th><th>%</th></tr></thead>
               <tbody>
                 {[
@@ -163,12 +163,12 @@ export default function RepDetails({ supervisorId }) {
                   const fmt = row.currency ? formatCurrency : formatNumber;
                   return (
                     <tr key={row.label}>
-                      <td>{row.label}</td>
-                      <td>{fmt(row.t)}</td>
-                      <td style={{ color: '#10b981', fontWeight: 700 }}>{fmt(row.a)}</td>
-                      <td style={{ color: '#ef4444' }}>{fmt(remaining)}</td>
-                      <td style={{ color: '#f59e0b' }}>{daily == null ? '-' : fmt(daily)}</td>
-                      <td>
+                      <td data-label="البند">{row.label}</td>
+                      <td data-label="الهدف">{fmt(row.t)}</td>
+                      <td data-label="المنجز" style={{ color: '#10b981', fontWeight: 700 }}>{fmt(row.a)}</td>
+                      <td data-label="المتبقي" style={{ color: '#ef4444' }}>{fmt(remaining)}</td>
+                      <td data-label="يومي مطلوب" style={{ color: '#f59e0b' }}>{daily == null ? '-' : fmt(daily)}</td>
+                      <td data-label="%">
                         <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{pct}%</span>
                         <div className="progress-bar"><div className="progress-fill" style={{ width: `${Math.min(100, pct)}%`, background: pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444' }} /></div>
                       </td>
@@ -176,16 +176,16 @@ export default function RepDetails({ supervisorId }) {
                   );
                 })}
                 <tr style={{ background: '#0f172a' }}>
-                  <td><strong>المتأخرات فوق 60 يوم</strong></td>
-                  <td style={{ color: '#ef4444' }}>{formatCurrency(target.overdue_total)}</td>
-                  <td style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(totals.overdue_collected)}</td>
-                  <td style={{ color: '#ef4444', fontWeight: 700 }}>{formatCurrency(Math.max(0, target.overdue_total - totals.overdue_collected))}</td>
-                  <td>-</td><td>-</td>
+                  <td data-label="البند"><strong>المتأخرات فوق 60 يوم</strong></td>
+                  <td data-label="الهدف" style={{ color: '#ef4444' }}>{formatCurrency(target.overdue_total)}</td>
+                  <td data-label="المنجز" style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(totals.overdue_collected)}</td>
+                  <td data-label="المتبقي" style={{ color: '#ef4444', fontWeight: 700 }}>{formatCurrency(Math.max(0, target.overdue_total - totals.overdue_collected))}</td>
+                  <td data-label="يومي مطلوب">-</td><td data-label="%">-</td>
                 </tr>
                 <tr>
-                  <td>المصروفات التراكمية</td><td>-</td>
-                  <td style={{ color: '#f59e0b', fontWeight: 700 }}>{formatCurrency(totals.expenses)}</td>
-                  <td>-</td><td>-</td><td>-</td>
+                  <td data-label="البند">المصروفات التراكمية</td><td data-label="الهدف">-</td>
+                  <td data-label="المنجز" style={{ color: '#f59e0b', fontWeight: 700 }}>{formatCurrency(totals.expenses)}</td>
+                  <td data-label="المتبقي">-</td><td data-label="يومي مطلوب">-</td><td data-label="%">-</td>
                 </tr>
               </tbody>
             </table>
@@ -198,42 +198,42 @@ export default function RepDetails({ supervisorId }) {
           {loading ? <div className="loading"><div className="spinner" />جاري التحميل...</div> :
             entries.length === 0 ? <div className="empty-state"><div className="empty-state-icon">📅</div><div className="empty-state-text">لا توجد إدخالات يومية</div></div> : (
               <div className="table-wrapper">
-                <table>
+                <table className="responsive-cards">
                   <thead>
                     <tr><th>التاريخ</th><th>المبيعات</th><th>التحصيل</th><th>عملاء جدد</th><th>زيارات</th><th>ناجحة</th><th>أصناف</th><th>قطع</th><th>توفر%</th><th>ساعات</th><th>كم</th><th>مصروفات</th><th>محصل متأخرات</th></tr>
                   </thead>
                   <tbody>
                     {entries.map(e => (
                       <tr key={e.id}>
-                        <td>{new Date(e.entry_date).toLocaleDateString('ar-SA-u-ca-gregory')}</td>
-                        <td>{formatCurrency(e.daily_sales)}</td>
-                        <td>{formatCurrency(e.daily_collection)}</td>
-                        <td>{e.new_customers}</td>
-                        <td>{e.total_visits}</td>
-                        <td>{e.successful_visits}</td>
-                        <td>{e.new_products_skus}</td>
-                        <td>{e.new_products_qty}</td>
-                        <td>{e.new_products_availability}%</td>
-                        <td>{e.working_hours}</td>
-                        <td>{e.km}</td>
-                        <td>{formatCurrency(e.daily_expenses)}</td>
-                        <td>{formatCurrency(e.overdue_collected)}</td>
+                        <td data-label="التاريخ">{new Date(e.entry_date).toLocaleDateString('ar-SA-u-ca-gregory')}</td>
+                        <td data-label="المبيعات">{formatCurrency(e.daily_sales)}</td>
+                        <td data-label="التحصيل">{formatCurrency(e.daily_collection)}</td>
+                        <td data-label="عملاء جدد">{e.new_customers}</td>
+                        <td data-label="زيارات">{e.total_visits}</td>
+                        <td data-label="ناجحة">{e.successful_visits}</td>
+                        <td data-label="أصناف">{e.new_products_skus}</td>
+                        <td data-label="قطع">{e.new_products_qty}</td>
+                        <td data-label="توفر%">{e.new_products_availability}%</td>
+                        <td data-label="ساعات">{e.working_hours}</td>
+                        <td data-label="كم">{e.km}</td>
+                        <td data-label="مصروفات">{formatCurrency(e.daily_expenses)}</td>
+                        <td data-label="محصل متأخرات">{formatCurrency(e.overdue_collected)}</td>
                       </tr>
                     ))}
                     <tr style={{ background: '#0f172a', fontWeight: 700 }}>
-                      <td>الإجمالي</td>
-                      <td style={{ color: '#10b981' }}>{formatCurrency(totals.sales)}</td>
-                      <td style={{ color: '#10b981' }}>{formatCurrency(totals.collection)}</td>
-                      <td>{totals.new_customers}</td>
-                      <td>{totals.total_visits}</td>
-                      <td>{totals.successful_visits}</td>
-                      <td>{totals.new_products_skus}</td>
-                      <td>{totals.new_products_qty}</td>
-                      <td>-</td>
-                      <td>{totals.working_hours}</td>
-                      <td>{totals.km}</td>
-                      <td style={{ color: '#f59e0b' }}>{formatCurrency(totals.expenses)}</td>
-                      <td style={{ color: '#10b981' }}>{formatCurrency(totals.overdue_collected)}</td>
+                      <td data-label="التاريخ">الإجمالي</td>
+                      <td data-label="المبيعات" style={{ color: '#10b981' }}>{formatCurrency(totals.sales)}</td>
+                      <td data-label="التحصيل" style={{ color: '#10b981' }}>{formatCurrency(totals.collection)}</td>
+                      <td data-label="عملاء جدد">{totals.new_customers}</td>
+                      <td data-label="زيارات">{totals.total_visits}</td>
+                      <td data-label="ناجحة">{totals.successful_visits}</td>
+                      <td data-label="أصناف">{totals.new_products_skus}</td>
+                      <td data-label="قطع">{totals.new_products_qty}</td>
+                      <td data-label="توفر%">-</td>
+                      <td data-label="ساعات">{totals.working_hours}</td>
+                      <td data-label="كم">{totals.km}</td>
+                      <td data-label="مصروفات" style={{ color: '#f59e0b' }}>{formatCurrency(totals.expenses)}</td>
+                      <td data-label="محصل متأخرات" style={{ color: '#10b981' }}>{formatCurrency(totals.overdue_collected)}</td>
                     </tr>
                   </tbody>
                 </table>

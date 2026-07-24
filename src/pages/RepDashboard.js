@@ -559,7 +559,7 @@ export default function RepDashboard({ repId }) {
               <div><span>أفضل شهر</span><strong>{bestHistoryMonth?.salesPercent > 0 ? `${bestHistoryMonth.label} (${bestHistoryMonth.salesPercent}%)` : '-'}</strong></div>
             </div>
             <div className="table-wrapper">
-              <table>
+              <table className="responsive-cards">
                 <thead>
                   <tr>
                     <th>الشهر</th>
@@ -577,29 +577,29 @@ export default function RepDashboard({ repId }) {
                 <tbody>
                   {history.map(row => (
                     <tr key={row.key}>
-                      <td>{row.label}</td>
-                      <td>{row.salesTarget > 0 ? formatCurrency(row.salesTarget) : '-'}</td>
-                      <td style={{ color: '#10b981' }}>{formatCurrency(row.sales)}</td>
-                      <td><span className={`badge ${row.salesPercent >= 100 ? 'badge-success' : row.salesPercent > 0 ? 'badge-warning' : 'badge-danger'}`}>{row.salesTarget > 0 ? `${row.salesPercent}%` : '-'}</span></td>
-                      <td>{row.collectionTarget > 0 ? formatCurrency(row.collectionTarget) : '-'}</td>
-                      <td style={{ color: '#10b981' }}>{formatCurrency(row.collection)}</td>
-                      <td><span className={`badge ${row.collectionPercent >= 100 ? 'badge-success' : row.collectionPercent > 0 ? 'badge-warning' : 'badge-danger'}`}>{row.collectionTarget > 0 ? `${row.collectionPercent}%` : '-'}</span></td>
-                      <td>{formatNumber(row.visits)}</td>
-                      <td>{formatNumber(row.successfulVisits)}</td>
-                      <td>{formatNumber(row.newCustomers)}</td>
+                      <td data-label="الشهر">{row.label}</td>
+                      <td data-label="هدف المبيعات">{row.salesTarget > 0 ? formatCurrency(row.salesTarget) : '-'}</td>
+                      <td data-label="مبيعات محققة" style={{ color: '#10b981' }}>{formatCurrency(row.sales)}</td>
+                      <td data-label="نسبة المبيعات"><span className={`badge ${row.salesPercent >= 100 ? 'badge-success' : row.salesPercent > 0 ? 'badge-warning' : 'badge-danger'}`}>{row.salesTarget > 0 ? `${row.salesPercent}%` : '-'}</span></td>
+                      <td data-label="هدف التحصيل">{row.collectionTarget > 0 ? formatCurrency(row.collectionTarget) : '-'}</td>
+                      <td data-label="تحصيل محقق" style={{ color: '#10b981' }}>{formatCurrency(row.collection)}</td>
+                      <td data-label="نسبة التحصيل"><span className={`badge ${row.collectionPercent >= 100 ? 'badge-success' : row.collectionPercent > 0 ? 'badge-warning' : 'badge-danger'}`}>{row.collectionTarget > 0 ? `${row.collectionPercent}%` : '-'}</span></td>
+                      <td data-label="الزيارات">{formatNumber(row.visits)}</td>
+                      <td data-label="ناجحة">{formatNumber(row.successfulVisits)}</td>
+                      <td data-label="عملاء جدد">{formatNumber(row.newCustomers)}</td>
                     </tr>
                   ))}
                   <tr style={{ background: '#0f172a', fontWeight: 700 }}>
-                    <td>الإجمالي</td>
-                    <td>-</td>
-                    <td style={{ color: '#10b981' }}>{formatCurrency(historyTotals.sales)}</td>
-                    <td>-</td>
-                    <td>-</td>
-                    <td style={{ color: '#10b981' }}>{formatCurrency(historyTotals.collection)}</td>
-                    <td>-</td>
-                    <td>{formatNumber(historyTotals.visits)}</td>
-                    <td>-</td>
-                    <td>{formatNumber(historyTotals.newCustomers)}</td>
+                    <td data-label="الشهر">الإجمالي</td>
+                    <td data-label="هدف المبيعات">-</td>
+                    <td data-label="مبيعات محققة" style={{ color: '#10b981' }}>{formatCurrency(historyTotals.sales)}</td>
+                    <td data-label="نسبة المبيعات">-</td>
+                    <td data-label="هدف التحصيل">-</td>
+                    <td data-label="تحصيل محقق" style={{ color: '#10b981' }}>{formatCurrency(historyTotals.collection)}</td>
+                    <td data-label="نسبة التحصيل">-</td>
+                    <td data-label="الزيارات">{formatNumber(historyTotals.visits)}</td>
+                    <td data-label="ناجحة">-</td>
+                    <td data-label="عملاء جدد">{formatNumber(historyTotals.newCustomers)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -722,7 +722,7 @@ export default function RepDashboard({ repId }) {
               <div className="empty-state"><div className="empty-state-icon">📅</div><div className="empty-state-text">لا توجد إدخالات بعد</div></div>
             ) : (
               <div className="table-wrapper">
-                <table>
+                <table className="responsive-cards">
                   <thead>
                     <tr>
                       <th>التاريخ</th><th>مبيعات</th><th>تحصيل</th><th>عملاء</th>
@@ -733,33 +733,33 @@ export default function RepDashboard({ repId }) {
                   <tbody>
                     {entries.map(entry => (
                       <tr key={entry.id}>
-                        <td>{new Date(entry.entry_date).toLocaleDateString('ar-SA-u-ca-gregory')}</td>
-                        <td style={{ color: '#10b981' }}>{formatCurrency(entry.daily_sales)}</td>
-                        <td style={{ color: '#10b981' }}>{formatCurrency(entry.daily_collection)}</td>
-                        <td>{entry.new_customers}</td>
-                        <td>{entry.total_visits}</td>
-                        <td>{entry.successful_visits}</td>
-                        <td>{entry.shelf_photos || 0}</td>
-                        <td>{entry.new_products_skus}</td>
-                        <td>{entry.new_products_qty}</td>
-                        <td>{entry.working_hours}</td>
-                        <td>{entry.km}</td>
-                        <td>{formatCurrency(entry.daily_expenses)}</td>
+                        <td data-label="التاريخ">{new Date(entry.entry_date).toLocaleDateString('ar-SA-u-ca-gregory')}</td>
+                        <td data-label="مبيعات" style={{ color: '#10b981' }}>{formatCurrency(entry.daily_sales)}</td>
+                        <td data-label="تحصيل" style={{ color: '#10b981' }}>{formatCurrency(entry.daily_collection)}</td>
+                        <td data-label="عملاء">{entry.new_customers}</td>
+                        <td data-label="زيارات">{entry.total_visits}</td>
+                        <td data-label="ناجحة">{entry.successful_visits}</td>
+                        <td data-label="صور رف">{entry.shelf_photos || 0}</td>
+                        <td data-label="أصناف">{entry.new_products_skus}</td>
+                        <td data-label="قطع">{entry.new_products_qty}</td>
+                        <td data-label="ساعات">{entry.working_hours}</td>
+                        <td data-label="كم">{entry.km}</td>
+                        <td data-label="مصروفات">{formatCurrency(entry.daily_expenses)}</td>
                       </tr>
                     ))}
                     <tr style={{ background: '#0f172a', fontWeight: 700 }}>
-                      <td>الإجمالي</td>
-                      <td style={{ color: '#10b981' }}>{formatCurrency(totals.sales)}</td>
-                      <td style={{ color: '#10b981' }}>{formatCurrency(totals.collection)}</td>
-                      <td>{formatNumber(totals.new_customers)}</td>
-                      <td>{formatNumber(totals.total_visits)}</td>
-                      <td>{formatNumber(totals.successful_visits)}</td>
-                      <td>{formatNumber(totals.shelf_photos)}</td>
-                      <td>{formatNumber(totals.new_products_skus)}</td>
-                      <td>{formatNumber(totals.new_products_qty)}</td>
-                      <td>{formatNumber(totals.working_hours)}</td>
-                      <td>{formatNumber(totals.km)}</td>
-                      <td style={{ color: '#f59e0b' }}>{formatCurrency(totals.expenses)}</td>
+                      <td data-label="التاريخ">الإجمالي</td>
+                      <td data-label="مبيعات" style={{ color: '#10b981' }}>{formatCurrency(totals.sales)}</td>
+                      <td data-label="تحصيل" style={{ color: '#10b981' }}>{formatCurrency(totals.collection)}</td>
+                      <td data-label="عملاء">{formatNumber(totals.new_customers)}</td>
+                      <td data-label="زيارات">{formatNumber(totals.total_visits)}</td>
+                      <td data-label="ناجحة">{formatNumber(totals.successful_visits)}</td>
+                      <td data-label="صور رف">{formatNumber(totals.shelf_photos)}</td>
+                      <td data-label="أصناف">{formatNumber(totals.new_products_skus)}</td>
+                      <td data-label="قطع">{formatNumber(totals.new_products_qty)}</td>
+                      <td data-label="ساعات">{formatNumber(totals.working_hours)}</td>
+                      <td data-label="كم">{formatNumber(totals.km)}</td>
+                      <td data-label="مصروفات" style={{ color: '#f59e0b' }}>{formatCurrency(totals.expenses)}</td>
                     </tr>
                   </tbody>
                 </table>

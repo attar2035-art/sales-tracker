@@ -208,7 +208,7 @@ export default function CustomerLoyaltyAnalysis({ baseYear = 2022, comparisonYea
       </div>
 
       {/* ملخص الولاء */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginTop: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: '1rem', marginTop: '1.5rem' }}>
         <div className="card" style={{ backgroundColor: '#dcfce7', borderRight: '4px solid #10b981' }}>
           <div style={{ fontWeight: 600, color: '#166534', fontSize: '0.9rem' }}>📈 نمو إيجابي</div>
           <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#15803d', marginTop: '0.5rem' }}>
