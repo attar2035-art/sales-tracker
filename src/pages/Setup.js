@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { createRepLoginAccount } from '../lib/auth';
 import { buildEffectiveTargetsMap, TARGET_FIELDS } from '../lib/targets';
@@ -47,6 +47,31 @@ export default function Setup() {
   const [accountRep, setAccountRep] = useState('');
   const [accountEmail, setAccountEmail] = useState('');
   const [accountPassword, setAccountPassword] = useState('');
+  const [errors, setErrors] = useState({});
+  const containerRef = useRef(null);
+
+  // Auto-advance: Enter (or the phone keyboard's "next") moves focus to the
+  // next enabled, visible field within the page's forms.
+  const handleKeyDown = (e) => {
+    if (e.key !== 'Enter' || e.target.tagName === 'TEXTAREA') return;
+    const root = containerRef.current;
+    if (!root) return;
+    const f = Array.from(
+      root.querySelectorAll('input:not([disabled]), select:not([disabled])')
+    ).filter(el => el.type !== 'hidden' && el.offsetParent !== null);
+    const i = f.indexOf(e.target);
+    if (i > -1 && i < f.length - 1) { e.preventDefault(); f[i + 1].focus(); }
+  };
+
+  const errCls = (base, key) => `${base}${errors[key] ? ' has-error' : ''}`;
+
+  // Clear a single field's inline error as the user corrects it.
+  const clearErr = (key) => setErrors(prev => {
+    if (!prev[key]) return prev;
+    const next = { ...prev };
+    delete next[key];
+    return next;
+  });
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchAll(); }, []);
@@ -80,7 +105,7 @@ export default function Setup() {
   };
 
   const addRegion = async () => {
-    if (!regionName.trim()) return;
+    if (!regionName.trim()) { setErrors(prev => ({ ...prev, regionName: 'أدخل اسم المنطقة' })); return; }
     setLoading(true);
     const { error } = await supabase.from('regions').insert({ name: regionName.trim() });
     if (error) showMsg('خطأ: ' + error.message, 'error');
@@ -92,7 +117,7 @@ export default function Setup() {
   };
 
   const addSupervisor = async () => {
-    if (!supName.trim()) return;
+    if (!supName.trim()) { setErrors(prev => ({ ...prev, supName: 'أدخل اسم المشرف' })); return; }
     setLoading(true);
     const { error } = await supabase.from('supervisors').insert({ name: supName.trim(), region_id: supRegion || null });
     if (error) showMsg('خطأ: ' + error.message, 'error');
@@ -104,7 +129,7 @@ export default function Setup() {
   };
 
   const addRep = async () => {
-    if (!repName.trim()) return;
+    if (!repName.trim()) { setErrors(prev => ({ ...prev, repName: 'أدخل اسم المندوب' })); return; }
     setLoading(true);
     const { error } = await supabase.from('representatives').insert({
       name: repName.trim(),
@@ -160,7 +185,8 @@ export default function Setup() {
   };
 
   const saveRepEdit = async () => {
-    if (!editingRep || !editRepName.trim()) return;
+    if (!editingRep) return;
+    if (!editRepName.trim()) { setErrors(prev => ({ ...prev, editRepName: 'الاسم مطلوب' })); return; }
     setLoading(true);
     const { error } = await supabase.from('representatives').update({
       name: editRepName.trim(),
@@ -190,7 +216,8 @@ export default function Setup() {
 
   const createRepAccount = async () => {
     if (!accountRep) { showMsg('اختر المندوب أولاً', 'error'); return; }
-    if (!accountEmail.trim()) { showMsg('أدخل إيميل المندوب', 'error'); return; }
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(accountEmail.trim());
+    if (!emailValid) { setErrors(prev => ({ ...prev, accountEmail: 'أدخل إيميلًا صحيحًا' })); return; }
     if (!accountPassword || accountPassword.length < 6) { showMsg('كلمة السر المؤقتة يجب أن تكون 6 أحرف على الأقل', 'error'); return; }
 
     setLoading(true);
@@ -319,7 +346,7 @@ export default function Setup() {
   };
 
   return (
-    <div>
+    <div ref={containerRef} onKeyDown={handleKeyDown}>
       <div className="page-header">
         <h1 className="page-title">⚙️ الإعدادات</h1>
       </div>
@@ -336,8 +363,11 @@ export default function Setup() {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
               <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
                 <label className="form-label">اسم المنطقة</label>
-                <input className="form-input" value={regionName} onChange={e => setRegionName(e.target.value)}
+                <input className={errCls('form-input', 'regionName')} value={regionName}
+                  enterKeyHint="next"
+                  onChange={e => { setRegionName(e.target.value); clearErr('regionName'); }}
                   placeholder="مثال: الرياض" onKeyDown={e => e.key === 'Enter' && addRegion()} />
+                {errors.regionName && <div className="form-error">{errors.regionName}</div>}
               </div>
               <button className="btn btn-primary" onClick={addRegion} disabled={loading}>إضافة</button>
             </div>
@@ -370,7 +400,9 @@ export default function Setup() {
             <div className="form-grid">
               <div className="form-group">
                 <label className="form-label">اسم المشرف</label>
-                <input className="form-input" value={supName} onChange={e => setSupName(e.target.value)} placeholder="الاسم الكامل" />
+                <input className={errCls('form-input', 'supName')} value={supName} enterKeyHint="next"
+                  onChange={e => { setSupName(e.target.value); clearErr('supName'); }} placeholder="الاسم الكامل" />
+                {errors.supName && <div className="form-error">{errors.supName}</div>}
               </div>
               <div className="form-group">
                 <label className="form-label">المنطقة</label>
@@ -410,7 +442,9 @@ export default function Setup() {
             <div className="form-grid">
               <div className="form-group">
                 <label className="form-label">اسم المندوب</label>
-                <input className="form-input" value={repName} onChange={e => setRepName(e.target.value)} placeholder="الاسم الكامل" />
+                <input className={errCls('form-input', 'repName')} value={repName} enterKeyHint="next"
+                  onChange={e => { setRepName(e.target.value); clearErr('repName'); }} placeholder="الاسم الكامل" />
+                {errors.repName && <div className="form-error">{errors.repName}</div>}
               </div>
               <div className="form-group">
                 <label className="form-label">المشرف</label>
@@ -435,7 +469,9 @@ export default function Setup() {
               <div className="form-grid">
                 <div className="form-group">
                   <label className="form-label">اسم المندوب</label>
-                  <input className="form-input" value={editRepName} onChange={e => setEditRepName(e.target.value)} placeholder="اسم المندوب" />
+                  <input className={errCls('form-input', 'editRepName')} value={editRepName} enterKeyHint="next"
+                    onChange={e => { setEditRepName(e.target.value); clearErr('editRepName'); }} placeholder="اسم المندوب" />
+                  {errors.editRepName && <div className="form-error">{errors.editRepName}</div>}
                 </div>
                 <div className="form-group">
                   <label className="form-label">المشرف</label>
@@ -510,9 +546,11 @@ export default function Setup() {
               </div>
               <div className="form-group">
                 <label className="form-label">إيميل الدخول</label>
-                <input className="form-input" type="email" value={accountEmail}
-                  onChange={e => setAccountEmail(e.target.value)}
+                <input className={errCls('form-input', 'accountEmail')} type="email" value={accountEmail}
+                  enterKeyHint="next"
+                  onChange={e => { setAccountEmail(e.target.value); clearErr('accountEmail'); }}
                   placeholder="rep@hawafel.com" />
+                {errors.accountEmail && <div className="form-error">{errors.accountEmail}</div>}
               </div>
               <div className="form-group">
                 <label className="form-label">كلمة السر المؤقتة</label>
