@@ -60,6 +60,13 @@ Apply all files in `supabase/migrations/` to staging, in filename order. Newly a
       `select proname from pg_proc where proname = 'customer_sales_totals';`
 - [ ] Confirm the earlier RLS/audit migrations are present (they define the security
       boundary the checks below rely on).
+- [ ] **No leftover permissive policy.** RLS OR-combines permissive policies, so one
+      stray `using (true)` policy defeats all the scoped ones. The hardening migration
+      drops the old policies by specific names (e.g. `customer_yearly_sales`' old
+      policy was `"Allow authenticated full access"`). Run section **8** of
+      `rls_verification.sql` (policy audit) and confirm **0 allow-all policies** remain
+      on the sensitive tables. (Validated locally; this guards against a real DB whose
+      old policy had a different name than the migration drops.)
 
 ### B2. Verify the `daily_entries` year/month contract (BUG-003)
 The app now writes `year`/`month` explicitly, but confirm the table accepts them:

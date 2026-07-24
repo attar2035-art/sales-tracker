@@ -217,6 +217,38 @@ begin;
 rollback;
 
 
+-- ############################################################################
+-- 8) Policy audit — no leftover permissive "allow-all" policy
+--    RLS combines PERMISSIVE policies with OR, so ONE stray "using (true)" policy
+--    silently defeats all the scoped ones. The hardening migration drops the old
+--    permissive policies by specific names (e.g. customer_yearly_sales' old policy
+--    was named "Allow authenticated full access"). Confirm nothing permissive is
+--    left behind on the sensitive tables.
+-- ############################################################################
+
+-- 8a. List all policies on the sensitive tables. Review by eye: every SELECT
+--     policy must be role/region-scoped; there must be NO policy with a
+--     qual of "true" (allow-all).
+select tablename, policyname, cmd, qual
+from pg_policies
+where schemaname = 'public'
+  and tablename in ('daily_entries','monthly_targets','customers',
+                    'customer_product_sales','customer_yearly_sales',
+                    'customer_yearly_history','user_roles','audit_logs')
+order by tablename, cmd, policyname;
+
+-- 8b. Hard check: any permissive policy whose qual is literally TRUE is a leak.
+--     EXPECT: 0 rows.
+select tablename, policyname, 'LEAK: allow-all policy' as problem
+from pg_policies
+where schemaname = 'public'
+  and permissive = 'PERMISSIVE'
+  and coalesce(btrim(qual), '') = 'true'
+  and tablename in ('daily_entries','monthly_targets','customers',
+                    'customer_product_sales','customer_yearly_sales',
+                    'customer_yearly_history');
+
+
 -- =============================================================================
 -- PASS CRITERIA: every "got" equals its "expected"; 2a raises an RLS error and
 -- 2c deletes 0 rows. Any mismatch is an RLS defect — do not release.
