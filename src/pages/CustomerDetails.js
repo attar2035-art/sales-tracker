@@ -17,11 +17,12 @@ export default function CustomerDetails({ customerId, onBack }) {
   const loadData = async () => {
     setLoading(true);
 
-    const { data: customerData } = await supabase
+    const { data: customerData, error: customerError } = await supabase
       .from('customers')
       .select('id, customer_code, customer_name, region_id, regions(name)')
       .eq('id', customerId)
-      .single();
+      .maybeSingle();
+    if (customerError) console.error(customerError);
     setCustomer(customerData || null);
 
     const { data: salesData, error } = await supabase
@@ -121,7 +122,7 @@ export default function CustomerDetails({ customerId, onBack }) {
           <div className="stat-value">{formatNumber(totals.quantity)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">إجمالي المبيعات (يناير - مايو 2026)</div>
+          <div className="stat-label">إجمالي المبيعات (كل الفترات)</div>
           <div className="stat-value">{formatCurrency(totals.amount)} ر.س</div>
         </div>
       </div>

@@ -3,9 +3,11 @@ import CustomerABCAnalysis from './CustomerABCAnalysis';
 import CustomerParetoAnalysis from './CustomerParetoAnalysis';
 import CustomerLoyaltyAnalysis from './CustomerLoyaltyAnalysis';
 
+const YEARS = [2022, 2023, 2024, 2025, 2026];
+
 export default function CustomerAnalytics() {
   const [activeTab, setActiveTab] = useState('abc'); // abc, pareto, loyalty
-  const [selectedYear, setSelectedYear] = useState(2022);
+  const [selectedYear, setSelectedYear] = useState(2025);
 
   return (
     <div>
@@ -23,10 +25,7 @@ export default function CustomerAnalytics() {
               value={selectedYear}
               onChange={e => setSelectedYear(parseInt(e.target.value))}
             >
-              <option value={2022}>2022</option>
-              <option value={2023}>2023</option>
-              <option value={2024}>2024</option>
-              <option value={2025}>2025</option>
+              {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
         </div>
@@ -83,7 +82,9 @@ export default function CustomerAnalytics() {
         {/* محتوى الـ Tabs */}
         {activeTab === 'abc' && <CustomerABCAnalysis year={selectedYear} />}
         {activeTab === 'pareto' && <CustomerParetoAnalysis year={selectedYear} />}
-        {activeTab === 'loyalty' && <CustomerLoyaltyAnalysis baseYear={selectedYear} comparisonYear={selectedYear + 1} />}
+        {/* Compare the selected year against the PREVIOUS year (always has prior
+            data), instead of a non-existent next year. */}
+        {activeTab === 'loyalty' && <CustomerLoyaltyAnalysis baseYear={selectedYear - 1} comparisonYear={selectedYear} />}
       </div>
 
       {/* معلومات إضافية */}

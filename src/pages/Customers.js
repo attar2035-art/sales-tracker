@@ -5,9 +5,9 @@ import CustomerDetails from './CustomerDetails';
 
 export default function Customers({ user }) {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [customers, setCustomers] = useState([]);
   const [regions, setRegions] = useState([]);
-  const [allowedRegionIds, setAllowedRegionIds] = useState(null); // null = no restriction (admin)
   const [search, setSearch] = useState('');
   const [regionFilter, setRegionFilter] = useState('all');
   const [sortBy, setSortBy] = useState('amount_desc');
@@ -26,25 +26,37 @@ export default function Customers({ user }) {
 
   const loadData = async () => {
     setLoading(true);
+    setError('');
 
-    // 1. تحديد المناطق المسموح بها حسب الدور
-    let regionIds = null; // null = admin, يشوف الكل
-
-    if (user?.role === 'supervisor' && user?.supervisor_id) {
-      const { data: reps } = await supabase
-        .from('representatives')
-        .select('region_id')
-        .eq('supervisor_id', user.supervisor_id);
-      regionIds = [...new Set((reps || []).map(r => r.region_id))];
-    } else if (user?.role === 'rep' && user?.rep_id) {
-      const { data: rep } = await supabase
-        .from('representatives')
-        .select('region_id')
-        .eq('id', user.rep_id)
-        .single();
-      regionIds = rep ? [rep.region_id] : [];
+    // 1. تحديد المناطق المسموح بها حسب الدور (fail closed: أي دور غير admin بدون
+    //    معرّف صحيح يرى لا شيء بدل رؤية كل العملاء).
+    let regionIds = null; // null = admin only, يشوف الكل
+    if (user?.role === 'admin') {
+      regionIds = null;
+    } else if (user?.role === 'supervisor') {
+      if (user?.supervisor_id) {
+        const { data: reps } = await supabase
+          .from('representatives')
+          .select('region_id')
+          .eq('supervisor_id', user.supervisor_id);
+        regionIds = [...new Set((reps || []).map(r => r.region_id))];
+      } else {
+        regionIds = [];
+      }
+    } else if (user?.role === 'rep') {
+      if (user?.rep_id) {
+        const { data: rep } = await supabase
+          .from('representatives')
+          .select('region_id')
+          .eq('id', user.rep_id)
+          .maybeSingle();
+        regionIds = rep ? [rep.region_id] : [];
+      } else {
+        regionIds = [];
+      }
+    } else {
+      regionIds = []; // unknown role: see nothing
     }
-    setAllowedRegionIds(regionIds);
 
     // 2. تحميل المناطق (للفلتر) — فقط المسموح بها
     let regionsQuery = supabase.from('regions').select('id, name').order('name');
@@ -63,6 +75,7 @@ export default function Customers({ user }) {
 
     if (error) {
       console.error(error);
+      setError('تعذّر تحميل بيانات العملاء. حاول مرة أخرى.');
       setCustomers([]);
       setLoading(false);
       return;
@@ -70,48 +83,70 @@ export default function Customers({ user }) {
 
     const customerIds = (customersData || []).map(c => c.id);
 
-    // 4. تحميل سجلات المبيعات على دفعات مع فلترة في السيرفر
-    const salesTotals = {};
-    const batchSize = 200;
-    const batches = [];
-    for (let i = 0; i < customerIds.length; i += batchSize) {
-      batches.push(customerIds.slice(i, i + batchSize));
+    // 4. حساب إجماليات المبيعات لكل عميل.
+    //    الأفضل: دالة تجميع على السيرفر (RPC) — تُرجع الإجماليات مباشرة بدل جلب
+    //    كل صفوف المبيعات للمتصفح. مع تراجع آمن للحساب على العميل إن لم تكن الدالة
+    //    منشورة بعد (BUG-020).
+    let totalsById = null;
+
+    const rpc = await supabase.rpc('customer_sales_totals', {
+      p_region_ids: regionIds ? regionIds.map(String) : null,
+    });
+    if (!rpc.error && Array.isArray(rpc.data)) {
+      totalsById = {};
+      rpc.data.forEach(row => {
+        totalsById[String(row.customer_id)] = {
+          amount: Number(row.total_amount) || 0,
+          quantity: Number(row.total_quantity) || 0,
+          skuCount: Number(row.sku_count) || 0,
+        };
+      });
+    } else {
+      // Fallback: batched client-side aggregation (previous behavior).
+      const salesTotals = {};
+      const batchSize = 200;
+      const batches = [];
+      for (let i = 0; i < customerIds.length; i += batchSize) {
+        batches.push(customerIds.slice(i, i + batchSize));
+      }
+      await Promise.all(batches.map(async (batch) => {
+        let from = 0;
+        const pageSize = 1000;
+        let keepGoing = true;
+        while (keepGoing) {
+          const { data: salesPage, error: salesError } = await supabase
+            .from('customer_product_sales')
+            .select('customer_id, amount, quantity, product_id')
+            .in('customer_id', batch)
+            .range(from, from + pageSize - 1);
+
+          if (salesError) { console.error(salesError); break; }
+
+          (salesPage || []).forEach(row => {
+            const key = String(row.customer_id);
+            if (!salesTotals[key]) salesTotals[key] = { amount: 0, quantity: 0, products: new Set() };
+            salesTotals[key].amount += Number(row.amount) || 0;
+            salesTotals[key].quantity += Number(row.quantity) || 0;
+            salesTotals[key].products.add(row.product_id);
+          });
+
+          keepGoing = (salesPage || []).length === pageSize;
+          from += pageSize;
+        }
+      }));
+      totalsById = {};
+      Object.entries(salesTotals).forEach(([key, t]) => {
+        totalsById[key] = { amount: t.amount, quantity: t.quantity, skuCount: t.products.size };
+      });
     }
 
-    await Promise.all(batches.map(async (batch) => {
-      let from = 0;
-      const pageSize = 1000;
-      let keepGoing = true;
-      while (keepGoing) {
-        const { data: salesPage, error: salesError } = await supabase
-          .from('customer_product_sales')
-          .select('customer_id, amount, quantity, product_id')
-          .in('customer_id', batch)
-          .range(from, from + pageSize - 1);
-
-        if (salesError) { console.error(salesError); break; }
-
-        (salesPage || []).forEach(row => {
-          if (!salesTotals[row.customer_id]) {
-            salesTotals[row.customer_id] = { amount: 0, quantity: 0, products: new Set() };
-          }
-          salesTotals[row.customer_id].amount += Number(row.amount) || 0;
-          salesTotals[row.customer_id].quantity += Number(row.quantity) || 0;
-          salesTotals[row.customer_id].products.add(row.product_id);
-        });
-
-        keepGoing = (salesPage || []).length === pageSize;
-        from += pageSize;
-      }
-    }));
-
     const merged = (customersData || []).map(c => {
-      const totals = salesTotals[c.id] || { amount: 0, quantity: 0, products: new Set() };
+      const totals = totalsById[String(c.id)] || { amount: 0, quantity: 0, skuCount: 0 };
       return {
         ...c,
         total_amount: totals.amount,
         total_quantity: totals.quantity,
-        sku_count: totals.products.size,
+        sku_count: totals.skuCount,
       };
     });
 
@@ -174,6 +209,10 @@ export default function Customers({ user }) {
     );
   }
 
+  if (error) {
+    return <div className="alert alert-error" style={{ margin: '1rem 0' }}>{error}</div>;
+  }
+
   return (
     <div>
       <h1 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '1.25rem' }}>
@@ -186,7 +225,7 @@ export default function Customers({ user }) {
           <div className="stat-value">{formatNumber(filtered.length)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">إجمالي المبيعات (يناير - مايو 2026)</div>
+          <div className="stat-label">إجمالي المبيعات (كل الفترات)</div>
           <div className="stat-value">{formatCurrency(totals.amount)} ر.س</div>
         </div>
         <div className="stat-card">

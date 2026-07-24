@@ -17,7 +17,9 @@ const EMPTY_ENTRY = {
 
 export default function DailyEntry() {
   const now = new Date();
-  const todayStr = now.toISOString().split('T')[0];
+  const pad2 = (n) => String(n).padStart(2, '0');
+  // Local calendar date (not UTC) so the default day is correct near midnight.
+  const todayStr = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [selectedDate, setSelectedDate] = useState(todayStr);
@@ -28,7 +30,9 @@ export default function DailyEntry() {
   const [msg, setMsg] = useState(null);
   const [existingEntry, setExistingEntry] = useState(null);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchReps(); }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (selectedRep && selectedDate) fetchEntry(); }, [selectedRep, selectedDate]);
 
   const fetchReps = async () => {
@@ -40,7 +44,7 @@ export default function DailyEntry() {
 
   const fetchEntry = async () => {
     const { data } = await supabase.from('daily_entries')
-      .select('*').eq('rep_id', selectedRep).eq('entry_date', selectedDate).single();
+      .select('*').eq('rep_id', selectedRep).eq('entry_date', selectedDate).maybeSingle();
     if (data) {
       setExistingEntry(data);
       setForm({
@@ -74,22 +78,49 @@ export default function DailyEntry() {
 
   const handleSave = async () => {
     if (!selectedRep || !selectedDate) { showMsg('اختر المندوب والتاريخ', 'error'); return; }
-    setLoading(true);
     const totalVisits = parseInt(form.total_visits) || 0;
     const shelfPhotos = parseInt(form.shelf_photos) || 0;
+    const successfulVisits = parseInt(form.successful_visits) || 0;
+    const availability = parseFloat(form.new_products_availability) || 0;
+
+    // Validation (was UI-only min=0 before): reject negatives, out-of-range and
+    // illogical cross-field values before persisting.
+    const numericKeys = [
+      'daily_sales', 'daily_collection', 'new_customers', 'new_customers_value',
+      'total_visits', 'shelf_photos', 'successful_visits', 'new_products_skus',
+      'new_products_qty', 'new_products_availability', 'working_hours', 'km',
+      'daily_expenses', 'overdue_total_input', 'overdue_collected',
+    ];
+    if (numericKeys.some(k => (parseFloat(form[k]) || 0) < 0)) {
+      showMsg('لا يمكن إدخال قيم سالبة', 'error'); return;
+    }
+    if (availability > 100) { showMsg('نسبة توفر المنتجات يجب أن تكون بين 0 و 100', 'error'); return; }
+    if (successfulVisits > totalVisits) { showMsg('الزيارات الناجحة لا يمكن أن تتجاوز إجمالي الزيارات', 'error'); return; }
+    if (shelfPhotos > totalVisits) { showMsg('عدد صور الرف لا يمكن أن يتجاوز عدد الزيارات', 'error'); return; }
+
+    if (existingEntry && !window.confirm('يوجد إدخال مسبق لهذا اليوم. سيتم استبداله بالقيم الجديدة. هل تريد المتابعة؟')) {
+      return;
+    }
+
+    setLoading(true);
+    // Derive year/month from the entry date so dashboards that filter by
+    // year/month always find the row (do not rely on a DB-side derivation).
+    const [entryYear, entryMonth] = selectedDate.split('-').map(Number);
     const payload = {
       rep_id: selectedRep,
       entry_date: selectedDate,
+      year: entryYear,
+      month: entryMonth,
       daily_sales: parseFloat(form.daily_sales) || 0,
       daily_collection: parseFloat(form.daily_collection) || 0,
       new_customers: parseInt(form.new_customers) || 0,
       new_customers_value: parseFloat(form.new_customers_value) || 0,
       total_visits: totalVisits,
       shelf_photos: shelfPhotos,
-      successful_visits: parseInt(form.successful_visits) || 0,
+      successful_visits: successfulVisits,
       new_products_skus: parseInt(form.new_products_skus) || 0,
       new_products_qty: parseInt(form.new_products_qty) || 0,
-      new_products_availability: parseFloat(form.new_products_availability) || 0,
+      new_products_availability: availability,
       working_hours: parseFloat(form.working_hours) || 0,
       km: parseFloat(form.km) || 0,
       daily_expenses: parseFloat(form.daily_expenses) || 0,
@@ -180,12 +211,13 @@ export default function DailyEntry() {
             <input className="form-input" type="date" value={selectedDate} onChange={handleDateChange} />
           </div>
           <div className="form-group">
-            <label className="form-label">الشهر</label>
+            <label className="form-label">الشهر (تِبعًا للتاريخ)</label>
             <div className="month-selector" style={{ padding: '0.5rem 0.875rem' }}>
-              <select value={month} onChange={e => setMonth(+e.target.value)}>
+              {/* Read-only: the saved row's month/year come from the selected date. */}
+              <select value={month} disabled title="يُحدَّد تلقائيًا من التاريخ">
                 {MONTHS_AR.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
               </select>
-              <select value={year} onChange={e => setYear(+e.target.value)}>
+              <select value={year} disabled title="يُحدَّد تلقائيًا من التاريخ">
                 {years.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>

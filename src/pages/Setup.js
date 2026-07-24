@@ -48,6 +48,7 @@ export default function Setup() {
   const [accountEmail, setAccountEmail] = useState('');
   const [accountPassword, setAccountPassword] = useState('');
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchAll(); }, []);
 
   const fetchAll = async () => {
@@ -56,6 +57,9 @@ export default function Setup() {
       supabase.from('supervisors').select('*, regions(name)').order('name'),
       supabase.from('representatives').select('*, supervisors(name), regions(name)').order('name'),
     ]);
+    if (r.error || s.error || rp.error) {
+      showMsg('تعذّر تحميل بيانات الإعدادات: ' + (r.error?.message || s.error?.message || rp.error?.message), 'error');
+    }
     if (r.data) setRegions(r.data);
     if (s.data) setSupervisors(s.data);
     if (rp.data) setReps(rp.data);
@@ -67,7 +71,11 @@ export default function Setup() {
   };
 
   const generateTempPassword = () => {
-    const randomPart = Math.random().toString(36).slice(2, 8).toUpperCase();
+    // Cryptographically-strong random (not Math.random) for temp credentials.
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const bytes = new Uint8Array(6);
+    (window.crypto || window.msCrypto).getRandomValues(bytes);
+    const randomPart = Array.from(bytes, b => alphabet[b % alphabet.length]).join('');
     setAccountPassword(`Hwf-${randomPart}-${new Date().getFullYear()}`);
   };
 
@@ -112,14 +120,21 @@ export default function Setup() {
   };
 
   const deleteItem = async (table, id) => {
-    if (!window.confirm('هل أنت متأكد من الحذف؟')) return;
-    await supabase.from(table).delete().eq('id', id);
+    if (!window.confirm('هل أنت متأكد من الحذف؟ قد يؤثر ذلك على بيانات مرتبطة.')) return;
+    const { error } = await supabase.from(table).delete().eq('id', id);
+    if (error) {
+      // Most likely a foreign-key constraint (referenced by reps/entries/targets).
+      showMsg('تعذّر الحذف — قد يكون العنصر مرتبطًا ببيانات أخرى: ' + error.message, 'error');
+      return;
+    }
     await logAuditEvent({ eventType: 'delete', pageKey: 'setup', entityType: table, entityId: id, details: { table } });
+    showMsg('تم الحذف');
     fetchAll();
   };
 
   const toggleRepActive = async (rep) => {
-    await supabase.from('representatives').update({ is_active: !rep.is_active }).eq('id', rep.id);
+    const { error } = await supabase.from('representatives').update({ is_active: !rep.is_active }).eq('id', rep.id);
+    if (error) { showMsg('تعذّر تغيير الحالة: ' + error.message, 'error'); return; }
     await logAuditEvent({
       eventType: 'status_change',
       pageKey: 'setup',
@@ -228,7 +243,10 @@ export default function Setup() {
     }
 
     const targetMap = buildEffectiveTargetsMap(targetsResult.data || [], year, month);
-    const currentTarget = targetMap[editingRep.id] || null;
+    const effectiveTarget = targetMap[editingRep.id] || null;
+    // Only split a target that truly belongs to THIS month. An inherited target
+    // (from a prior month) must not be materialized/split here (BUG-024).
+    const monthTarget = effectiveTarget && !effectiveTarget._isInherited ? effectiveTarget : null;
     const entries = entriesResult.data || [];
     const achieved = TARGET_FIELDS.reduce((acc, field) => {
       const entryField = ACHIEVEMENT_FIELD_BY_TARGET[field];
@@ -236,6 +254,7 @@ export default function Setup() {
       return acc;
     }, {});
 
+    // Step 1: create the new rep.
     const { data: newRep, error: insertError } = await supabase.from('representatives').insert({
       name: editRepName.trim(),
       supervisor_id: editRepSup || null,
@@ -248,11 +267,25 @@ export default function Setup() {
       return;
     }
 
-    if (currentTarget) {
+    // Step 2: deactivate the OLD rep first (the ownership transfer). If this fails,
+    // undo step 1 so we never end with two active reps.
+    const { error: deactivateError } = await supabase.from('representatives')
+      .update({ is_active: false })
+      .eq('id', editingRep.id);
+    if (deactivateError) {
+      await supabase.from('representatives').delete().eq('id', newRep.id);
+      showMsg('لم يتم التسليم بسبب خطأ في تعطيل المندوب القديم: ' + deactivateError.message, 'error');
+      setLoading(false);
+      return;
+    }
+
+    // Step 3: split this month's target (only if a real month target exists). On
+    // failure, compensate fully: reactivate the old rep and delete the new one.
+    if (monthTarget) {
       const oldTargetPayload = { rep_id: editingRep.id, year, month };
       const newTargetPayload = { rep_id: newRep.id, year, month };
       TARGET_FIELDS.forEach(field => {
-        const total = parseFloat(currentTarget[field]) || 0;
+        const total = parseFloat(monthTarget[field]) || 0;
         const oldShare = Math.min(parseFloat(achieved[field]) || 0, total);
         oldTargetPayload[field] = oldShare;
         newTargetPayload[field] = Math.max(0, total - oldShare);
@@ -262,27 +295,26 @@ export default function Setup() {
         .upsert([oldTargetPayload, newTargetPayload], { onConflict: 'rep_id,year,month' });
 
       if (targetError) {
+        await supabase.from('representatives').update({ is_active: true }).eq('id', editingRep.id);
         await supabase.from('representatives').delete().eq('id', newRep.id);
-        showMsg('لم يتم التسليم بسبب خطأ في تقسيم الأهداف: ' + targetError.message, 'error');
+        showMsg('لم يتم التسليم بسبب خطأ في تقسيم الأهداف (تم التراجع): ' + targetError.message, 'error');
         setLoading(false);
         return;
       }
     }
 
-    const { error: updateError } = await supabase.from('representatives')
-      .update({ is_active: false })
-      .eq('id', editingRep.id);
-    if (updateError) showMsg('تم إنشاء المندوب الجديد لكن حدث خطأ في تعطيل القديم: ' + updateError.message, 'error');
-    else {
-      await logAuditEvent({
-        eventType: 'handover',
-        pageKey: 'setup',
-        entityType: 'representatives',
-        entityId: editingRep.id,
-        details: { from: editingRep.name, to: editRepName.trim(), new_rep_id: newRep.id },
-      });
-      showMsg(currentTarget ? 'تم التسليم وتقسيم هدف الشهر على القديم والجديد' : 'تم التسليم بدون تقسيم أهداف لعدم وجود هدف سابق'); cancelEditRep(); fetchAll();
-    }
+    await logAuditEvent({
+      eventType: 'handover',
+      pageKey: 'setup',
+      entityType: 'representatives',
+      entityId: editingRep.id,
+      details: { from: editingRep.name, to: editRepName.trim(), new_rep_id: newRep.id, split_target: !!monthTarget },
+    });
+    showMsg(monthTarget
+      ? 'تم التسليم وتقسيم هدف الشهر على القديم والجديد'
+      : 'تم التسليم بدون تقسيم أهداف (لا يوجد هدف مخصّص لهذا الشهر)');
+    cancelEditRep();
+    fetchAll();
     setLoading(false);
   };
 

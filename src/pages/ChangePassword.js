@@ -10,7 +10,10 @@ export default function ChangePassword({ forceChange = false, onChanged }) {
   const handleChange = async () => {
     if (!newPassword || !confirm) { setMsg({ text: 'أدخل كلمة السر والتأكيد', type: 'error' }); return; }
     if (newPassword !== confirm) { setMsg({ text: 'كلمتا السر غير متطابقتين', type: 'error' }); return; }
-    if (newPassword.length < 6) { setMsg({ text: 'كلمة السر يجب أن تكون 6 أحرف على الأقل', type: 'error' }); return; }
+    if (newPassword.length < 8) { setMsg({ text: 'كلمة السر يجب أن تكون 8 أحرف على الأقل', type: 'error' }); return; }
+    if (!/[A-Za-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      setMsg({ text: 'كلمة السر يجب أن تحتوي على حرف ورقم على الأقل', type: 'error' }); return;
+    }
     setLoading(true);
     const { error } = await updatePassword(newPassword);
     if (error) setMsg({ text: 'خطأ: ' + error.message, type: 'error' });

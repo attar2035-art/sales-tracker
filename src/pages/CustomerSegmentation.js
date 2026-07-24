@@ -1,23 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { formatCurrency, formatNumber } from '../lib/helpers';
+import { classifyByCumulativeSales, ABCD_BOUNDARIES } from '../lib/analytics';
 import * as XLSX from 'xlsx';
 
 const YEARS = [2022, 2023, 2024, 2025, 2026];
 
+// Canonical cumulative-sales ABC/D grading, shared with the ABC analysis tab
+// so a customer is graded the same way everywhere (BUG-022).
 function classifyABCD(customers) {
   if (!customers.length) return [];
-  const sorted = [...customers].sort((a, b) => b.net_sales - a.net_sales);
-  const total = sorted.length;
-  return sorted.map((c, i) => {
-    const pct = (i + 1) / total;
-    let grade;
-    if (pct <= 0.2) grade = 'A';
-    else if (pct <= 0.5) grade = 'B';
-    else if (pct <= 0.8) grade = 'C';
-    else grade = 'D';
-    return { ...c, grade };
-  });
+  return classifyByCumulativeSales(customers, { valueKey: 'net_sales', boundaries: ABCD_BOUNDARIES });
 }
 
 const GRADE_COLORS = { A: '#10b981', B: '#3b82f6', C: '#f59e0b', D: '#ef4444' };
@@ -57,33 +50,31 @@ export default function CustomerSegmentation() {
   };
 
   const runImport = async () => {
+    // Non-destructive & idempotent: upsert on (customer_code, year, region_name).
+    // Existing rows are updated in place; nothing is deleted. Re-running is safe.
+    const confirmed = window.confirm(
+      'سيتم تحديث/إضافة بيانات العملاء المحضرة (بدون حذف أي بيانات موجودة). '
+      + 'السجلات المطابقة (نفس رقم العميل/السنة/المنطقة) سيتم تحديثها. هل تريد المتابعة؟'
+    );
+    if (!confirmed) return;
+
     setImporting(true);
     setImportProgress('جاري تحميل البيانات...');
     try {
       const mod = await import('../data/customers_import.json');
       const jsonData = mod.default || mod;
 
-      // 1) امسح أي بيانات قديمة/ناقصة أولاً لضمان نتيجة نظيفة
-      setImportProgress('جاري مسح البيانات القديمة...');
-      const { error: delErr } = await supabase
-        .from('customer_yearly_sales')
-        .delete()
-        .gte('id', 0);
-      if (delErr) {
-        setImportProgress('خطأ في مسح البيانات القديمة: ' + delErr.message);
-        setImporting(false);
-        return;
-      }
-
-      // 2) أدخل كل السجلات (إدخال مباشر لا يعتمد على قيد التفرد)
-      setImportProgress('تم المسح. جاري إدخال ' + jsonData.length + ' سجل...');
+      // Upsert in batches — no delete step, so a mid-run failure never loses data.
+      setImportProgress('جاري تحديث/إدخال ' + jsonData.length + ' سجل...');
       const batch = 200;
       let imported = 0;
       let errors = 0;
       let lastError = '';
       for (let i = 0; i < jsonData.length; i += batch) {
         const chunk = jsonData.slice(i, i + batch);
-        const { error } = await supabase.from('customer_yearly_sales').insert(chunk);
+        const { error } = await supabase
+          .from('customer_yearly_sales')
+          .upsert(chunk, { onConflict: 'customer_code,year,region_name' });
         if (error) {
           console.error('Batch error:', error);
           errors++;
@@ -91,12 +82,12 @@ export default function CustomerSegmentation() {
         } else {
           imported += chunk.length;
         }
-        setImportProgress('تم إدخال ' + imported + ' من ' + jsonData.length + (errors > 0 ? ' (' + errors + ' أخطاء: ' + lastError + ')' : ''));
+        setImportProgress('تم تحديث/إدخال ' + imported + ' من ' + jsonData.length + (errors > 0 ? ' (' + errors + ' أخطاء: ' + lastError + ')' : ''));
       }
       if (errors > 0 && imported === 0) {
-        setImportProgress('خطأ في الإدخال: ' + lastError);
+        setImportProgress('خطأ في الاستيراد: ' + lastError);
       } else {
-        setImportProgress('اكتمل! تم استيراد ' + imported + ' سجل' + (errors > 0 ? ' (مع ' + errors + ' دفعات بها أخطاء: ' + lastError + ')' : ''));
+        setImportProgress('اكتمل! تم تحديث/استيراد ' + imported + ' سجل' + (errors > 0 ? ' (مع ' + errors + ' دفعات بها أخطاء: ' + lastError + ')' : ''));
       }
       await fetchData();
     } catch (e) {
@@ -109,34 +100,62 @@ export default function CustomerSegmentation() {
     const file = e.target.files[0];
     if (!file) return;
     setImportMsg('');
+    setImportPreview(null);
+
+    // Guardrails around the (known-vulnerable) xlsx parser: restrict type/size and
+    // cap rows so a malicious/oversized file can't exhaust memory or trigger ReDoS.
+    // NOTE: the xlsx dependency (SheetJS 0.18.5) has open HIGH advisories with no npm
+    // fix (BUG-005). The real remediation is to upgrade to the SheetJS CDN build or
+    // parse server-side; these guardrails are defense-in-depth only.
+    const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+    const MAX_ROWS = 100000;
+    const nameOk = /\.(xlsx|xls|csv)$/i.test(file.name || '');
+    if (!nameOk) { setImportMsg('نوع الملف غير مدعوم. ارفع ملف Excel (.xlsx/.xls/.csv).'); return; }
+    if (file.size > MAX_BYTES) { setImportMsg('حجم الملف كبير جدًا (الحد 10 ميجابايت).'); return; }
+
     const reader = new FileReader();
+    reader.onerror = () => setImportMsg('تعذّر قراءة الملف. حاول مرة أخرى.');
     reader.onload = (evt) => {
-      const wb = XLSX.read(evt.target.result, { type: 'array' });
-      const allRows = [];
-      wb.SheetNames.forEach(sheetName => {
-        const ws = wb.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_json(ws);
-        rows.forEach(row => {
-          const code = String(row['رقم العميل'] || '').trim();
-          if (!code) return;
-          allRows.push({
-            customer_code: code,
-            customer_name: String(row['اسم العميل'] || '').trim(),
-            region_name: sheetName.trim(),
-            year: importYear,
-            net_sales: parseFloat(row['صافي المبيعات']) || 0,
-            collected: parseFloat(row['المبلغ المحصل']) || 0,
-            aging_0_30: parseFloat(row['0 - 30'] || row['0-30']) || 0,
-            aging_31_60: parseFloat(row['31 - 60'] || row['31-60']) || 0,
-            aging_61_90: parseFloat(row['61 - 90'] || row['61-90']) || 0,
-            aging_91_120: parseFloat(row['91 - 120'] || row['91-120']) || 0,
-            aging_120_plus: parseFloat(row['> 120'] || row['>120']) || 0,
-            debt_age: String(row['عمر الدين'] || row['عمر الدين '] || '').trim(),
-            monthly_avg_collection: parseFloat(row['المتوسط الشهري للتحصيل'] || row['المتوسط الشهري للتحصيل ']) || 0,
-          });
-        });
-      });
-      setImportPreview({ sheets: wb.SheetNames.length, total: allRows.length, rows: allRows });
+      try {
+        const wb = XLSX.read(evt.target.result, { type: 'array' });
+        const allRows = [];
+        let skipped = 0;
+        let capped = false;
+        for (const sheetName of wb.SheetNames) {
+          const ws = wb.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(ws);
+          for (const row of rows) {
+            const code = String(row['رقم العميل'] || '').trim();
+            if (!code) { skipped += 1; continue; }
+            if (allRows.length >= MAX_ROWS) { capped = true; break; }
+            allRows.push({
+              customer_code: code,
+              customer_name: String(row['اسم العميل'] || '').trim(),
+              region_name: sheetName.trim(),
+              year: importYear,
+              net_sales: parseFloat(row['صافي المبيعات']) || 0,
+              collected: parseFloat(row['المبلغ المحصل']) || 0,
+              aging_0_30: parseFloat(row['0 - 30'] || row['0-30']) || 0,
+              aging_31_60: parseFloat(row['31 - 60'] || row['31-60']) || 0,
+              aging_61_90: parseFloat(row['61 - 90'] || row['61-90']) || 0,
+              aging_91_120: parseFloat(row['91 - 120'] || row['91-120']) || 0,
+              aging_120_plus: parseFloat(row['> 120'] || row['>120']) || 0,
+              debt_age: String(row['عمر الدين'] || row['عمر الدين '] || '').trim(),
+              monthly_avg_collection: parseFloat(row['المتوسط الشهري للتحصيل'] || row['المتوسط الشهري للتحصيل ']) || 0,
+            });
+          }
+          if (capped) break;
+        }
+        if (!allRows.length) {
+          setImportMsg('لم يتم العثور على صفوف صالحة. تأكد أن الملف يحتوي عمود "رقم العميل" وشيتات بأسماء المناطق.');
+          return;
+        }
+        setImportMsg(capped ? `تم بلوغ الحد الأقصى (${MAX_ROWS} صف); سيتم استيراد أول ${allRows.length} فقط.` : '');
+        setImportPreview({ sheets: wb.SheetNames.length, total: allRows.length, skipped, rows: allRows });
+      } catch (err) {
+        console.error('Excel parse failed:', err);
+        setImportMsg('تعذّر قراءة ملف Excel. تأكد أن الملف سليم وغير تالف.');
+      }
     };
     reader.readAsArrayBuffer(file);
   };

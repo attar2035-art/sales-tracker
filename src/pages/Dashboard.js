@@ -6,9 +6,14 @@ import { supabase } from '../lib/supabase';
 import {
   MONTHS_AR, formatCurrency, formatNumber,
   getAchievementStatus, getStatusColor, getStatusLabel,
-  getMonthProgress, getRemainingWorkingDays, getTotalWorkingDaysInMonth,
+  getMonthProgress, getRemainingWorkingDays, getTotalWorkingDaysInMonth, getMonthPhase,
 } from '../lib/helpers';
 import { buildEffectiveTargetsMap } from '../lib/targets';
+import { getDailyRequirement } from '../lib/repMetrics';
+
+// Format a daily-required figure that may be null (finished month → not applicable).
+const fmtDaily = (value, currency = true) =>
+  value == null ? '-' : (currency ? formatCurrency(value) : formatNumber(value));
 
 const NO_SUPERVISOR = '__none__';
 
@@ -36,8 +41,6 @@ const getSixMonthWindow = (year, month) => {
   return { months, startDate: toDateString(start), endDate: toDateString(end) };
 };
 
-const metricPercent = (achieved, target) => target > 0 ? Math.round((achieved / target) * 100) : 0;
-
 function calcPoints(achieved, target) {
   const sales = target.target_sales > 0 ? Math.min(1, achieved.sales / target.target_sales) * 40 : 0;
   const collection = target.target_collection > 0 ? Math.min(1, achieved.collection / target.target_collection) * 30 : 0;
@@ -47,10 +50,13 @@ function calcPoints(achieved, target) {
   return Math.round(sales + collection + skus + customers + visits);
 }
 
-function KPICard({ icon, title, achieved, target, unit = '', color = '#3b82f6' }) {
+function KPICard({ icon, title, achieved, target, unit = '', color = '#3b82f6', monthProgress }) {
   const pct = target > 0 ? Math.min(100, Math.round((achieved / target) * 100)) : 0;
   const remaining = Math.max(0, target - achieved);
-  const monthProg = getMonthProgress(new Date().getFullYear(), new Date().getMonth() + 1);
+  // Use the SELECTED month's progress (passed in), not today's.
+  const monthProg = monthProgress != null
+    ? monthProgress
+    : getMonthProgress(new Date().getFullYear(), new Date().getMonth() + 1);
   const status = getAchievementStatus(achieved, target, monthProg);
   return (
     <div className="stat-card" style={{ borderRight: `4px solid ${color}` }}>
@@ -128,7 +134,9 @@ export default function Dashboard({ supervisorId }) {
   const [activeMetric, setActiveMetric] = useState('sales');
   const [activeView, setActiveView] = useState('points');
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchMeta(); }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, [year, month, filterSup]);
 
   const fetchMeta = async () => {
@@ -169,6 +177,8 @@ export default function Dashboard({ supervisorId }) {
       entriesMap[e.rep_id].push(e);
     });
     const remainingDays = getRemainingWorkingDays(year, month);
+    const totalDays = getTotalWorkingDaysInMonth(year, month);
+    const monthPhase = getMonthPhase(year, month);
     const monthProg = getMonthProgress(year, month);
     const combined = reps.map(rep => {
       const t = targetsMap[rep.id] || {};
@@ -178,6 +188,7 @@ export default function Dashboard({ supervisorId }) {
         sales: sum('daily_sales'), collection: sum('daily_collection'),
         new_customers: sum('new_customers'), new_customers_value: sum('new_customers_value'),
         total_visits: sum('total_visits'), successful_visits: sum('successful_visits'),
+        shelf_photos: sum('shelf_photos'),
         new_products_skus: sum('new_products_skus'), new_products_qty: sum('new_products_qty'),
         new_products_availability: repEntries.length > 0
           ? repEntries.reduce((a, e) => a + (parseFloat(e.new_products_availability) || 0), 0) / repEntries.length : 0,
@@ -193,14 +204,17 @@ export default function Dashboard({ supervisorId }) {
         new_products_skus: Math.max(0, (t.target_new_products_skus || 0) - achieved.new_products_skus),
         new_products_qty: Math.max(0, (t.target_new_products_qty || 0) - achieved.new_products_qty),
       };
+      // Month-phase aware: null for a finished month (no daily rate applies),
+      // spread over all working days for a future month.
+      const dr = (rem) => getDailyRequirement(rem, remainingDays, monthPhase, totalDays);
       const dailyRequired = {
-        sales: remainingDays > 0 ? remaining.sales / remainingDays : remaining.sales,
-        collection: remainingDays > 0 ? remaining.collection / remainingDays : remaining.collection,
-        new_customers: remainingDays > 0 ? remaining.new_customers / remainingDays : remaining.new_customers,
-        total_visits: remainingDays > 0 ? remaining.total_visits / remainingDays : remaining.total_visits,
-        successful_visits: remainingDays > 0 ? remaining.successful_visits / remainingDays : remaining.successful_visits,
-        new_products_skus: remainingDays > 0 ? remaining.new_products_skus / remainingDays : remaining.new_products_skus,
-        new_products_qty: remainingDays > 0 ? remaining.new_products_qty / remainingDays : remaining.new_products_qty,
+        sales: dr(remaining.sales),
+        collection: dr(remaining.collection),
+        new_customers: dr(remaining.new_customers),
+        total_visits: dr(remaining.total_visits),
+        successful_visits: dr(remaining.successful_visits),
+        new_products_skus: dr(remaining.new_products_skus),
+        new_products_qty: dr(remaining.new_products_qty),
       };
       const points = calcPoints(achieved, t);
       return {
@@ -386,25 +400,25 @@ export default function Dashboard({ supervisorId }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-        <KPICard icon="🎯" title="المبيعات" achieved={kpi.sales} target={kpi.targetSales} color="#3b82f6" />
-        <KPICard icon="💰" title="التحصيل" achieved={kpi.collection} target={kpi.targetCollection} color="#10b981" />
+        <KPICard monthProgress={monthProg} icon="🎯" title="المبيعات" achieved={kpi.sales} target={kpi.targetSales} color="#3b82f6" />
+        <KPICard monthProgress={monthProg} icon="💰" title="التحصيل" achieved={kpi.collection} target={kpi.targetCollection} color="#10b981" />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-        <KPICard icon="📦" title="الأصناف الجديدة" achieved={kpi.newProductsSkus} target={kpi.targetNewProductsSkus} color="#f59e0b" unit=" صنف" />
-        <KPICard icon="📦" title="قطع المنتجات الجديدة" achieved={kpi.newProductsQty} target={kpi.targetNewProductsQty} color="#f59e0b" unit=" قطعة" />
+        <KPICard monthProgress={monthProg} icon="📦" title="الأصناف الجديدة" achieved={kpi.newProductsSkus} target={kpi.targetNewProductsSkus} color="#f59e0b" unit=" صنف" />
+        <KPICard monthProgress={monthProg} icon="📦" title="قطع المنتجات الجديدة" achieved={kpi.newProductsQty} target={kpi.targetNewProductsQty} color="#f59e0b" unit=" قطعة" />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-        <KPICard icon="👥" title="العملاء الجدد" achieved={kpi.newCustomers} target={kpi.targetNewCustomers} color="#8b5cf6" unit=" عميل" />
-        <KPICard icon="🧾" title="قيمة فواتير العملاء الجدد" achieved={kpi.newCustomersValue} target={0} color="#8b5cf6" />
+        <KPICard monthProgress={monthProg} icon="👥" title="العملاء الجدد" achieved={kpi.newCustomers} target={kpi.targetNewCustomers} color="#8b5cf6" unit=" عميل" />
+        <KPICard monthProgress={monthProg} icon="🧾" title="قيمة فواتير العملاء الجدد" achieved={kpi.newCustomersValue} target={0} color="#8b5cf6" />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-        <KPICard icon="📍" title="الزيارات الإجمالي" achieved={kpi.totalVisits} target={kpi.targetVisits} color="#06b6d4" unit=" زيارة" />
-        <KPICard icon="✅" title="الزيارات الناجحة" achieved={kpi.successfulVisits} target={kpi.targetSuccessfulVisits} color="#06b6d4" unit=" زيارة" />
+        <KPICard monthProgress={monthProg} icon="📍" title="الزيارات الإجمالي" achieved={kpi.totalVisits} target={kpi.targetVisits} color="#06b6d4" unit=" زيارة" />
+        <KPICard monthProgress={monthProg} icon="✅" title="الزيارات الناجحة" achieved={kpi.successfulVisits} target={kpi.targetSuccessfulVisits} color="#06b6d4" unit=" زيارة" />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        <KPICard icon="🚗" title="الكيلومترات" achieved={kpi.km} target={0} color="#64748b" unit=" كم" />
-        <KPICard icon="💸" title="المصروفات" achieved={kpi.expenses} target={0} color="#64748b" />
-        <KPICard icon="⚠️" title="المحصل من المتأخرات" achieved={kpi.overdueCollected} target={kpi.overdueTotal} color="#ef4444" />
+        <KPICard monthProgress={monthProg} icon="🚗" title="الكيلومترات" achieved={kpi.km} target={0} color="#64748b" unit=" كم" />
+        <KPICard monthProgress={monthProg} icon="💸" title="المصروفات" achieved={kpi.expenses} target={0} color="#64748b" />
+        <KPICard monthProgress={monthProg} icon="⚠️" title="المحصل من المتأخرات" achieved={kpi.overdueCollected} target={kpi.overdueTotal} color="#ef4444" />
       </div>
 
       <section className="dashboard-visual-panel">
@@ -595,7 +609,7 @@ export default function Dashboard({ supervisorId }) {
                           <td>{formatCurrency(d.target.target_sales)}</td>
                           <td style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(d.achieved.sales)}</td>
                           <td style={{ color: '#ef4444' }}>{formatCurrency(d.remaining.sales)}</td>
-                          <td style={{ color: '#f59e0b' }}>{formatCurrency(d.dailyRequired.sales)}</td>
+                          <td style={{ color: '#f59e0b' }}>{fmtDaily(d.dailyRequired.sales)}</td>
                           <td>
                             <div style={{ minWidth: 80 }}>
                               <div style={{ fontSize: '0.8rem', fontWeight: 700, color: getStatusColor(status) }}>{salesPct}%</div>
@@ -608,16 +622,16 @@ export default function Dashboard({ supervisorId }) {
                           <td>{formatCurrency(d.target.target_collection)}</td>
                           <td style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(d.achieved.collection)}</td>
                           <td style={{ color: '#ef4444' }}>{formatCurrency(d.remaining.collection)}</td>
-                          <td style={{ color: '#f59e0b' }}>{formatCurrency(d.dailyRequired.collection)}</td>
+                          <td style={{ color: '#f59e0b' }}>{fmtDaily(d.dailyRequired.collection)}</td>
                           <td><div style={{ fontSize: '0.8rem', fontWeight: 700 }}>{colPct}%</div><div className="progress-bar"><div className="progress-fill" style={{ width: `${Math.min(100, colPct)}%`, background: '#10b981' }} /></div></td>
                         </>}
                         {activeMetric === 'visits' && <>
                           <td>{formatNumber(d.target.target_total_visits)}</td>
                           <td style={{ color: '#60a5fa', fontWeight: 700 }}>{formatNumber(d.achieved.total_visits)}</td>
                           <td style={{ color: '#10b981' }}>{formatNumber(d.achieved.successful_visits)}</td>
-                          <td style={{ color: '#a78bfa' }}>{formatNumber(d.achieved.total_visits)}</td>
+                          <td style={{ color: '#a78bfa' }}>{formatNumber(d.achieved.shelf_photos)}</td>
                           <td style={{ color: '#ef4444' }}>{formatNumber(d.remaining.total_visits)}</td>
-                          <td style={{ color: '#f59e0b' }}>{formatNumber(d.dailyRequired.total_visits).split('.')[0]}</td>
+                          <td style={{ color: '#f59e0b' }}>{d.dailyRequired.total_visits == null ? '-' : formatNumber(d.dailyRequired.total_visits).split('.')[0]}</td>
                         </>}
                         {activeMetric === 'products' && <>
                           <td>{formatNumber(d.target.target_new_products_skus)}</td>
