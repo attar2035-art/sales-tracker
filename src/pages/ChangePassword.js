@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { updatePassword } from '../lib/auth';
 
-export default function ChangePassword({ forceChange = false, onChanged }) {
+export default function ChangePassword({ forceChange = false, recovery = false, onChanged }) {
   const [newPassword, setNewPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -64,13 +64,18 @@ export default function ChangePassword({ forceChange = false, onChanged }) {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">🔑 تغيير كلمة السر</h1>
+        <h1 className="page-title">🔑 {recovery ? 'تعيين كلمة سر جديدة' : 'تغيير كلمة السر'}</h1>
       </div>
       <div ref={containerRef} onKeyDown={handleKeyDown} className="card" style={{ maxWidth: 450 }}>
         {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
         {forceChange && (
           <div className="alert alert-warning">
             يجب تغيير كلمة السر المؤقتة قبل استخدام النظام.
+          </div>
+        )}
+        {recovery && (
+          <div className="alert alert-warning">
+            أدخل كلمة سر جديدة لحسابك لإكمال الاستعادة.
           </div>
         )}
         <div className="form-group">
@@ -92,7 +97,7 @@ export default function ChangePassword({ forceChange = false, onChanged }) {
         </div>
         <button className="btn btn-primary" onClick={handleChange} disabled={loading}
           style={{ width: '100%', padding: '0.75rem' }}>
-          {loading ? '⏳ جاري الحفظ...' : forceChange ? 'تغيير كلمة السر والبدء' : '💾 حفظ كلمة السر'}
+          {loading ? '⏳ جاري الحفظ...' : recovery ? 'تعيين كلمة السر والدخول' : forceChange ? 'تغيير كلمة السر والبدء' : '💾 حفظ كلمة السر'}
         </button>
       </div>
     </div>

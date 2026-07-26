@@ -33,6 +33,18 @@ export const updatePassword = async (newPassword) => {
   return { error };
 };
 
+// Self-service password recovery: emails the user a reset link that returns to
+// this app (whatever host it is served from). Clicking it opens the app with a
+// recovery session, which App.js detects to show the "set new password" screen.
+export const sendPasswordReset = async (email) => {
+  const redirectTo = `${window.location.origin}${window.location.pathname}`;
+  const { error } = await supabase.auth.resetPasswordForEmail(
+    (email || '').trim().toLowerCase(),
+    { redirectTo },
+  );
+  return { error };
+};
+
 const getRepAccountErrorMessage = (error) => {
   const message = (error?.message || '').toLowerCase();
   if (

@@ -80,10 +80,14 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState('dashboard');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [recovery, setRecovery] = useState(false);
 
   useEffect(() => {
     checkUser();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      // A password-reset link opens the app with a recovery session; show the
+      // "set new password" screen instead of the normal dashboard.
+      if (event === 'PASSWORD_RECOVERY') setRecovery(true);
       checkUser();
     });
     return () => subscription.unsubscribe();
@@ -117,6 +121,11 @@ export default function App() {
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a' }}>
       <div className="loading"><div className="spinner" />جاري التحميل...</div>
     </div>
+  );
+
+  // Recovery flow (from a password-reset email): let the user set a new password.
+  if (recovery) return (
+    <ChangePassword recovery onChanged={() => { setRecovery(false); checkUser(); }} />
   );
 
   if (!user) return <Login onLogin={checkUser} />;
