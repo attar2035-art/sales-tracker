@@ -146,14 +146,13 @@ export default function DailyEntry() {
     }
 
     setLoading(true);
-    // Derive year/month from the entry date so dashboards that filter by
-    // year/month always find the row (do not rely on a DB-side derivation).
-    const [entryYear, entryMonth] = selectedDate.split('-').map(Number);
+    // NOTE: `year` and `month` are GENERATED ALWAYS columns in the database
+    // (derived from entry_date). Writing them explicitly makes every insert
+    // fail with "cannot insert a non-DEFAULT value into a generated column",
+    // so they are intentionally omitted here — the DB computes them.
     const payload = {
       rep_id: selectedRep,
       entry_date: selectedDate,
-      year: entryYear,
-      month: entryMonth,
       daily_sales: parseFloat(form.daily_sales) || 0,
       daily_collection: parseFloat(form.daily_collection) || 0,
       new_customers: parseInt(form.new_customers) || 0,
