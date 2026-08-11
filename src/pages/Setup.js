@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { createRepLoginAccount } from '../lib/auth';
+import { createRepLoginAccount, createManagerLoginAccount } from '../lib/auth';
 import { buildEffectiveTargetsMap, TARGET_FIELDS } from '../lib/targets';
 import { logAuditEvent } from '../lib/audit';
 
@@ -18,6 +18,11 @@ const ACHIEVEMENT_FIELD_BY_TARGET = {
   overdue_total: 'overdue_collected',
 };
 
+const MANAGER_TYPE_LABELS = {
+  sales_manager: 'مدير المبيعات',
+  company_manager: 'مدير الشركة',
+};
+
 const getLocalDateParts = () => {
   const now = new Date();
   const year = now.getFullYear();
@@ -32,6 +37,7 @@ export default function Setup() {
   const [regions, setRegions] = useState([]);
   const [supervisors, setSupervisors] = useState([]);
   const [reps, setReps] = useState([]);
+  const [managers, setManagers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
   const [regionName, setRegionName] = useState('');
@@ -47,6 +53,10 @@ export default function Setup() {
   const [accountRep, setAccountRep] = useState('');
   const [accountEmail, setAccountEmail] = useState('');
   const [accountPassword, setAccountPassword] = useState('');
+  const [managerName, setManagerName] = useState('');
+  const [managerEmail, setManagerEmail] = useState('');
+  const [managerType, setManagerType] = useState('sales_manager');
+  const [accountManager, setAccountManager] = useState(null);
   const [errors, setErrors] = useState({});
   const containerRef = useRef(null);
 
@@ -77,17 +87,19 @@ export default function Setup() {
   useEffect(() => { fetchAll(); }, []);
 
   const fetchAll = async () => {
-    const [r, s, rp] = await Promise.all([
+    const [r, s, rp, mg] = await Promise.all([
       supabase.from('regions').select('*').order('name'),
       supabase.from('supervisors').select('*, regions(name)').order('name'),
       supabase.from('representatives').select('*, supervisors(name), regions(name)').order('name'),
+      supabase.from('managers').select('*').order('name'),
     ]);
-    if (r.error || s.error || rp.error) {
-      showMsg('تعذّر تحميل بيانات الإعدادات: ' + (r.error?.message || s.error?.message || rp.error?.message), 'error');
+    if (r.error || s.error || rp.error || mg.error) {
+      showMsg('تعذّر تحميل بيانات الإعدادات: ' + (r.error?.message || s.error?.message || rp.error?.message || mg.error?.message), 'error');
     }
     if (r.data) setRegions(r.data);
     if (s.data) setSupervisors(s.data);
     if (rp.data) setReps(rp.data);
+    if (mg.data) setManagers(mg.data);
   };
 
   const showMsg = (text, type = 'success') => {
@@ -247,6 +259,72 @@ export default function Setup() {
     setLoading(false);
   };
 
+  const addManager = async () => {
+    let hasError = false;
+    if (!managerName.trim()) { setErrors(prev => ({ ...prev, managerName: 'أدخل اسم المدير' })); hasError = true; }
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(managerEmail.trim());
+    if (!emailValid) { setErrors(prev => ({ ...prev, managerEmail: 'أدخل إيميلًا صحيحًا' })); hasError = true; }
+    if (hasError) return;
+    setLoading(true);
+    const { error } = await supabase.from('managers').insert({
+      name: managerName.trim(),
+      email: managerEmail.trim().toLowerCase(),
+      manager_type: managerType,
+    });
+    if (error) showMsg('خطأ: ' + error.message, 'error');
+    else {
+      await logAuditEvent({ eventType: 'create', pageKey: 'setup', entityType: 'managers', details: { name: managerName.trim(), email: managerEmail.trim().toLowerCase(), manager_type: managerType } });
+      showMsg('تم إضافة المدير'); setManagerName(''); setManagerEmail(''); setManagerType('sales_manager'); fetchAll();
+    }
+    setLoading(false);
+  };
+
+  const toggleManagerActive = async (manager) => {
+    const { error } = await supabase.from('managers').update({ is_active: !manager.is_active }).eq('id', manager.id);
+    if (error) { showMsg('تعذّر تغيير الحالة: ' + error.message, 'error'); return; }
+    await logAuditEvent({
+      eventType: 'status_change',
+      pageKey: 'setup',
+      entityType: 'managers',
+      entityId: manager.id,
+      details: { name: manager.name, from: manager.is_active ? 'نشط' : 'غير نشط', to: !manager.is_active ? 'نشط' : 'غير نشط' },
+    });
+    fetchAll();
+  };
+
+  const startAccountForManager = (manager) => {
+    setAccountManager(manager);
+    generateTempPassword();
+  };
+
+  const createManagerAccount = async () => {
+    if (!accountManager) { showMsg('اختر المدير أولاً', 'error'); return; }
+    if (!accountPassword || accountPassword.length < 6) { showMsg('كلمة السر المؤقتة يجب أن تكون 6 أحرف على الأقل', 'error'); return; }
+    setLoading(true);
+    const { data, error } = await createManagerLoginAccount({
+      email: accountManager.email,
+      password: accountPassword,
+      managerId: accountManager.id,
+    });
+    if (error) showMsg('خطأ في إنشاء الحساب: ' + error.message, 'error');
+    else {
+      await logAuditEvent({
+        eventType: 'account_create',
+        pageKey: 'setup',
+        entityType: 'managers',
+        entityId: accountManager.id,
+        details: { name: accountManager.name || '', email: (accountManager.email || '').trim().toLowerCase() },
+      });
+      const successText = data?.mode === 'linked_existing'
+        ? 'الإيميل كان موجودًا بالفعل، وتم ربطه بالمدير وتحديث كلمة السر المؤقتة.'
+        : 'تم إنشاء حساب دخول المدير. أعطه كلمة السر المؤقتة وسيغيرها عند أول دخول.';
+      showMsg(successText);
+      setAccountManager(null);
+      setAccountPassword('');
+    }
+    setLoading(false);
+  };
+
   const handoverRep = async () => {
     if (!editingRep || !editRepName.trim()) return;
     if (!window.confirm('سيتم إنشاء مندوب جديد وتعطيل الحالي مع تقسيم هدف الشهر: المحقق للقديم والمتبقي للجديد. هل تريد المتابعة؟')) return;
@@ -352,7 +430,7 @@ export default function Setup() {
       </div>
       {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
       <div className="tabs">
-        {[['regions','🗺️ المناطق'], ['supervisors','👔 المشرفون'], ['reps','👤 المندوبون'], ['accounts','🔐 حسابات الدخول']].map(([k, label]) => (
+        {[['regions','🗺️ المناطق'], ['supervisors','👔 المشرفون'], ['reps','👤 المندوبون'], ['managers','👔 المديرون'], ['accounts','🔐 حسابات الدخول']].map(([k, label]) => (
           <button key={k} className={`tab ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>{label}</button>
         ))}
       </div>
@@ -518,6 +596,91 @@ export default function Setup() {
                           <button className="btn btn-success btn-sm" onClick={() => startAccountForRep(r)}>حساب دخول</button>
                           <button className="btn btn-ghost btn-sm" onClick={() => toggleRepActive(r)}>{r.is_active ? 'تعطيل' : 'تفعيل'}</button>
                           <button className="btn btn-danger btn-sm" onClick={() => deleteItem('representatives', r.id)}>حذف</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {tab === 'managers' && (
+        <div>
+          <div className="card">
+            <div className="card-title">➕ إضافة مدير</div>
+            <div className="form-grid">
+              <div className="form-group">
+                <label className="form-label">الاسم</label>
+                <input className={errCls('form-input', 'managerName')} value={managerName} enterKeyHint="next"
+                  onChange={e => { setManagerName(e.target.value); clearErr('managerName'); }} placeholder="الاسم الكامل" />
+                {errors.managerName && <div className="form-error">{errors.managerName}</div>}
+              </div>
+              <div className="form-group">
+                <label className="form-label">البريد الإلكتروني</label>
+                <input className={errCls('form-input', 'managerEmail')} type="email" value={managerEmail} enterKeyHint="next"
+                  onChange={e => { setManagerEmail(e.target.value); clearErr('managerEmail'); }} placeholder="manager@hawafel.com" />
+                {errors.managerEmail && <div className="form-error">{errors.managerEmail}</div>}
+              </div>
+              <div className="form-group">
+                <label className="form-label">النوع</label>
+                <select className="form-select" value={managerType} onChange={e => setManagerType(e.target.value)}>
+                  <option value="sales_manager">مدير المبيعات</option>
+                  <option value="company_manager">مدير الشركة</option>
+                </select>
+              </div>
+            </div>
+            <button className="btn btn-primary" onClick={addManager} disabled={loading}>إضافة المدير</button>
+          </div>
+          {accountManager && (
+            <div className="card">
+              <div className="card-title">🔐 إنشاء حساب دخول للمدير: {accountManager.name}</div>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label className="form-label">إيميل الدخول</label>
+                  <input className="form-input" type="email" value={accountManager.email || ''} disabled />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">كلمة السر المؤقتة</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <input className="form-input" type="text" value={accountPassword}
+                      onChange={e => setAccountPassword(e.target.value)}
+                      placeholder="كلمة سر مؤقتة" />
+                    <button className="btn btn-ghost" type="button" onClick={generateTempPassword}>توليد</button>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <button className="btn btn-primary" onClick={createManagerAccount} disabled={loading}>
+                  {loading ? 'جاري إنشاء الحساب...' : 'إنشاء الحساب وربطه بالمدير'}
+                </button>
+                <button className="btn btn-ghost" onClick={() => { setAccountManager(null); setAccountPassword(''); }} disabled={loading}>إلغاء</button>
+              </div>
+              <div style={{ marginTop: '0.75rem', color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.7 }}>
+                بعد الإنشاء أعطِ المدير الإيميل وكلمة السر المؤقتة. عند أول دخول سيجبره النظام على تغيير كلمة السر قبل عرض صفحته.
+              </div>
+            </div>
+          )}
+          <div className="card">
+            <div className="card-title">قائمة المديرين ({managers.length})</div>
+            {managers.length === 0 ? (
+              <div className="empty-state"><div className="empty-state-icon">👔</div><div className="empty-state-text">لا يوجد مديرون بعد</div></div>
+            ) : (
+              <div className="table-wrapper">
+                <table className="responsive-cards">
+                  <thead><tr><th>الاسم</th><th>البريد</th><th>النوع</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
+                  <tbody>
+                    {managers.map(m => (
+                      <tr key={m.id}>
+                        <td data-label="الاسم">{m.name}</td>
+                        <td data-label="البريد">{m.email}</td>
+                        <td data-label="النوع">{MANAGER_TYPE_LABELS[m.manager_type] || m.manager_type}</td>
+                        <td data-label="الحالة"><span className={`badge ${m.is_active ? 'badge-success' : 'badge-danger'}`}>{m.is_active ? 'نشط' : 'غير نشط'}</span></td>
+                        <td className="no-label" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <button className="btn btn-success btn-sm" onClick={() => startAccountForManager(m)}>إنشاء حساب دخول</button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => toggleManagerActive(m)}>{m.is_active ? 'إيقاف' : 'تفعيل'}</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => deleteItem('managers', m.id)}>حذف</button>
                         </td>
                       </tr>
                     ))}

@@ -30,8 +30,8 @@ export default function Customers({ user }) {
 
     // 1. تحديد المناطق المسموح بها حسب الدور (fail closed: أي دور غير admin بدون
     //    معرّف صحيح يرى لا شيء بدل رؤية كل العملاء).
-    let regionIds = null; // null = admin only, يشوف الكل
-    if (user?.role === 'admin') {
+    let regionIds = null; // null = admin/manager يشوفون الكل
+    if (user?.role === 'admin' || user?.role === 'manager') {
       regionIds = null;
     } else if (user?.role === 'supervisor') {
       if (user?.supervisor_id) {
