@@ -15,6 +15,7 @@ import CustomerSegmentation from './pages/CustomerSegmentation';
 import ActivityLog from './pages/ActivityLog';
 import SupervisorRoute from './pages/SupervisorRoute';
 import KnowledgeCenter from './pages/KnowledgeCenter';
+import PermissionsCenter from './pages/PermissionsCenter';
 import FloatingVisitButton from './components/FloatingVisitButton';
 import { logAuditEvent } from './lib/audit';
 
@@ -28,6 +29,7 @@ const NAV_ADMIN = [
   { key: 'segmentation', label: 'تقسيم العملاء', icon: '📊' },
   { key: 'knowledge', label: 'مركز المعرفة', icon: '🧠' },
   { key: 'audit', label: 'سجل النشاط', icon: '🧾' },
+  { key: 'permissions', label: 'مركز الصلاحيات', icon: '🛡️' },
   { key: 'setup', label: 'الإعدادات', icon: '⚙️' },
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
 ];
@@ -183,6 +185,7 @@ export default function App() {
         case 'analytics': return <CustomerAnalytics />;
         case 'segmentation': return <CustomerSegmentation />;
         case 'knowledge': return <KnowledgeCenter user={user} />;
+        case 'permissions': return <PermissionsCenter />;
         case 'audit': return <ActivityLog />;
         case 'setup': return <Setup />;
         case 'password': return <ChangePassword />;
