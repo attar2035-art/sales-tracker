@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getOrCreateTodayRoute, listRouteVisits, summarizeVisits } from '../lib/visits';
+import {
+  getOrCreateTodayRoute, listRouteVisits, summarizeVisits,
+  sendVisitReport, completeRoute,
+} from '../lib/visits';
 
 const STATUS_LABELS = { planned: 'مخططة', completed: 'مكتملة', cancelled: 'ملغاة' };
 const STATUS_COLORS = { planned: '#f59e0b', completed: '#10b981', cancelled: '#ef4444' };
@@ -9,6 +12,26 @@ export default function SupervisorRoute({ user, refreshSignal }) {
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [sending, setSending] = useState(false);
+  const [notice, setNotice] = useState(null);
+
+  const endDayAndSend = async () => {
+    if (!route) return;
+    if (!window.confirm('إنهاء اليوم وإرسال التقرير الكامل للمديرين وإلى بريدك؟')) return;
+    setSending(true);
+    setNotice(null);
+    const { data, error: sendError } = await sendVisitReport({ type: 'daily', routeId: route.id });
+    if (sendError || data?.error) {
+      setNotice({ type: 'error', text: 'تعذّر إرسال التقرير: ' + (sendError?.message || data?.error || '') });
+    } else if ((data?.sent ?? 0) === 0) {
+      setNotice({ type: 'error', text: 'لم يُرسَل: لا يوجد مستلمون مفعّلون في مركز الصلاحيات.' });
+    } else {
+      await completeRoute(route.id);
+      setNotice({ type: 'success', text: `✓ تم إرسال التقرير إلى ${data.sent} مستلم وإنهاء اليوم.` });
+      setRoute(r => (r ? { ...r, status: 'completed' } : r));
+    }
+    setSending(false);
+  };
 
   const load = useCallback(async () => {
     if (!user?.supervisor_id) { setLoading(false); return; }
@@ -40,6 +63,7 @@ export default function SupervisorRoute({ user, refreshSignal }) {
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
+      {notice && <div className={`alert alert-${notice.type}`}>{notice.text}</div>}
 
       {!error && (
         <>
@@ -57,6 +81,16 @@ export default function SupervisorRoute({ user, refreshSignal }) {
               <div className="stat-value">{stats.successRate}%</div>
             </div>
           </div>
+
+          {route?.status !== 'completed' ? (
+            <button className="btn btn-primary btn-block" onClick={endDayAndSend}
+              disabled={sending || visits.length === 0}
+              style={{ marginBottom: '1rem' }}>
+              {sending ? '⏳ جاري الإرسال...' : '📤 إنهاء اليوم وإرسال التقرير للمديرين'}
+            </button>
+          ) : (
+            <div className="alert alert-success">✓ تم إنهاء اليوم وإرسال التقرير.</div>
+          )}
 
           {visits.length === 0 ? (
             <div className="card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>

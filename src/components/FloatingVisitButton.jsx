@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   getOrCreateTodayRoute, searchCustomersForVisit, getCurrentPosition,
-  startVisit, uploadVisitPhoto, attachPhotosToVisit,
+  startVisit, uploadVisitPhoto, attachPhotosToVisit, sendVisitReport,
 } from '../lib/visits';
 
 export default function FloatingVisitButton({ user, onVisitLogged }) {
@@ -59,6 +59,10 @@ export default function FloatingVisitButton({ user, onVisitLogged }) {
         }
         if (uploaded.length > 0) await attachPhotosToVisit(visit.id, uploaded);
       }
+
+      // Notify the managers (Permissions Center) about this visit. Fire-and-
+      // forget: an email failure must never block or fail the saved visit.
+      sendVisitReport({ type: 'single', visitId: visit.id }).catch(() => {});
 
       setMsg({ text: '✓ تم تسجيل الزيارة بنجاح', type: 'success' });
       if (onVisitLogged) onVisitLogged();

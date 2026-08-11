@@ -111,6 +111,20 @@ export const attachPhotosToVisit = async (visitId, photoPaths) => {
   return supabase.from('supervisor_visits').update({ photos: photoPaths }).eq('id', visitId);
 };
 
+// Email a visit report to the managers in the Permissions Center (and, for the
+// end-of-day report, the supervisor too). Runs server-side in the
+// send-visit-report edge function (Resend); the user's JWT is attached
+// automatically by supabase.functions.invoke.
+//   payload: { type: 'single', visitId }  |  { type: 'daily', routeId }
+export const sendVisitReport = async (payload) => {
+  return supabase.functions.invoke('send-visit-report', { body: payload });
+};
+
+// Mark today's route as completed (used by the end-of-day "send report" action).
+export const completeRoute = async (routeId) => {
+  return supabase.from('supervisor_routes').update({ status: 'completed' }).eq('id', routeId);
+};
+
 // Knowledge Center: all visits in a date range, scoped by role like every
 // other report in the app (admin sees everyone, supervisor sees only their
 // own routes). Supervisor and customer names are resolved with plain client-
