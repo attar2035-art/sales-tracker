@@ -13,6 +13,9 @@ import Customers from './pages/Customers';
 import CustomerAnalytics from './components/CustomerAnalytics';
 import CustomerSegmentation from './pages/CustomerSegmentation';
 import ActivityLog from './pages/ActivityLog';
+import SupervisorRoute from './pages/SupervisorRoute';
+import KnowledgeCenter from './pages/KnowledgeCenter';
+import FloatingVisitButton from './components/FloatingVisitButton';
 import { logAuditEvent } from './lib/audit';
 
 const NAV_ADMIN = [
@@ -23,6 +26,7 @@ const NAV_ADMIN = [
   { key: 'customers', label: 'العملاء', icon: '👥' },
   { key: 'analytics', label: 'تحليل العملاء', icon: '📈' },
   { key: 'segmentation', label: 'تقسيم العملاء', icon: '📊' },
+  { key: 'knowledge', label: 'مركز المعرفة', icon: '🧠' },
   { key: 'audit', label: 'سجل النشاط', icon: '🧾' },
   { key: 'setup', label: 'الإعدادات', icon: '⚙️' },
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
@@ -30,6 +34,8 @@ const NAV_ADMIN = [
 
 const NAV_SUPERVISOR = [
   { key: 'dashboard', label: 'لوحة المتابعة', icon: '📊' },
+  { key: 'myroute', label: 'زياراتي اليوم', icon: '📍' },
+  { key: 'knowledge', label: 'مركز المعرفة', icon: '🧠' },
   { key: 'repdetails', label: 'تفاصيل المندوب', icon: '👤' },
   { key: 'customers', label: 'العملاء', icon: '👥' },
   { key: 'analytics', label: 'تحليل العملاء', icon: '📈' },
@@ -156,6 +162,8 @@ export default function App() {
     }
     if (user.role === 'supervisor') {
       if (page === 'password') return <ChangePassword />;
+      if (page === 'myroute') return <SupervisorRoute user={user} />;
+      if (page === 'knowledge') return <KnowledgeCenter user={user} />;
       if (page === 'repdetails') return <RepDetails supervisorId={user.supervisor_id} />;
       if (page === 'customers') return <Customers user={user} />;
       if (page === 'analytics') return <CustomerAnalytics />;
@@ -171,6 +179,7 @@ export default function App() {
         case 'customers': return <Customers user={user} />;
         case 'analytics': return <CustomerAnalytics />;
         case 'segmentation': return <CustomerSegmentation />;
+        case 'knowledge': return <KnowledgeCenter user={user} />;
         case 'audit': return <ActivityLog />;
         case 'setup': return <Setup />;
         case 'password': return <ChangePassword />;
@@ -246,6 +255,8 @@ export default function App() {
       <main className="main-content">
         {renderPage()}
       </main>
+
+      {!user.must_change_password && <FloatingVisitButton user={user} />}
     </div>
   );
 }
