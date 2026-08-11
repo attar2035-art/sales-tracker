@@ -80,11 +80,17 @@ serve(async (req) => {
   // Resolve active recipients and pick the ones relevant to the involved regions.
   const pickRecipients = async (regionIds: (string | null)[]) => {
     const regionSet = new Set(regionIds.filter(Boolean) as string[]);
+    // Region-scoped extra recipients from the Permissions Center...
     const { data: recs } = await admin.from('report_recipients')
       .select('email, region_id, is_active').eq('is_active', true);
-    return [...new Set((recs || [])
+    const fromCenter = (recs || [])
       .filter(r => !r.region_id || regionSet.has(r.region_id))
-      .map(r => String(r.email).toLowerCase()))];
+      .map(r => String(r.email).toLowerCase());
+    // ...plus every active manager (managers are company-wide recipients).
+    const { data: mgrs } = await admin.from('managers')
+      .select('email').eq('is_active', true);
+    const fromManagers = (mgrs || []).map(m => String(m.email).toLowerCase());
+    return [...new Set([...fromCenter, ...fromManagers])];
   };
 
   const ownsRoute = (routeSupervisorId: string) =>

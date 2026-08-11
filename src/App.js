@@ -58,6 +58,15 @@ const NAV_REP = [
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
 ];
 
+// Managers: company-wide, read-only.
+const NAV_MANAGER = [
+  { key: 'dashboard', label: 'لوحة المتابعة', icon: '📊' },
+  { key: 'knowledge', label: 'مركز المعرفة', icon: '🧠' },
+  { key: 'customers', label: 'العملاء', icon: '👥' },
+  { key: 'analytics', label: 'تحليل العملاء', icon: '📈' },
+  { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
+];
+
 function NoAccess({ email, onLogout }) {
   return (
     <div style={{
@@ -146,6 +155,7 @@ export default function App() {
     if (user.role === 'supervisor') return NAV_SUPERVISOR;
     if (user.role === 'data_entry') return NAV_DATA_ENTRY;
     if (user.role === 'rep') return NAV_REP;
+    if (user.role === 'manager') return NAV_MANAGER;
     // Fail closed: an unknown or missing role gets no navigation, not admin.
     return [];
   };
@@ -164,6 +174,14 @@ export default function App() {
       if (page === 'password') return <ChangePassword />;
       if (page === 'targets') return <Targets />;
       return <DailyEntry />;
+    }
+    if (user.role === 'manager') {
+      // Company-wide, read-only.
+      if (page === 'password') return <ChangePassword />;
+      if (page === 'knowledge') return <KnowledgeCenter user={user} />;
+      if (page === 'customers') return <Customers user={user} />;
+      if (page === 'analytics') return <CustomerAnalytics />;
+      return <Dashboard />;
     }
     if (user.role === 'supervisor') {
       if (page === 'password') return <ChangePassword />;

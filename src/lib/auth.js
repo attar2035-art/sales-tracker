@@ -13,7 +13,7 @@ export const getCurrentUser = async () => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   const { data: role } = await supabase.from('user_roles')
-    .select('role, supervisor_id, rep_id, supervisors(name,id)')
+    .select('role, supervisor_id, rep_id, manager_id, supervisors(name,id), managers(name,manager_type)')
     .eq('user_id', user.id).single();
   return {
     ...user,
@@ -21,6 +21,8 @@ export const getCurrentUser = async () => {
     supervisor: role?.supervisors || null,
     supervisor_id: role?.supervisor_id || null,
     rep_id: role?.rep_id || null,
+    manager: role?.managers || null,
+    manager_id: role?.manager_id || null,
     must_change_password: user.user_metadata?.must_change_password === true,
   };
 };
@@ -91,6 +93,35 @@ export const createRepLoginAccount = async ({ email, password, repId }) => {
         data: null,
         error: { message: getRepAccountErrorMessage({ message: payload.error || response.statusText || String(response.status) }) },
       };
+    }
+    return { data: payload, error: null };
+  } catch (error) {
+    return { data: null, error: { message: getRepAccountErrorMessage(error) } };
+  }
+};
+
+// Create (or link) a login account for a manager — mirrors createRepLoginAccount
+// but targets the create-manager-account edge function and the manager role.
+export const createManagerLoginAccount = async ({ email, password, managerId }) => {
+  const normalizedEmail = email.trim().toLowerCase();
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData?.session?.access_token;
+  if (!token) {
+    return { data: null, error: { message: 'يجب تسجيل الدخول كمدير نظام قبل إنشاء حساب مدير.' } };
+  }
+  const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+  if (!supabaseUrl) {
+    return { data: null, error: { message: 'رابط Supabase غير مضبوط في إعدادات التشغيل.' } };
+  }
+  try {
+    const response = await fetch(`${supabaseUrl.replace(/\/$/, '')}/functions/v1/create-manager-account`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: normalizedEmail, password, managerId }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return { data: null, error: { message: getRepAccountErrorMessage({ message: payload.error || response.statusText || String(response.status) }) } };
     }
     return { data: payload, error: null };
   } catch (error) {

@@ -115,7 +115,7 @@ export default function KnowledgeCenter({ user }) {
             </div>
           </div>
 
-          {user?.role === 'admin' && bySupervisor.length > 0 && (
+          {(user?.role === 'admin' || user?.role === 'manager') && bySupervisor.length > 0 && (
             <div className="card">
               <div className="card-title">الأداء حسب المشرف</div>
               <div className="table-wrapper">
