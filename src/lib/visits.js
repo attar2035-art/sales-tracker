@@ -27,9 +27,10 @@ export const getOrCreateTodayRoute = async (supervisorId) => {
   return { data: created, error: insertError };
 };
 
-// No FK constraint links supervisor_visits.customer_id -> customers.id (see
-// migration comment on the id-type assumption), so PostgREST can't resolve an
-// embedded `customers(...)` select. Names are joined client-side instead.
+// Customer names are joined client-side (rather than a PostgREST embedded
+// `customers(...)` select) to keep this query independent of the embed-through
+// relationship — the FK on supervisor_visits.customer_id exists, but a plain
+// lookup keeps the shape identical to listVisitsInRange below.
 export const listRouteVisits = async (routeId) => {
   const { data, error } = await supabase
     .from('supervisor_visits')
@@ -112,8 +113,8 @@ export const attachPhotosToVisit = async (visitId, photoPaths) => {
 
 // Knowledge Center: all visits in a date range, scoped by role like every
 // other report in the app (admin sees everyone, supervisor sees only their
-// own routes). Supervisor names are joined client-side for the same reason
-// customer names are — no FK constraint for PostgREST to embed through.
+// own routes). Supervisor and customer names are resolved with plain client-
+// side lookups to keep the result shape consistent across the two readers.
 export const listVisitsInRange = async (user, fromDate, toDate) => {
   let routesQuery = supabase
     .from('supervisor_routes')

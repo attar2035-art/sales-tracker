@@ -4,7 +4,7 @@ import { getOrCreateTodayRoute, listRouteVisits, summarizeVisits } from '../lib/
 const STATUS_LABELS = { planned: 'مخططة', completed: 'مكتملة', cancelled: 'ملغاة' };
 const STATUS_COLORS = { planned: '#f59e0b', completed: '#10b981', cancelled: '#ef4444' };
 
-export default function SupervisorRoute({ user }) {
+export default function SupervisorRoute({ user, refreshSignal }) {
   const [route, setRoute] = useState(null);
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +26,7 @@ export default function SupervisorRoute({ user }) {
     setLoading(false);
   }, [user?.supervisor_id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load, refreshSignal]);
 
   const stats = summarizeVisits(visits);
 

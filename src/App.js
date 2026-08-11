@@ -87,6 +87,9 @@ export default function App() {
   const [page, setPage] = useState('dashboard');
   const [menuOpen, setMenuOpen] = useState(false);
   const [recovery, setRecovery] = useState(false);
+  // Bumped when a visit is logged via the floating button, so the supervisor's
+  // "today's route" page reloads its list without a manual refresh.
+  const [visitRefresh, setVisitRefresh] = useState(0);
 
   useEffect(() => {
     checkUser();
@@ -162,7 +165,7 @@ export default function App() {
     }
     if (user.role === 'supervisor') {
       if (page === 'password') return <ChangePassword />;
-      if (page === 'myroute') return <SupervisorRoute user={user} />;
+      if (page === 'myroute') return <SupervisorRoute user={user} refreshSignal={visitRefresh} />;
       if (page === 'knowledge') return <KnowledgeCenter user={user} />;
       if (page === 'repdetails') return <RepDetails supervisorId={user.supervisor_id} />;
       if (page === 'customers') return <Customers user={user} />;
@@ -256,7 +259,9 @@ export default function App() {
         {renderPage()}
       </main>
 
-      {!user.must_change_password && <FloatingVisitButton user={user} />}
+      {!user.must_change_password && (
+        <FloatingVisitButton user={user} onVisitLogged={() => setVisitRefresh(v => v + 1)} />
+      )}
     </div>
   );
 }
