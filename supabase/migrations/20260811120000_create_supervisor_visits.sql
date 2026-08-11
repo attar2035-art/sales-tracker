@@ -1,19 +1,13 @@
 -- Field-visit tracking for supervisors: one route per supervisor per day,
 -- containing individual customer visits with GPS check-in and photos.
 --
--- SCHEMA-TYPE CAVEAT: supervisor_id/customer_id below are declared uuid to
--- match user_roles.supervisor_id / user_roles.rep_id and the existing
--- audit_logs.supervisor_id/rep_id columns (same assumption that migration
--- already made). No REFERENCES constraint is added to supervisors/customers
--- because this repo has no committed CREATE TABLE for those tables to verify
--- the real column type against (they predate migrations, created directly in
--- Supabase). If the live schema turns out to use bigint ids instead, this
--- migration will fail on the (unused) casts below and needs a follow-up fix
--- once the real types are confirmed.
+-- supervisor_id/customer_id verified uuid against the live schema (list_tables:
+-- public.supervisors.id and public.customers.id are both uuid) before this
+-- migration was applied, so proper REFERENCES constraints are used below.
 
 create table if not exists public.supervisor_routes (
   id uuid primary key default gen_random_uuid(),
-  supervisor_id uuid not null,
+  supervisor_id uuid not null references public.supervisors(id) on delete cascade,
   route_date date not null default current_date,
   status text not null default 'in_progress' check (status in ('in_progress', 'completed')),
   created_at timestamptz not null default now(),
@@ -26,7 +20,7 @@ create index if not exists supervisor_routes_route_date_idx on public.supervisor
 create table if not exists public.supervisor_visits (
   id uuid primary key default gen_random_uuid(),
   route_id uuid not null references public.supervisor_routes(id) on delete cascade,
-  customer_id uuid not null,
+  customer_id uuid not null references public.customers(id) on delete restrict,
   visit_status text not null default 'planned' check (visit_status in ('planned', 'completed', 'cancelled')),
   check_in_time timestamptz,
   check_out_time timestamptz,
