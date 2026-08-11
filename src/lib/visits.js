@@ -46,7 +46,24 @@ export const attachCustomerNames = async (visits) => {
   if (ids.length === 0) return visits;
   const { data: customers } = await supabase.from('customers').select('id, customer_name, customer_code').in('id', ids);
   const byId = new Map((customers || []).map(c => [c.id, c]));
-  return visits.map(v => ({ ...v, customer_name: byId.get(v.customer_id)?.customer_name, customer_code: byId.get(v.customer_id)?.customer_code }));
+  // Prefer the free-form name the supervisor typed; fall back to the linked
+  // customer record for legacy visits that still reference customer_id.
+  return visits.map(v => ({
+    ...v,
+    customer_name: v.customer_name || byId.get(v.customer_id)?.customer_name,
+    customer_code: byId.get(v.customer_id)?.customer_code,
+  }));
+};
+
+// Reps that belong to a supervisor's team — used to fill the "المندوب" picker
+// in the visit form.
+export const listRepsForSupervisor = async (supervisorId) => {
+  if (!supervisorId) return { data: [], error: null };
+  return supabase
+    .from('representatives')
+    .select('id, name')
+    .eq('supervisor_id', supervisorId)
+    .order('name');
 };
 
 // region-scoped customer search for the visit picker, matching the same
@@ -83,12 +100,22 @@ export const getCurrentPosition = () => new Promise((resolve, reject) => {
   );
 });
 
-export const startVisit = async ({ routeId, customerId, gps, notes }) => {
+// A visit is now free-form: the supervisor types the customer/shop name and
+// address details by hand instead of picking an existing customer record.
+export const startVisit = async ({
+  routeId, customerName, contactPerson, city, neighborhood, street, repName, gps, notes,
+}) => {
   return supabase
     .from('supervisor_visits')
     .insert({
       route_id: routeId,
-      customer_id: customerId,
+      customer_id: null,
+      customer_name: customerName || null,
+      contact_person: contactPerson || null,
+      city: city || null,
+      neighborhood: neighborhood || null,
+      street: street || null,
+      rep_name: repName || null,
       visit_status: 'completed',
       check_in_time: new Date().toISOString(),
       gps_lat: gps?.lat ?? null,
@@ -109,6 +136,11 @@ export const uploadVisitPhoto = async (userId, file) => {
 
 export const attachPhotosToVisit = async (visitId, photoPaths) => {
   return supabase.from('supervisor_visits').update({ photos: photoPaths }).eq('id', visitId);
+};
+
+// A single free-form attachment (any file type) uploaded with the visit.
+export const attachFileToVisit = async (visitId, path) => {
+  return supabase.from('supervisor_visits').update({ attachment_path: path }).eq('id', visitId);
 };
 
 // Email a visit report to the managers in the Permissions Center (and, for the
