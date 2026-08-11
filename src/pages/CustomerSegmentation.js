@@ -27,7 +27,6 @@ export default function CustomerSegmentation() {
   const [selectedRegion, setSelectedRegion] = useState('all');
   const [activeTab, setActiveTab] = useState('overview');
   const [tableError, setTableError] = useState(false);
-  const [importProgress, setImportProgress] = useState('');
 
   useEffect(() => { fetchData(); }, []);
 
@@ -47,53 +46,6 @@ export default function CustomerSegmentation() {
     setData(rows || []);
     setTableError(false);
     setLoading(false);
-  };
-
-  const runImport = async () => {
-    // Non-destructive & idempotent: upsert on (customer_code, year, region_name).
-    // Existing rows are updated in place; nothing is deleted. Re-running is safe.
-    const confirmed = window.confirm(
-      'سيتم تحديث/إضافة بيانات العملاء المحضرة (بدون حذف أي بيانات موجودة). '
-      + 'السجلات المطابقة (نفس رقم العميل/السنة/المنطقة) سيتم تحديثها. هل تريد المتابعة؟'
-    );
-    if (!confirmed) return;
-
-    setImporting(true);
-    setImportProgress('جاري تحميل البيانات...');
-    try {
-      const mod = await import('../data/customers_import.json');
-      const jsonData = mod.default || mod;
-
-      // Upsert in batches — no delete step, so a mid-run failure never loses data.
-      setImportProgress('جاري تحديث/إدخال ' + jsonData.length + ' سجل...');
-      const batch = 200;
-      let imported = 0;
-      let errors = 0;
-      let lastError = '';
-      for (let i = 0; i < jsonData.length; i += batch) {
-        const chunk = jsonData.slice(i, i + batch);
-        const { error } = await supabase
-          .from('customer_yearly_sales')
-          .upsert(chunk, { onConflict: 'customer_code,year,region_name' });
-        if (error) {
-          console.error('Batch error:', error);
-          errors++;
-          lastError = error.message;
-        } else {
-          imported += chunk.length;
-        }
-        setImportProgress('تم تحديث/إدخال ' + imported + ' من ' + jsonData.length + (errors > 0 ? ' (' + errors + ' أخطاء: ' + lastError + ')' : ''));
-      }
-      if (errors > 0 && imported === 0) {
-        setImportProgress('خطأ في الاستيراد: ' + lastError);
-      } else {
-        setImportProgress('اكتمل! تم تحديث/استيراد ' + imported + ' سجل' + (errors > 0 ? ' (مع ' + errors + ' دفعات بها أخطاء: ' + lastError + ')' : ''));
-      }
-      await fetchData();
-    } catch (e) {
-      setImportProgress('خطأ: ' + e.message);
-    }
-    setImporting(false);
   };
 
   const handleFileUpload = (e) => {
@@ -398,14 +350,9 @@ CREATE POLICY "Allow authenticated full access"
                 <div className="card" style={{ padding: '2rem', textAlign: 'center' }}>
                   <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📂</div>
                   <div style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }}>لا توجد بيانات بعد</div>
-                  <button className="btn btn-primary" style={{ maxWidth: 300, margin: '0 auto', fontSize: '1.1rem', padding: '0.75rem 2rem' }} onClick={runImport} disabled={importing}>
-                    {importing ? 'جاري الاستيراد...' : '📥 استيراد البيانات (10,348 عميل)'}
+                  <button className="btn btn-primary" style={{ maxWidth: 300, margin: '0 auto', fontSize: '1.1rem', padding: '0.75rem 2rem' }} onClick={() => setActiveTab('import')}>
+                    📥 استيراد بيانات العملاء
                   </button>
-                  {importProgress && (
-                    <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#1e293b', borderRadius: 8, color: importProgress.includes('خطأ') ? '#ef4444' : '#10b981', fontWeight: 700 }}>
-                      {importProgress}
-                    </div>
-                  )}
                 </div>
               ) : (
                 <>
@@ -660,25 +607,6 @@ CREATE POLICY "Allow authenticated full access"
           {activeTab === 'import' && (
             <div className="card" style={{ padding: '2rem' }}>
               <div className="card-title">📥 استيراد بيانات العملاء</div>
-
-              <div style={{ marginBottom: '2rem', padding: '1.5rem', background: '#0f172a', borderRadius: 12, border: '2px solid #3b82f6', textAlign: 'center' }}>
-                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📂</div>
-                <div style={{ color: '#e2e8f0', fontWeight: 700, marginBottom: '0.75rem', fontSize: '1.1rem' }}>
-                  استيراد جميع البيانات المحضرة (10,348 عميل — 2022 إلى 2026)
-                </div>
-                <button className="btn btn-primary" style={{ fontSize: '1.1rem', padding: '0.75rem 2rem' }} onClick={runImport} disabled={importing}>
-                  {importing ? 'جاري الاستيراد...' : '📥 استيراد الكل الآن'}
-                </button>
-                {importProgress && (
-                  <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#1e293b', borderRadius: 8, color: importProgress.includes('خطأ') ? '#ef4444' : '#10b981', fontWeight: 700 }}>
-                    {importProgress}
-                  </div>
-                )}
-              </div>
-
-              <div style={{ borderTop: '1px solid #334155', paddingTop: '1.5rem', marginBottom: '1rem' }}>
-                <div style={{ fontWeight: 700, color: '#94a3b8', marginBottom: '0.75rem' }}>أو ارفع ملف إكسل يدوياً:</div>
-              </div>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
                 ارفع ملف إكسل لكل سنة. الملف يجب أن يحتوي على شيتات بأسماء المناطق.
               </p>

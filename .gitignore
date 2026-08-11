@@ -142,8 +142,12 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 
-# Raw customer data exports (real business/financial data, not for version control)
+# Raw customer data exports (real business/financial data, not for version control).
+# Bulk customer import now happens only through the in-app manual Excel upload
+# (Customer Segmentation > Import tab), never from a file bundled into source/build.
 customer_data_all_years.csv
+src/data/customers_import.json
+import-tool.html
 
 
 # Create React App production build (built in CI / host, not committed)
