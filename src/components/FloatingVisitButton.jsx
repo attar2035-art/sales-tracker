@@ -1,38 +1,39 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  getOrCreateTodayRoute, searchCustomersForVisit, getCurrentPosition,
-  startVisit, uploadVisitPhoto, attachPhotosToVisit, sendVisitReport,
+  getOrCreateTodayRoute, getCurrentPosition, startVisit,
+  uploadVisitPhoto, attachPhotosToVisit, attachFileToVisit,
+  listRepsForSupervisor, sendVisitReport,
 } from '../lib/visits';
+
+const EMPTY = {
+  customerName: '', contactPerson: '', city: '', neighborhood: '', street: '',
+  repName: '', notes: '',
+};
 
 export default function FloatingVisitButton({ user, onVisitLogged }) {
   const [open, setOpen] = useState(false);
-  const [term, setTerm] = useState('');
-  const [results, setResults] = useState([]);
-  const [customer, setCustomer] = useState(null);
-  const [notes, setNotes] = useState('');
-  const [files, setFiles] = useState([]);
+  const [form, setForm] = useState(EMPTY);
+  const [reps, setReps] = useState([]);
+  const [photos, setPhotos] = useState([]);
+  const [attachment, setAttachment] = useState(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
-  const searchTimer = useRef(null);
 
+  // Load the supervisor's own reps once the sheet is opened.
   useEffect(() => {
-    if (!open) return;
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(async () => {
-      const { data } = await searchCustomersForVisit(user, term);
-      setResults(data || []);
-    }, 300);
-    return () => clearTimeout(searchTimer.current);
-  }, [term, open, user]);
+    if (!open || !user?.supervisor_id) return;
+    listRepsForSupervisor(user.supervisor_id).then(({ data }) => setReps(data || []));
+  }, [open, user]);
+
+  const set = (key, value) => setForm(f => ({ ...f, [key]: value }));
 
   const reset = () => {
-    setTerm(''); setResults([]); setCustomer(null); setNotes(''); setFiles([]); setMsg(null);
+    setForm(EMPTY); setPhotos([]); setAttachment(null); setMsg(null);
   };
-
   const closeModal = () => { setOpen(false); reset(); };
 
   const handleSave = async () => {
-    if (!customer) { setMsg({ text: 'اختر المحل/العميل أولاً', type: 'error' }); return; }
+    if (!form.customerName.trim()) { setMsg({ text: 'اكتب اسم العميل/المحل أولاً', type: 'error' }); return; }
     setSaving(true);
     setMsg(null);
     try {
@@ -47,17 +48,32 @@ export default function FloatingVisitButton({ user, onVisitLogged }) {
       }
 
       const { data: visit, error: visitError } = await startVisit({
-        routeId: route.id, customerId: customer.id, gps, notes,
+        routeId: route.id,
+        customerName: form.customerName.trim(),
+        contactPerson: form.contactPerson.trim(),
+        city: form.city.trim(),
+        neighborhood: form.neighborhood.trim(),
+        street: form.street.trim(),
+        repName: form.repName.trim(),
+        gps,
+        notes: form.notes.trim(),
       });
       if (visitError || !visit) throw new Error(visitError?.message || 'تعذّر تسجيل الزيارة');
 
-      if (files.length > 0) {
+      // Live camera photos.
+      if (photos.length > 0) {
         const uploaded = [];
-        for (const file of files) {
+        for (const file of photos) {
           const { path, error } = await uploadVisitPhoto(user.id, file);
           if (!error && path) uploaded.push(path);
         }
         if (uploaded.length > 0) await attachPhotosToVisit(visit.id, uploaded);
+      }
+
+      // Optional single file attachment.
+      if (attachment) {
+        const { path, error } = await uploadVisitPhoto(user.id, attachment);
+        if (!error && path) await attachFileToVisit(visit.id, path);
       }
 
       // Notify the managers (Permissions Center) about this visit. Fire-and-
@@ -98,74 +114,103 @@ export default function FloatingVisitButton({ user, onVisitLogged }) {
           <div
             onClick={e => e.stopPropagation()}
             className="card"
-            style={{ width: '100%', maxWidth: 480, maxHeight: '85vh', overflowY: 'auto', borderRadius: '16px 16px 0 0', margin: 0 }}
+            style={{ width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto', borderRadius: '16px 16px 0 0', margin: 0 }}
           >
             <div className="card-title">📍 إدخال زيارة جديدة</div>
 
             {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
 
-            {!customer ? (
-              <div className="form-group">
-                <label className="form-label">ابحث عن المحل/العميل</label>
+            <div className="form-group">
+              <label className="form-label">اسم العميل/المحل *</label>
+              <input
+                className="form-input" value={form.customerName} autoFocus
+                onChange={e => set('customerName', e.target.value)}
+                placeholder="اكتب اسم المحل أو العميل..."
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">اسم المسؤول</label>
+              <input
+                className="form-input" value={form.contactPerson}
+                onChange={e => set('contactPerson', e.target.value)}
+                placeholder="اسم الشخص المسؤول..."
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label className="form-label">المدينة</label>
                 <input
-                  className="form-input" value={term} autoFocus
-                  onChange={e => setTerm(e.target.value)}
-                  placeholder="اسم العميل..."
+                  className="form-input" value={form.city}
+                  onChange={e => set('city', e.target.value)}
+                  placeholder="المدينة"
                 />
-                <div style={{ marginTop: '0.5rem', maxHeight: 220, overflowY: 'auto' }}>
-                  {results.map(c => (
-                    <button
-                      key={c.id}
-                      onClick={() => setCustomer(c)}
-                      style={{
-                        display: 'block', width: '100%', textAlign: 'right', padding: '0.6rem 0.75rem',
-                        background: '#1e293b', border: 'none', borderBottom: '1px solid #334155',
-                        color: '#e2e8f0', cursor: 'pointer',
-                      }}
-                    >
-                      <div style={{ fontWeight: 700 }}>{c.customer_name}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{c.regions?.name || '—'}</div>
-                    </button>
-                  ))}
-                  {term && results.length === 0 && (
-                    <div style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>لا نتائج</div>
-                  )}
-                </div>
               </div>
-            ) : (
-              <>
-                <div style={{ padding: '0.75rem', background: '#1e293b', borderRadius: 8, marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 700 }}>{customer.customer_name}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{customer.regions?.name || '—'}</div>
-                  </div>
-                  <button onClick={() => setCustomer(null)} style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer' }}>تغيير</button>
-                </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label className="form-label">الحي</label>
+                <input
+                  className="form-input" value={form.neighborhood}
+                  onChange={e => set('neighborhood', e.target.value)}
+                  placeholder="الحي"
+                />
+              </div>
+            </div>
 
-                <div className="form-group">
-                  <label className="form-label">صور (اختياري)</label>
-                  <input
-                    type="file" accept="image/*" capture="environment" multiple
-                    className="form-input"
-                    onChange={e => setFiles(Array.from(e.target.files || []))}
-                  />
-                  {files.length > 0 && <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem' }}>{files.length} صورة مختارة</div>}
-                </div>
+            <div className="form-group">
+              <label className="form-label">الشارع</label>
+              <input
+                className="form-input" value={form.street}
+                onChange={e => set('street', e.target.value)}
+                placeholder="اسم الشارع..."
+              />
+            </div>
 
-                <div className="form-group">
-                  <label className="form-label">ملاحظات</label>
-                  <textarea
-                    className="form-input" rows={3} value={notes}
-                    onChange={e => setNotes(e.target.value)}
-                    placeholder="طلبات، مشاكل، ملاحظات عن الزيارة..."
-                  />
-                </div>
+            <div className="form-group">
+              <label className="form-label">المندوب (في منطقتك)</label>
+              <select
+                className="form-input" value={form.repName}
+                onChange={e => set('repName', e.target.value)}
+              >
+                <option value="">— اختر المندوب —</option>
+                {reps.map(r => (
+                  <option key={r.id} value={r.name}>{r.name}</option>
+                ))}
+              </select>
+            </div>
 
-                <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleSave} disabled={saving}>
-                  {saving ? '⏳ جاري الحفظ...' : '✓ تسجيل الدخول للزيارة'}
-                </button>
-              </>
-            )}
+            <div className="form-group">
+              <label className="form-label">📷 صور (كاميرا مباشرة)</label>
+              <input
+                type="file" accept="image/*" capture="environment" multiple
+                className="form-input"
+                onChange={e => setPhotos(Array.from(e.target.files || []))}
+              />
+              {photos.length > 0 && <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem' }}>{photos.length} صورة من الكاميرا</div>}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">📎 ملف مرفق (اختياري)</label>
+              <input
+                type="file"
+                className="form-input"
+                onChange={e => setAttachment((e.target.files || [])[0] || null)}
+              />
+              {attachment && <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem' }}>{attachment.name}</div>}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">ملاحظات حرة</label>
+              <textarea
+                className="form-input" rows={3} value={form.notes}
+                onChange={e => set('notes', e.target.value)}
+                placeholder="أي بيانات أو ملاحظات إضافية عن الزيارة..."
+              />
+            </div>
+
+            <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleSave} disabled={saving}>
+              {saving ? '⏳ جاري الحفظ...' : '✓ تسجيل الزيارة'}
+            </button>
 
             <button onClick={closeModal} style={{ width: '100%', marginTop: '0.75rem', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0.5rem' }}>
               إلغاء

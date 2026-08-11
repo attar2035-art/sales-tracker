@@ -52,12 +52,10 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const resendKey = Deno.env.get('RESEND_API_KEY');
   const fromEmail = Deno.env.get('REPORTS_FROM_EMAIL') || 'may@hawafel.com';
   const fromName = Deno.env.get('REPORTS_FROM_NAME') || 'نظام متابعة المبيعات';
   const appUrl = Deno.env.get('APP_URL') || 'https://sales-tracker-ijyb.onrender.com';
   if (!supabaseUrl || !serviceRoleKey) return json({ error: 'Missing Supabase admin env' }, 500);
-  if (!resendKey) return json({ error: 'RESEND_API_KEY secret is not set on the function' }, 500);
 
   const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
   if (!jwt) return json({ error: 'Missing authorization token' }, 401);
@@ -65,6 +63,17 @@ serve(async (req) => {
   const admin = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  // Resend key: prefer the platform secret, but fall back to the locked-down
+  // app_secrets table (readable only by the service role) so the key never has
+  // to live in the public repository.
+  let resendKey = Deno.env.get('RESEND_API_KEY') || null;
+  if (!resendKey) {
+    const { data: secret } = await admin.from('app_secrets')
+      .select('value').eq('key', 'resend_api_key').maybeSingle();
+    resendKey = secret?.value || null;
+  }
+  if (!resendKey) return json({ error: 'RESEND_API_KEY is not configured' }, 500);
 
   const { data: requester, error: reqErr } = await admin.auth.getUser(jwt);
   if (reqErr || !requester.user) return json({ error: 'Unauthorized' }, 401);
@@ -76,6 +85,25 @@ serve(async (req) => {
   const from = `${fromName} <${fromEmail}>`;
   const body = await req.json().catch(() => ({}));
   const type = body?.type;
+
+  // Signed URL (7 days) for a stored photo/file so recipients can open it.
+  const signUrl = async (path: string | null | undefined) => {
+    if (!path) return null;
+    const { data } = await admin.storage.from('visit-photos').createSignedUrl(path, 60 * 60 * 24 * 7);
+    return data?.signedUrl || null;
+  };
+  // Build the shared "customer + address + rep" detail rows from a visit row,
+  // preferring the free-form fields the supervisor typed in.
+  const detailRows = (v: Record<string, unknown>, fallbackName?: string) => {
+    const row = (label: string, val: unknown) => val
+      ? `<tr><td style="padding:6px 8px;color:#64748b">${label}</td><td style="padding:6px 8px">${esc(val)}</td></tr>` : '';
+    return row('العميل/المحل', v.customer_name || fallbackName || 'عميل')
+      + row('المسؤول', v.contact_person)
+      + row('المدينة', v.city)
+      + row('الحي', v.neighborhood)
+      + row('الشارع', v.street)
+      + row('المندوب', v.rep_name);
+  };
 
   // Resolve active recipients and pick the ones relevant to the involved regions.
   const pickRecipients = async (regionIds: (string | null)[]) => {
@@ -107,8 +135,9 @@ serve(async (req) => {
         .select('id, supervisor_id, route_date').eq('id', visit.route_id).single();
       if (!route || !ownsRoute(route.supervisor_id)) return json({ error: 'Forbidden' }, 403);
 
-      const { data: cust } = await admin.from('customers')
-        .select('customer_name, region_id').eq('id', visit.customer_id).maybeSingle();
+      const { data: cust } = visit.customer_id
+        ? await admin.from('customers').select('customer_name, region_id').eq('id', visit.customer_id).maybeSingle()
+        : { data: null };
       const { data: sup } = await admin.from('supervisors')
         .select('name').eq('id', route.supervisor_id).maybeSingle();
 
@@ -117,19 +146,26 @@ serve(async (req) => {
 
       const gps = visit.gps_lat && visit.gps_lng
         ? `<a href="https://www.google.com/maps?q=${visit.gps_lat},${visit.gps_lng}">📍 الموقع على الخريطة</a>` : '—';
+      const photoPaths = Array.isArray(visit.photos) ? visit.photos : [];
+      const photoUrls = (await Promise.all(photoPaths.map((p: string) => signUrl(p)))).filter(Boolean) as string[];
+      const photosCell = photoUrls.length
+        ? photoUrls.map((u, i) => `<a href="${u}">📷 صورة ${i + 1}</a>`).join(' &nbsp; ')
+        : `${photoPaths.length} صورة`;
+      const attachUrl = await signUrl(visit.attachment_path as string);
+      const custName = visit.customer_name || cust?.customer_name || 'عميل';
       const inner = `
         <p style="font-size:15px">سجّل المشرف <b>${esc(sup?.name || '')}</b> زيارة جديدة:</p>
         <table style="width:100%;border-collapse:collapse;font-size:14px">
-          <tr><td style="padding:8px;color:#64748b">العميل/المحل</td><td style="padding:8px"><b>${esc(cust?.customer_name || 'عميل')}</b></td></tr>
-          <tr><td style="padding:8px;color:#64748b">التاريخ</td><td style="padding:8px">${esc(route.route_date)}</td></tr>
-          <tr><td style="padding:8px;color:#64748b">وقت الزيارة</td><td style="padding:8px">${fmtTime(visit.check_in_time)}</td></tr>
-          <tr><td style="padding:8px;color:#64748b">الموقع</td><td style="padding:8px">${gps}</td></tr>
-          <tr><td style="padding:8px;color:#64748b">الحالة</td><td style="padding:8px">${esc(STATUS_AR[visit.visit_status] || visit.visit_status)}</td></tr>
-          ${visit.visit_notes ? `<tr><td style="padding:8px;color:#64748b">ملاحظات</td><td style="padding:8px">${esc(visit.visit_notes)}</td></tr>` : ''}
-          <tr><td style="padding:8px;color:#64748b">الصور</td><td style="padding:8px">${Array.isArray(visit.photos) ? visit.photos.length : 0} صورة</td></tr>
+          ${detailRows(visit, cust?.customer_name)}
+          <tr><td style="padding:6px 8px;color:#64748b">التاريخ</td><td style="padding:6px 8px">${esc(route.route_date)}</td></tr>
+          <tr><td style="padding:6px 8px;color:#64748b">وقت الزيارة</td><td style="padding:6px 8px">${fmtTime(visit.check_in_time)}</td></tr>
+          <tr><td style="padding:6px 8px;color:#64748b">الموقع</td><td style="padding:6px 8px">${gps}</td></tr>
+          ${visit.visit_notes ? `<tr><td style="padding:6px 8px;color:#64748b">ملاحظات</td><td style="padding:6px 8px">${esc(visit.visit_notes)}</td></tr>` : ''}
+          ${attachUrl ? `<tr><td style="padding:6px 8px;color:#64748b">ملف مرفق</td><td style="padding:6px 8px"><a href="${attachUrl}">📎 فتح الملف</a></td></tr>` : ''}
+          <tr><td style="padding:6px 8px;color:#64748b">الصور</td><td style="padding:6px 8px">${photosCell}</td></tr>
         </table>`;
       await sendEmail(resendKey, from, recipients,
-        `زيارة جديدة — ${sup?.name || 'مشرف'} — ${cust?.customer_name || ''}`,
+        `زيارة جديدة — ${sup?.name || 'مشرف'} — ${custName}`,
         shell('إشعار زيارة', inner));
       return json({ sent: recipients.length });
     }
@@ -170,8 +206,11 @@ serve(async (req) => {
       const completed = list.filter(v => v.visit_status === 'completed').length;
       const rows = list.map(v => {
         const c = custById.get(v.customer_id);
+        const name = v.customer_name || c?.customer_name || '—';
+        const sub = [v.city, v.neighborhood].filter(Boolean).join(' — ');
+        const rep = v.rep_name ? `<div style="font-size:11px;color:#94a3b8">مندوب: ${esc(v.rep_name)}</div>` : '';
         return `<tr>
-          <td style="padding:6px 8px;border-bottom:1px solid #eef2f7">${esc(c?.customer_name || '—')}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #eef2f7"><b>${esc(name)}</b>${sub ? `<div style="font-size:11px;color:#94a3b8">${esc(sub)}</div>` : ''}${rep}</td>
           <td style="padding:6px 8px;border-bottom:1px solid #eef2f7">${fmtTime(v.check_in_time)}</td>
           <td style="padding:6px 8px;border-bottom:1px solid #eef2f7">${esc(STATUS_AR[v.visit_status] || v.visit_status)}</td>
           <td style="padding:6px 8px;border-bottom:1px solid #eef2f7">${Array.isArray(v.photos) ? v.photos.length : 0}</td>
