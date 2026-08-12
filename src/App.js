@@ -25,6 +25,7 @@ const NAV_ADMIN = [
   { key: 'daily', label: 'الإدخال اليومي', icon: '📝' },
   { key: 'targets', label: 'الأهداف الشهرية', icon: '🎯' },
   { key: 'repdetails', label: 'تفاصيل المندوب', icon: '👤' },
+  { key: 'supervisors', label: 'متابعة المشرفين', icon: '👔' },
   { key: 'customers', label: 'العملاء', icon: '👥' },
   { key: 'analytics', label: 'تحليل العملاء', icon: '📈' },
   { key: 'segmentation', label: 'تقسيم العملاء', icon: '📊' },
@@ -202,6 +203,7 @@ export default function App() {
         case 'daily': return <DailyEntry />;
         case 'targets': return <Targets />;
         case 'repdetails': return <RepDetails />;
+        case 'supervisors': return <SupervisorFollowup />;
         case 'customers': return <Customers user={user} />;
         case 'analytics': return <CustomerAnalytics />;
         case 'segmentation': return <CustomerSegmentation />;
