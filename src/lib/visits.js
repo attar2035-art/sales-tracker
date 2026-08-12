@@ -143,6 +143,37 @@ export const attachFileToVisit = async (visitId, path) => {
   return supabase.from('supervisor_visits').update({ attachment_path: path }).eq('id', visitId);
 };
 
+// Report titles/types the supervisor can pick when filing a free-form report.
+export const REPORT_TYPES = [
+  'زيارة ميدانية',
+  'جرد شهري',
+  'تقرير كفاءة',
+  'تقرير أسبوعي',
+  'تقرير شهري',
+  'تقرير يومي',
+];
+
+// Create a free-form supervisor report (separate from route visits).
+export const createReport = async ({ supervisorId, reportType, content }) => {
+  return supabase
+    .from('supervisor_reports')
+    .insert({
+      supervisor_id: supervisorId,
+      report_type: reportType,
+      content: content || null,
+    })
+    .select('*')
+    .single();
+};
+
+// Attach uploaded photo/file storage paths to a report after it is created.
+export const attachReportMedia = async (reportId, { photos, files }) => {
+  return supabase
+    .from('supervisor_reports')
+    .update({ photos: photos || [], files: files || [] })
+    .eq('id', reportId);
+};
+
 // Email a visit report to the managers in the Permissions Center (and, for the
 // end-of-day report, the supervisor too). Runs server-side in the
 // send-visit-report edge function (Resend); the user's JWT is attached

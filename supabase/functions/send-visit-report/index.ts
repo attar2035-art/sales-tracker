@@ -234,7 +234,47 @@ serve(async (req) => {
       return json({ sent: recipients.length });
     }
 
-    return json({ error: 'Invalid type (expected single|daily)' }, 400);
+    if (type === 'report') {
+      const reportId = body?.reportId;
+      if (!reportId) return json({ error: 'Missing reportId' }, 400);
+      const { data: report } = await admin.from('supervisor_reports')
+        .select('*').eq('id', reportId).single();
+      if (!report) return json({ error: 'Report not found' }, 404);
+      if (!ownsRoute(report.supervisor_id)) return json({ error: 'Forbidden' }, 403);
+
+      const { data: sup } = await admin.from('supervisors')
+        .select('name').eq('id', report.supervisor_id).maybeSingle();
+
+      const recipients = await pickRecipients([]);
+      if (recipients.length === 0) return json({ sent: 0, reason: 'no recipients' });
+
+      const photoPaths = Array.isArray(report.photos) ? report.photos : [];
+      const photoUrls = (await Promise.all(photoPaths.map((p: string) => signUrl(p)))).filter(Boolean) as string[];
+      const filePaths = Array.isArray(report.files) ? report.files : [];
+      const fileUrls = (await Promise.all(filePaths.map((p: string) => signUrl(p)))).filter(Boolean) as string[];
+      const photosCell = photoUrls.length
+        ? photoUrls.map((u, i) => `<a href="${u}">📷 صورة ${i + 1}</a>`).join(' &nbsp; ') : '—';
+      const filesCell = fileUrls.length
+        ? fileUrls.map((u, i) => `<a href="${u}">📎 ملف ${i + 1}</a>`).join(' &nbsp; ') : '—';
+      let dateStr = String(report.created_at || '');
+      try { dateStr = new Date(report.created_at).toLocaleDateString('ar-EG'); } catch { /* keep raw */ }
+      const contentHtml = esc(report.content || '').replace(/\n/g, '<br>');
+      const inner = `
+        <p style="font-size:15px">قدّم المشرف <b>${esc(sup?.name || '')}</b> تقريراً جديداً:</p>
+        <table style="width:100%;border-collapse:collapse;font-size:14px">
+          <tr><td style="padding:6px 8px;color:#64748b">نوع التقرير</td><td style="padding:6px 8px"><b>${esc(report.report_type)}</b></td></tr>
+          <tr><td style="padding:6px 8px;color:#64748b">التاريخ</td><td style="padding:6px 8px">${esc(dateStr)}</td></tr>
+          <tr><td style="padding:6px 8px;color:#64748b">الصور</td><td style="padding:6px 8px">${photosCell}</td></tr>
+          <tr><td style="padding:6px 8px;color:#64748b">الملفات</td><td style="padding:6px 8px">${filesCell}</td></tr>
+        </table>
+        ${report.content ? `<div style="margin-top:14px;padding:12px;background:#f8fafc;border-radius:8px;white-space:pre-wrap;font-size:14px">${contentHtml}</div>` : ''}`;
+      await sendEmail(resendKey, from, recipients,
+        `تقرير — ${report.report_type} — ${sup?.name || 'مشرف'}`,
+        shell('تقرير المشرف', inner));
+      return json({ sent: recipients.length });
+    }
+
+    return json({ error: 'Invalid type (expected single|daily|report)' }, 400);
   } catch (e) {
     return json({ error: String((e as Error).message || e) }, 500);
   }
