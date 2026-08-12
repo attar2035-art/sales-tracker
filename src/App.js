@@ -14,6 +14,7 @@ import CustomerAnalytics from './components/CustomerAnalytics';
 import CustomerSegmentation from './pages/CustomerSegmentation';
 import ActivityLog from './pages/ActivityLog';
 import SupervisorRoute from './pages/SupervisorRoute';
+import SupervisorFollowup from './pages/SupervisorFollowup';
 import KnowledgeCenter from './pages/KnowledgeCenter';
 import PermissionsCenter from './pages/PermissionsCenter';
 import FloatingVisitButton from './components/FloatingVisitButton';
@@ -61,6 +62,7 @@ const NAV_REP = [
 // Managers: company-wide, read-only.
 const NAV_MANAGER = [
   { key: 'dashboard', label: 'لوحة المتابعة', icon: '📊' },
+  { key: 'supervisors', label: 'متابعة المشرفين', icon: '👔' },
   { key: 'knowledge', label: 'مركز المعرفة', icon: '🧠' },
   { key: 'customers', label: 'العملاء', icon: '👥' },
   { key: 'analytics', label: 'تحليل العملاء', icon: '📈' },
@@ -178,6 +180,7 @@ export default function App() {
     if (user.role === 'manager') {
       // Company-wide, read-only.
       if (page === 'password') return <ChangePassword />;
+      if (page === 'supervisors') return <SupervisorFollowup />;
       if (page === 'knowledge') return <KnowledgeCenter user={user} />;
       if (page === 'customers') return <Customers user={user} />;
       if (page === 'analytics') return <CustomerAnalytics />;

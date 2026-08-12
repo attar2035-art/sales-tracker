@@ -283,6 +283,48 @@ export const listVisitsInRange = async (user, fromDate, toDate) => {
   };
 };
 
+// All supervisors, for the manager's follow-up picker.
+export const listSupervisors = async () =>
+  supabase.from('supervisors').select('id, name').order('name');
+
+// A single supervisor's visits within a date range (manager follow-up view).
+export const listVisitsForSupervisor = async (supervisorId, fromDate, toDate) => {
+  if (!supervisorId) return { data: [], error: null };
+  const { data: routes, error: rErr } = await supabase
+    .from('supervisor_routes')
+    .select('id, route_date, status')
+    .eq('supervisor_id', supervisorId)
+    .gte('route_date', fromDate)
+    .lte('route_date', toDate);
+  if (rErr) return { data: null, error: rErr };
+  if (!routes || !routes.length) return { data: [], error: null };
+  const routeById = new Map(routes.map(r => [r.id, r]));
+  const { data: visits, error: vErr } = await supabase
+    .from('supervisor_visits')
+    .select('*')
+    .in('route_id', routes.map(r => r.id))
+    .order('created_at', { ascending: false });
+  if (vErr) return { data: null, error: vErr };
+  const enriched = await attachCustomerNames(visits || []);
+  return {
+    data: enriched.map(v => ({ ...v, route_date: routeById.get(v.route_id)?.route_date })),
+    error: null,
+  };
+};
+
+// A single supervisor's free-form reports within a date range.
+export const listReportsForSupervisor = async (supervisorId, fromDate, toDate) => {
+  if (!supervisorId) return { data: [], error: null };
+  let q = supabase
+    .from('supervisor_reports')
+    .select('*')
+    .eq('supervisor_id', supervisorId)
+    .order('created_at', { ascending: false });
+  if (fromDate) q = q.gte('created_at', fromDate);
+  if (toDate) q = q.lte('created_at', `${toDate}T23:59:59`);
+  return q;
+};
+
 // KPI summary for a set of routes (Knowledge Center). `routes` is the raw
 // rows from supervisor_routes; `visits` from supervisor_visits.
 export const summarizeVisits = (visits) => {
