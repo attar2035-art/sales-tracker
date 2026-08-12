@@ -143,6 +143,60 @@ export const attachFileToVisit = async (visitId, path) => {
   return supabase.from('supervisor_visits').update({ attachment_path: path }).eq('id', visitId);
 };
 
+// Weekdays used by the weekly route plan (Saturday-first, as in the region).
+export const WEEKDAYS = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
+
+// The regions a user can pick a route for: admins see all, a supervisor sees
+// only the regions covered by their own reps.
+export const listRegionsForSupervisor = async (user) => {
+  if (user?.role === 'admin') {
+    return supabase.from('regions').select('id, name').order('name');
+  }
+  if (user?.role === 'supervisor' && user?.supervisor_id) {
+    const { data: reps } = await supabase
+      .from('representatives').select('region_id').eq('supervisor_id', user.supervisor_id);
+    const ids = [...new Set((reps || []).map(r => r.region_id).filter(Boolean))];
+    if (!ids.length) return { data: [], error: null };
+    return supabase.from('regions').select('id, name').in('id', ids).order('name');
+  }
+  return { data: [], error: null };
+};
+
+// Customers planned on a region's route for a given weekday.
+export const listRoutePlanCustomers = async (regionId, dayOfWeek) => {
+  if (!regionId || !dayOfWeek) return { data: [], error: null };
+  return supabase
+    .from('route_plan_customers')
+    .select('id, customer_name, neighborhood, city, sort_order')
+    .eq('region_id', regionId)
+    .eq('day_of_week', dayOfWeek)
+    .order('sort_order', { ascending: true })
+    .order('customer_name', { ascending: true });
+};
+
+// Admin bulk import of route-plan rows. Rows must already carry a resolved
+// region_id. Existing rows for every (region_id, day) pair in the batch are
+// replaced so re-uploading a sheet refreshes that day cleanly.
+export const importRoutePlan = async (rows) => {
+  if (!rows || !rows.length) return { error: null, inserted: 0 };
+  const pairs = [...new Set(rows.map(r => `${r.region_id}|${r.day_of_week}`))];
+  for (const pair of pairs) {
+    const [regionId, day] = pair.split('|');
+    const { error: delErr } = await supabase
+      .from('route_plan_customers').delete().eq('region_id', regionId).eq('day_of_week', day);
+    if (delErr) return { error: delErr, inserted: 0 };
+  }
+  const batchSize = 500;
+  let inserted = 0;
+  for (let i = 0; i < rows.length; i += batchSize) {
+    const batch = rows.slice(i, i + batchSize);
+    const { error } = await supabase.from('route_plan_customers').insert(batch);
+    if (error) return { error, inserted };
+    inserted += batch.length;
+  }
+  return { error: null, inserted };
+};
+
 // Report titles/types the supervisor can pick when filing a free-form report.
 export const REPORT_TYPES = [
   'زيارة ميدانية',

@@ -1,8 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
 import { createRepLoginAccount, createManagerLoginAccount } from '../lib/auth';
 import { buildEffectiveTargetsMap, TARGET_FIELDS } from '../lib/targets';
+import { importRoutePlan, WEEKDAYS } from '../lib/visits';
 import { logAuditEvent } from '../lib/audit';
+
+// Accepted Arabic weekday spellings normalised to the canonical WEEKDAYS list.
+const DAY_ALIASES = {
+  'السبت': 'السبت', 'الأحد': 'الأحد', 'الاحد': 'الأحد',
+  'الاثنين': 'الاثنين', 'الإثنين': 'الاثنين', 'الأثنين': 'الاثنين',
+  'الثلاثاء': 'الثلاثاء', 'الثلاثا': 'الثلاثاء',
+  'الأربعاء': 'الأربعاء', 'الاربعاء': 'الأربعاء',
+  'الخميس': 'الخميس', 'الجمعة': 'الجمعة', 'الجمعه': 'الجمعة',
+};
 
 const ACHIEVEMENT_FIELD_BY_TARGET = {
   target_sales: 'daily_sales',
@@ -40,6 +51,11 @@ export default function Setup() {
   const [managers, setManagers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
+  // Route-plan sheet import
+  const [routeMsg, setRouteMsg] = useState('');
+  const [routePreview, setRoutePreview] = useState(null);
+  const [routeImporting, setRouteImporting] = useState(false);
+  const routeFileRef = useRef(null);
   const [regionName, setRegionName] = useState('');
   const [supName, setSupName] = useState('');
   const [supRegion, setSupRegion] = useState('');
@@ -167,6 +183,70 @@ export default function Setup() {
     await logAuditEvent({ eventType: 'delete', pageKey: 'setup', entityType: table, entityId: id, details: { table } });
     showMsg('تم الحذف');
     fetchAll();
+  };
+
+  // --- Route-plan sheet import (region + weekday -> planned customers) ---
+  const handleRouteFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setRouteMsg(''); setRoutePreview(null);
+    const norm = (s) => String(s ?? '').trim();
+    if (!/\.(xlsx|xls|csv)$/i.test(file.name || '')) { setRouteMsg('نوع الملف غير مدعوم. ارفع Excel (.xlsx/.xls/.csv).'); return; }
+    if (file.size > 10 * 1024 * 1024) { setRouteMsg('حجم الملف كبير جدًا (الحد 10 ميجابايت).'); return; }
+    const regionByName = new Map((regions || []).map(r => [norm(r.name), r.id]));
+    const reader = new FileReader();
+    reader.onerror = () => setRouteMsg('تعذّر قراءة الملف.');
+    reader.onload = (evt) => {
+      try {
+        const wb = XLSX.read(evt.target.result, { type: 'array' });
+        const rows = [];
+        const unresolvedRegions = new Set();
+        const badDays = new Set();
+        let skipped = 0; let order = 0;
+        for (const sheetName of wb.SheetNames) {
+          const json = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]);
+          for (const row of json) {
+            const custName = norm(row['اسم العميل'] || row['العميل'] || row['اسم المحل']);
+            if (!custName) { skipped += 1; continue; }
+            const regionName = norm(row['المنطقة'] || row['منطقة']) || norm(sheetName);
+            const regionId = regionByName.get(regionName);
+            if (!regionId) { unresolvedRegions.add(regionName || '(فارغ)'); skipped += 1; continue; }
+            const day = DAY_ALIASES[norm(row['اليوم'] || row['يوم'])];
+            if (!day) { badDays.add(norm(row['اليوم'] || row['يوم']) || '(فارغ)'); skipped += 1; continue; }
+            rows.push({
+              region_id: regionId,
+              day_of_week: day,
+              customer_name: custName,
+              neighborhood: norm(row['الحي']) || null,
+              city: norm(row['المدينة'] || row['المدينه']) || null,
+              sort_order: order,
+            });
+            order += 1;
+          }
+        }
+        if (!rows.length) {
+          setRouteMsg('لم يتم العثور على صفوف صالحة. تأكد من الأعمدة: المنطقة، اليوم، اسم العميل، الحي، المدينة.');
+          return;
+        }
+        setRoutePreview({ rows, skipped, unresolvedRegions: [...unresolvedRegions], badDays: [...badDays] });
+      } catch (err) {
+        console.error('route sheet parse failed', err);
+        setRouteMsg('تعذّر قراءة الملف. تأكد أنه سليم وغير تالف.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const doImportRoute = async () => {
+    if (!routePreview) return;
+    setRouteImporting(true); setRouteMsg('');
+    const { error, inserted } = await importRoutePlan(routePreview.rows);
+    setRouteImporting(false);
+    if (error) { setRouteMsg('تعذّر الاستيراد: ' + error.message); return; }
+    await logAuditEvent({ eventType: 'import', pageKey: 'setup', entityType: 'route_plan_customers', details: { inserted } });
+    setRouteMsg(`✓ تم استيراد ${inserted} عميل في خطوط السير.`);
+    setRoutePreview(null);
+    if (routeFileRef.current) routeFileRef.current.value = '';
   };
 
   const toggleRepActive = async (rep) => {
@@ -430,7 +510,7 @@ export default function Setup() {
       </div>
       {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
       <div className="tabs">
-        {[['regions','🗺️ المناطق'], ['supervisors','👔 المشرفون'], ['reps','👤 المندوبون'], ['managers','👔 المديرون'], ['accounts','🔐 حسابات الدخول']].map(([k, label]) => (
+        {[['regions','🗺️ المناطق'], ['supervisors','👔 المشرفون'], ['reps','👤 المندوبون'], ['managers','👔 المديرون'], ['routes','🧭 خطوط السير'], ['accounts','🔐 حسابات الدخول']].map(([k, label]) => (
           <button key={k} className={`tab ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>{label}</button>
         ))}
       </div>
@@ -686,6 +766,38 @@ export default function Setup() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {tab === 'routes' && (
+        <div>
+          <div className="card">
+            <div className="card-title">🧭 رفع خطوط السير</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.8, marginBottom: '0.75rem' }}>
+              ارفع ملف Excel أو CSV بالأعمدة: <b>المنطقة</b>، <b>اليوم</b>، <b>اسم العميل</b>، <b>الحي</b>، <b>المدينة</b>.
+              اليوم يكون أحد: {WEEKDAYS.join('، ')}. لو تركت عمود «المنطقة» فارغًا، يُستخدم اسم الشيت كمنطقة.
+              رفع نفس (المنطقة + اليوم) مرة أخرى يستبدل القائمة القديمة له.
+            </div>
+            {routeMsg && <div className={`alert ${routeMsg.startsWith('✓') ? 'alert-success' : 'alert-error'}`}>{routeMsg}</div>}
+            <input ref={routeFileRef} type="file" accept=".xlsx,.xls,.csv" className="form-input" onChange={handleRouteFile} />
+
+            {routePreview && (
+              <div style={{ marginTop: '1rem' }}>
+                <div style={{ marginBottom: '0.5rem' }}>
+                  جاهز للاستيراد: <b>{routePreview.rows.length}</b> عميل
+                  {routePreview.skipped > 0 && <span style={{ color: 'var(--text-muted)' }}> — تم تجاهل {routePreview.skipped} صف</span>}
+                </div>
+                {routePreview.unresolvedRegions.length > 0 && (
+                  <div className="alert alert-error">مناطق غير معروفة (لن تُستورد): {routePreview.unresolvedRegions.join('، ')}. أنشئها أولًا في تبويب المناطق أو صحّح الاسم.</div>
+                )}
+                {routePreview.badDays.length > 0 && (
+                  <div className="alert alert-error">أيام غير صحيحة (لن تُستورد): {routePreview.badDays.join('، ')}.</div>
+                )}
+                <button className="btn btn-primary" onClick={doImportRoute} disabled={routeImporting}>
+                  {routeImporting ? 'جاري الاستيراد...' : `استيراد ${routePreview.rows.length} عميل`}
+                </button>
               </div>
             )}
           </div>

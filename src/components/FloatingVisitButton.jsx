@@ -4,7 +4,11 @@ import {
   uploadVisitPhoto, attachPhotosToVisit, attachFileToVisit,
   listRepsForSupervisor, sendVisitReport,
   createReport, attachReportMedia, REPORT_TYPES,
+  listRegionsForSupervisor, listRoutePlanCustomers, WEEKDAYS,
 } from '../lib/visits';
+
+// Today's Arabic weekday, to pre-select the route-plan day.
+const TODAY_WEEKDAY = WEEKDAYS[(new Date().getDay() + 1) % 7];
 
 const EMPTY_VISIT = {
   customerName: '', contactPerson: '', city: '', neighborhood: '', street: '',
@@ -23,6 +27,13 @@ export default function FloatingVisitButton({ user, onVisitLogged }) {
   const [photos, setPhotos] = useState([]);
   const [attachment, setAttachment] = useState(null);
 
+  // Route plan (region + weekday -> planned customers)
+  const [regions, setRegions] = useState([]);
+  const [regionId, setRegionId] = useState('');
+  const [day, setDay] = useState(TODAY_WEEKDAY);
+  const [routeCustomers, setRouteCustomers] = useState([]);
+  const [routeLoading, setRouteLoading] = useState(false);
+
   // Report form
   const [reportType, setReportType] = useState(REPORT_TYPES[0]);
   const [reportContent, setReportContent] = useState('');
@@ -32,13 +43,38 @@ export default function FloatingVisitButton({ user, onVisitLogged }) {
   useEffect(() => {
     if (!open || mode !== 'visit' || !user?.supervisor_id) return;
     listRepsForSupervisor(user.supervisor_id).then(({ data }) => setReps(data || []));
+    listRegionsForSupervisor(user).then(({ data }) => {
+      const list = data || [];
+      setRegions(list);
+      if (list.length === 1) setRegionId(list[0].id); // auto-pick the only region
+    });
   }, [open, mode, user]);
+
+  // Load the planned customers whenever the region or day changes.
+  useEffect(() => {
+    if (!open || mode !== 'visit' || !regionId || !day) { setRouteCustomers([]); return; }
+    setRouteLoading(true);
+    listRoutePlanCustomers(regionId, day).then(({ data }) => {
+      setRouteCustomers(data || []);
+      setRouteLoading(false);
+    });
+  }, [open, mode, regionId, day]);
+
+  const pickRouteCustomer = (c) => {
+    setForm(f => ({
+      ...f,
+      customerName: c.customer_name || '',
+      neighborhood: c.neighborhood || '',
+      city: c.city || '',
+    }));
+  };
 
   const set = (key, value) => setForm(f => ({ ...f, [key]: value }));
 
   const reset = () => {
     setMode('choose'); setMsg(null); setSaving(false);
     setForm(EMPTY_VISIT); setPhotos([]); setAttachment(null);
+    setRegionId(''); setDay(TODAY_WEEKDAY); setRouteCustomers([]);
     setReportType(REPORT_TYPES[0]); setReportContent(''); setReportPhotos([]); setReportFiles([]);
   };
   const closeModal = () => { setOpen(false); reset(); };
@@ -188,6 +224,50 @@ export default function FloatingVisitButton({ user, onVisitLogged }) {
             {/* Step 2a: the visit form */}
             {mode === 'visit' && (
               <>
+                {/* Route plan: pick region + day to list the planned customers */}
+                <div style={{ padding: '0.75rem', background: '#0f172a', borderRadius: 10, marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div className="form-group" style={{ flex: 1, marginBottom: '0.5rem' }}>
+                      <label className="form-label">المنطقة</label>
+                      <select className="form-input" value={regionId} onChange={e => setRegionId(e.target.value)}>
+                        <option value="">— اختر المنطقة —</option>
+                        {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group" style={{ flex: 1, marginBottom: '0.5rem' }}>
+                      <label className="form-label">اليوم</label>
+                      <select className="form-input" value={day} onChange={e => setDay(e.target.value)}>
+                        {WEEKDAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  {regionId && (
+                    routeLoading ? (
+                      <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>⏳ جاري تحميل عملاء خط السير...</div>
+                    ) : routeCustomers.length > 0 ? (
+                      <div style={{ maxHeight: 180, overflowY: 'auto', marginTop: '0.25rem' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.35rem' }}>عملاء خط السير ({routeCustomers.length}) — اضغط لاختيار العميل:</div>
+                        {routeCustomers.map(c => (
+                          <button
+                            key={c.id}
+                            onClick={() => pickRouteCustomer(c)}
+                            style={{
+                              display: 'block', width: '100%', textAlign: 'right', padding: '0.5rem 0.6rem',
+                              background: form.customerName === c.customer_name ? '#1d4ed8' : '#1e293b',
+                              border: 'none', borderBottom: '1px solid #334155', color: '#e2e8f0', cursor: 'pointer',
+                            }}
+                          >
+                            <div style={{ fontWeight: 700 }}>{c.customer_name}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{[c.city, c.neighborhood].filter(Boolean).join(' — ') || '—'}</div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>لا يوجد عملاء لهذا اليوم في هذه المنطقة — اكتب العميل يدويًا بالأسفل (جديد أو خارج خط السير).</div>
+                    )
+                  )}
+                </div>
+
                 <div className="form-group">
                   <label className="form-label">اسم العميل/المحل *</label>
                   <input className="form-input" value={form.customerName} autoFocus
