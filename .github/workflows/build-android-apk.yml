@@ -1,0 +1,71 @@
+name: Build Android APK
+
+# Builds an installable Android APK from the web app (via Capacitor) and
+# uploads it as a downloadable artifact. Run it manually from the Actions tab:
+#   Actions → "Build Android APK" → Run workflow.
+#
+# ONE-TIME SETUP: add two repository secrets so the app can reach Supabase
+# (values are the same ones in your local .env):
+#   Settings → Secrets and variables → Actions → New repository secret
+#     REACT_APP_SUPABASE_URL
+#     REACT_APP_SUPABASE_KEY
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required secrets
+        env:
+          URL: ${{ secrets.REACT_APP_SUPABASE_URL }}
+          KEY: ${{ secrets.REACT_APP_SUPABASE_KEY }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then
+            echo "::error::Missing REACT_APP_SUPABASE_URL and/or REACT_APP_SUPABASE_KEY secrets."
+            echo "Add them under Settings → Secrets and variables → Actions (values are in your .env)."
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        env:
+          CI: 'false'
+          REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL }}
+          REACT_APP_SUPABASE_KEY: ${{ secrets.REACT_APP_SUPABASE_KEY }}
+        run: npm run build
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sales-tracker-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
