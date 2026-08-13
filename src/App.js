@@ -229,7 +229,7 @@ export default function App() {
     if (user.role === 'rep') return <span className="badge badge-info">مندوب</span>;
     return null;
   };
-  const activeLabel = nav.find(item => item.key === page)?.label || 'نظام متابعة المبيعات';
+  const activeLabel = nav.find(item => item.key === page)?.label || 'شركة حوافل';
 
   const navList = (
     <>
@@ -270,14 +270,14 @@ export default function App() {
       <div className={`drawer-overlay ${menuOpen ? 'open' : ''}`}
         onClick={() => setMenuOpen(false)} aria-hidden={!menuOpen} />
       <nav className={`drawer ${menuOpen ? 'open' : ''}`} aria-label="التنقل">
-        <div className="sidebar-logo">🏭 نظام متابعة<br />المبيعات</div>
+        <div className="sidebar-logo">🏭 شركة حوافل</div>
         {userStrip}
         {navList}
       </nav>
 
       {/* Desktop sidebar */}
       <nav className="sidebar">
-        <div className="sidebar-logo">🏭 نظام متابعة<br />المبيعات</div>
+        <div className="sidebar-logo">🏭 شركة حوافل</div>
         {userStrip}
         {navList}
       </nav>

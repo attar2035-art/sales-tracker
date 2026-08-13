@@ -1,6 +1,6 @@
 {
   "appId": "com.hawafel.salestracker",
-  "appName": "متابعة المبيعات",
+  "appName": "شركة حوافل",
   "webDir": "build",
   "android": {
     "allowMixedContent": false
