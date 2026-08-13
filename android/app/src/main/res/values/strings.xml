@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">متابعة المبيعات</string>
+    <string name="title_activity_main">متابعة المبيعات</string>
+    <string name="package_name">com.hawafel.salestracker</string>
+    <string name="custom_url_scheme">com.hawafel.salestracker</string>
+</resources>

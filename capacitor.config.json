@@ -1,0 +1,8 @@
+{
+  "appId": "com.hawafel.salestracker",
+  "appName": "متابعة المبيعات",
+  "webDir": "build",
+  "android": {
+    "allowMixedContent": false
+  }
+}

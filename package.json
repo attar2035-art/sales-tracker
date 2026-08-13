@@ -4,6 +4,7 @@
   "private": true,
   "homepage": ".",
   "dependencies": {
+    "@capacitor/core": "^6.2.1",
     "@supabase/supabase-js": "^2.39.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -16,6 +17,8 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "health:production": "node tools/production-health-check.js",
+    "cap:sync": "cap sync android",
+    "android:apk": "npm run build && cap sync android && cd android && ./gradlew assembleDebug",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -36,6 +39,8 @@
     ]
   },
   "devDependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/cli": "^6.2.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^14.3.1",
     "@testing-library/user-event": "^14.6.1"
