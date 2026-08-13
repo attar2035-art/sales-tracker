@@ -18,6 +18,7 @@ import SupervisorFollowup from './pages/SupervisorFollowup';
 import KnowledgeCenter from './pages/KnowledgeCenter';
 import PermissionsCenter from './pages/PermissionsCenter';
 import FloatingVisitButton from './components/FloatingVisitButton';
+import InstallPrompt from './components/InstallPrompt';
 import { logAuditEvent } from './lib/audit';
 
 const NAV_ADMIN = [
@@ -288,6 +289,7 @@ export default function App() {
       {!user.must_change_password && (
         <FloatingVisitButton user={user} onVisitLogged={() => setVisitRefresh(v => v + 1)} />
       )}
+      <InstallPrompt />
     </div>
   );
 }
