@@ -417,12 +417,18 @@ async function main() {
     outbox.push({ ...buildRepEmail(metrics, email, REPORT_DATE, remainingDays), kind: 'rep' });
   }
 
-  // 2) Full report (all reps) — for admins and data-entry users alike.
-  const fullReportEmails = ADMIN_REPORT_EMAILS.length
+  // 2) Full report (all reps) — for admins, data-entry users, AND every active
+  //    manager (managers are company-wide report recipients, same as visit reports).
+  const { data: managerRows } = await supabase.from('managers').select('email').eq('is_active', true);
+  const managerEmails = (managerRows || []).map(m => String(m.email || '')).filter(Boolean);
+  const baseFullEmails = ADMIN_REPORT_EMAILS.length
     ? ADMIN_REPORT_EMAILS
-    : [...new Set(roles.filter(role => role.role === 'admin' || role.role === 'data_entry')
+    : roles.filter(role => role.role === 'admin' || role.role === 'data_entry')
         .map(role => emailByUserId[role.user_id])
-        .filter(Boolean))];
+        .filter(Boolean);
+  const fullReportEmails = [...new Set(
+    [...baseFullEmails, ...managerEmails].map(e => String(e).trim().toLowerCase()).filter(Boolean),
+  )];
   if (!repMetrics.length) {
     console.log('No active reps found — skipping full/supervisor summaries');
   } else if (!fullReportEmails.length) {
