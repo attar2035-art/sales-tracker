@@ -124,8 +124,11 @@ export default function DailyEntry() {
       'daily_expenses', 'overdue_total_input', 'overdue_collected',
     ];
     const fieldErrors = {};
+    // Sales may be negative so a data-entry user can post a return that deducts
+    // from the day's sales; every other numeric field stays non-negative.
+    const negativeAllowed = new Set(['daily_sales']);
     numericKeys.forEach(k => {
-      if ((parseFloat(form[k]) || 0) < 0) fieldErrors[k] = 'لا يمكن إدخال قيمة سالبة';
+      if (!negativeAllowed.has(k) && (parseFloat(form[k]) || 0) < 0) fieldErrors[k] = 'لا يمكن إدخال قيمة سالبة';
     });
     if (availability > 100) fieldErrors.new_products_availability = 'النسبة يجب أن تكون بين 0 و 100';
     if (successfulVisits > totalVisits) fieldErrors.successful_visits = 'لا يمكن أن تتجاوز إجمالي الزيارات';
@@ -213,7 +216,7 @@ export default function DailyEntry() {
 
   const sections = [
     { title: '💰 البيع والتحصيل', fields: [
-      { key: 'daily_sales', label: 'مبيعات اليوم', placeholder: 'المبلغ' },
+      { key: 'daily_sales', label: 'مبيعات اليوم', placeholder: 'المبلغ (بالسالب للمرتجع)', allowNegative: true },
       { key: 'daily_collection', label: 'تحصيل اليوم', placeholder: 'المبلغ' },
     ]},
     { title: '👥 العملاء الجدد', fields: [
@@ -281,7 +284,9 @@ export default function DailyEntry() {
                 {section.fields.map(f => (
                   <div className="form-group" key={f.key}>
                     <label className="form-label">{f.label}</label>
-                    <input className={errCls(f.key)} type="number" min="0" inputMode="decimal"
+                    <input className={errCls(f.key)} type="number"
+                      min={f.allowNegative ? undefined : '0'}
+                      inputMode={f.allowNegative ? 'text' : 'decimal'}
                       enterKeyHint="next" data-field={f.key}
                       value={form[f.key]}
                       onChange={e => changeField(f.key, e.target.value)}
