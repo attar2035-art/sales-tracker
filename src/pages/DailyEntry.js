@@ -4,7 +4,7 @@ import { MONTHS_AR, isWorkingDay } from '../lib/helpers';
 import { logAuditEvent } from '../lib/audit';
 
 const EMPTY_ENTRY = {
-  daily_sales: '', daily_collection: '',
+  daily_sales: '', daily_returns: '', daily_collection: '',
   new_customers: '', new_customers_value: '',
   total_visits: '', shelf_photos: '', successful_visits: '',
   new_products_skus: '', new_products_qty: '',
@@ -79,7 +79,9 @@ export default function DailyEntry() {
     if (data) {
       setExistingEntry(data);
       setForm({
-        daily_sales: data.daily_sales || '',
+        // daily_sales stores NET; show gross (= net + returns) back in the البيع box.
+        daily_sales: ((Number(data.daily_sales) || 0) + (Number(data.daily_returns) || 0)) || '',
+        daily_returns: data.daily_returns || '',
         daily_collection: data.daily_collection || '',
         new_customers: data.new_customers || '',
         new_customers_value: data.new_customers_value || '',
@@ -118,17 +120,16 @@ export default function DailyEntry() {
     // illogical cross-field values before persisting. Errors are attached to the
     // specific field so they render directly under it.
     const numericKeys = [
-      'daily_sales', 'daily_collection', 'new_customers', 'new_customers_value',
+      'daily_sales', 'daily_returns', 'daily_collection', 'new_customers', 'new_customers_value',
       'total_visits', 'shelf_photos', 'successful_visits', 'new_products_skus',
       'new_products_qty', 'new_products_availability', 'working_hours', 'km',
       'daily_expenses', 'overdue_total_input', 'overdue_collected',
     ];
     const fieldErrors = {};
-    // Sales may be negative so a data-entry user can post a return that deducts
-    // from the day's sales; every other numeric field stays non-negative.
-    const negativeAllowed = new Set(['daily_sales']);
+    // Both البيع (gross sales) and المردود (returns) are entered as non-negative
+    // amounts; the net (sales − returns) may end up negative and that's fine.
     numericKeys.forEach(k => {
-      if (!negativeAllowed.has(k) && (parseFloat(form[k]) || 0) < 0) fieldErrors[k] = 'لا يمكن إدخال قيمة سالبة';
+      if ((parseFloat(form[k]) || 0) < 0) fieldErrors[k] = 'لا يمكن إدخال قيمة سالبة';
     });
     if (availability > 100) fieldErrors.new_products_availability = 'النسبة يجب أن تكون بين 0 و 100';
     if (successfulVisits > totalVisits) fieldErrors.successful_visits = 'لا يمكن أن تتجاوز إجمالي الزيارات';
@@ -156,7 +157,10 @@ export default function DailyEntry() {
     const payload = {
       rep_id: selectedRep,
       entry_date: selectedDate,
-      daily_sales: parseFloat(form.daily_sales) || 0,
+      // Store NET sales (gross − returns) so every report reflects returns; keep
+      // the raw returns amount alongside it.
+      daily_sales: (parseFloat(form.daily_sales) || 0) - (parseFloat(form.daily_returns) || 0),
+      daily_returns: parseFloat(form.daily_returns) || 0,
       daily_collection: parseFloat(form.daily_collection) || 0,
       new_customers: parseInt(form.new_customers) || 0,
       new_customers_value: parseFloat(form.new_customers_value) || 0,
@@ -216,7 +220,8 @@ export default function DailyEntry() {
 
   const sections = [
     { title: '💰 البيع والتحصيل', fields: [
-      { key: 'daily_sales', label: 'مبيعات اليوم', placeholder: 'المبلغ (بالسالب للمرتجع)', allowNegative: true },
+      { key: 'daily_sales', label: 'مبيعات اليوم (البيع)', placeholder: 'قيمة البيع' },
+      { key: 'daily_returns', label: 'مردود اليوم', placeholder: 'قيمة المردود', hint: 'يُخصم من البيع — صافي المبيعات = البيع − المردود' },
       { key: 'daily_collection', label: 'تحصيل اليوم', placeholder: 'المبلغ' },
     ]},
     { title: '👥 العملاء الجدد', fields: [
@@ -284,13 +289,12 @@ export default function DailyEntry() {
                 {section.fields.map(f => (
                   <div className="form-group" key={f.key}>
                     <label className="form-label">{f.label}</label>
-                    <input className={errCls(f.key)} type="number"
-                      min={f.allowNegative ? undefined : '0'}
-                      inputMode={f.allowNegative ? 'text' : 'decimal'}
+                    <input className={errCls(f.key)} type="number" min="0" inputMode="decimal"
                       enterKeyHint="next" data-field={f.key}
                       value={form[f.key]}
                       onChange={e => changeField(f.key, e.target.value)}
                       placeholder={f.placeholder} />
+                    {f.hint && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>{f.hint}</div>}
                     {errors[f.key] && <div className="form-error">{errors[f.key]}</div>}
                   </div>
                 ))}
