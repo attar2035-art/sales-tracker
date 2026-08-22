@@ -94,16 +94,71 @@ function statusPillClass(status) {
   return 'warn';
 }
 
+// Dynamic, motivational lines tailored to the rep's numbers: a push toward the
+// sales target, a nudge when no new customers were added, and praise for the
+// indicators already hitting target.
+function buildMotivation(metrics, remainingDays) {
+  const b = Object.fromEntries((metrics.breakdown || []).map(r => [r.key, r]));
+  const cur = (v) => formatCurrency(v);
+  const msgs = [];
+
+  // Sales — the headline motivator.
+  const s = b.sales;
+  if (s && s.target > 0) {
+    if (s.achieved >= s.target) {
+      msgs.push({ tone: 'win', text: `🎉 ألف مبروك! حقّقت هدف المبيعات بالكامل (${s.percent}%). إنجاز يستحق الفخر — استمر في القمة! 🏆` });
+    } else {
+      msgs.push({ tone: 'push', text: `🎯 باقٍ ${cur(s.remaining)} فقط للوصول لهدف المبيعات. بمعدل ${cur(s.dailyRequired)} يوميًا خلال ${formatNumber(remainingDays)} يوم عمل تقدر تحقّقه — أنت قادر عليها! 💪🔥` });
+    }
+  }
+
+  // New customers — nudge hard when none were added this month.
+  const ncMonth = Number(metrics.month?.newCustomers) || 0;
+  if (ncMonth <= 0) {
+    msgs.push({ tone: 'warn', text: '🧲 لم تُسجّل أي عميل جديد هذا الشهر حتى الآن — وكل عميل جديد يعني مبيعات إضافية تتكرّر شهريًا. استهدف عميلًا واحدًا اليوم وابدأ سلسلة النمو!' });
+  } else {
+    msgs.push({ tone: 'win', text: `👏 أضفت ${formatNumber(ncMonth)} عميل جديد هذا الشهر — توسيعك لقاعدة عملائك ممتاز، واصل الصيد! 🧲` });
+  }
+
+  // Praise every other indicator that already hit its target.
+  const goodLabels = (metrics.breakdown || [])
+    .filter(r => r.key !== 'sales' && r.key !== 'newCustomers' && r.target > 0 && r.achieved >= r.target)
+    .map(r => r.label);
+  if (goodLabels.length) {
+    msgs.push({ tone: 'win', text: `⭐ أداؤك ممتاز في: ${goodLabels.join('، ')} — حقّقت الهدف فيها. عمل رائع، حافظ على المستوى!` });
+  }
+
+  // Collection nudge if still behind.
+  const c = b.collection;
+  if (c && c.target > 0 && c.achieved < c.target) {
+    msgs.push({ tone: 'push', text: `💰 باقٍ ${cur(c.remaining)} على هدف التحصيل — متابعتك اليومية للتحصيل تحمي سيولة الشركة وتقرّبك من مكافأتك.` });
+  }
+
+  msgs.push({ tone: 'end', text: '🚀 كل إدخال يومي دقيق يقرّبك من هدفك. نثق فيك — لننهِ الشهر في المقدمة! 💚 فريق حوافل' });
+  return msgs;
+}
+
+const MOTIV_STYLE = {
+  win: { bg: '#ecfdf5', bd: '#10b981', fg: '#065f46' },
+  push: { bg: '#eff6ff', bd: '#3b82f6', fg: '#1e40af' },
+  warn: { bg: '#fef2f2', bd: '#ef4444', fg: '#991b1b' },
+  end: { bg: '#f8fafc', bd: '#94a3b8', fg: '#334155' },
+};
+
 function buildRepEmail(metrics, email, reportDate, remainingDays) {
   const { rep, yesterday, breakdown, requiredSalesDaily, requiredCollectionDaily, requiredVisitsDaily } = metrics;
   const [year, monthNum] = reportDate.split('-').map(Number);
   const fmt = (row, value) => (row.currency ? formatCurrency(value) : formatNumber(value));
   const subject = `تقرير أداء أمس - ${rep.name} - ${reportDate}`;
+  const motivation = buildMotivation(metrics, remainingDays);
 
   const text = [
     `تقرير أداء أمس للمندوب: ${rep.name}`,
     `التاريخ: ${reportDate}`,
     `المنطقة: ${rep.regions?.name || '-'}`,
+    '',
+    '✦ رسالة اليوم:',
+    ...motivation.map(m => `• ${m.text}`),
     '',
     `مبيعات أمس: ${formatCurrency(yesterday.sales)}`,
     `تحصيل أمس: ${formatCurrency(yesterday.collection)}`,
@@ -157,6 +212,14 @@ function buildRepEmail(metrics, email, reportDate, remainingDays) {
         المنطقة: ${escapeHtml(rep.regions?.name || '-')} · المشرف: ${escapeHtml(rep.supervisors?.name || 'بدون مشرف')}<br/>
         التاريخ: ${escapeHtml(reportDate)} · الشهر: ${MONTHS_AR[monthNum - 1]} ${year}
       </div>
+    </div>
+
+    <div class="card">
+      <h2>رسالة اليوم 💬</h2>
+      ${motivation.map(m => {
+        const s = MOTIV_STYLE[m.tone] || MOTIV_STYLE.end;
+        return `<div style="background:${s.bg};border-inline-start:4px solid ${s.bd};border-radius:8px;padding:10px 12px;margin:8px 0;color:${s.fg};font-size:14px;line-height:1.9;font-weight:600">${escapeHtml(m.text)}</div>`;
+      }).join('')}
     </div>
 
     <div class="card">
