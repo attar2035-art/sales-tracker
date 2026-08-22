@@ -10,6 +10,10 @@ import {
 } from '../lib/helpers';
 import { buildEffectiveTargetsMap } from '../lib/targets';
 import { getDailyRequirement } from '../lib/repMetrics';
+import { getVisitRatingCounts } from '../lib/visits';
+
+const RATING_ORDER = ['VIP', 'ممتاز', 'جيد', 'متوسط', 'ضعيف جداً'];
+const RATING_COLORS = { 'VIP': '#a855f7', 'ممتاز': '#10b981', 'جيد': '#3b82f6', 'متوسط': '#f59e0b', 'ضعيف جداً': '#ef4444' };
 
 // Format a daily-required figure that may be null (finished month → not applicable).
 const fmtDaily = (value, currency = true) =>
@@ -137,7 +141,18 @@ export default function Dashboard({ supervisorId }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchMeta(); }, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  const [ratingCounts, setRatingCounts] = useState({});
+
   useEffect(() => { fetchData(); }, [year, month, filterSup]);
+
+  useEffect(() => {
+    const pad2 = (n) => String(n).padStart(2, '0');
+    const fromDate = `${year}-${pad2(month)}-01`;
+    const toDate = toDateString(new Date(year, month, 0));
+    const supScope = (filterSup && filterSup !== NO_SUPERVISOR) ? filterSup : (supervisorId || null);
+    getVisitRatingCounts(supScope, fromDate, toDate).then(setRatingCounts).catch(() => setRatingCounts({}));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [year, month, filterSup]);
 
   const fetchMeta = async () => {
     const { data: s } = await supabase.from('supervisors').select('*').order('name');
@@ -420,6 +435,27 @@ export default function Dashboard({ supervisorId }) {
         <KPICard monthProgress={monthProg} icon="💸" title="المصروفات" achieved={kpi.expenses} target={0} color="#64748b" />
         <KPICard monthProgress={monthProg} icon="⚠️" title="المحصل من المتأخرات" achieved={kpi.overdueCollected} target={kpi.overdueTotal} color="#ef4444" />
       </div>
+
+      {(() => {
+        const rated = RATING_ORDER.reduce((s, r) => s + (ratingCounts[r] || 0), 0);
+        return (
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div className="card-title">🏷️ توزيع فئات العملاء (من زيارات المشرفين){rated > 0 && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 400 }}> — {rated} زيارة مقيّمة</span>}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
+              {RATING_ORDER.map(r => (
+                <div key={r} style={{
+                  flex: '1 1 100px', minWidth: 100, textAlign: 'center',
+                  background: '#0f172a', border: `1px solid ${RATING_COLORS[r]}`, borderRadius: 10, padding: '0.6rem',
+                }}>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: RATING_COLORS[r] }}>{ratingCounts[r] || 0}</div>
+                  <div style={{ fontSize: '0.78rem', color: '#cbd5e1', marginTop: '0.15rem' }}>{r}</div>
+                </div>
+              ))}
+            </div>
+            {rated === 0 && <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.5rem' }}>لا توجد زيارات مقيّمة في هذه الفترة.</div>}
+          </div>
+        );
+      })()}
 
       <section className="dashboard-visual-panel">
         <div className="card-title">تقرير الشهر الحالي — مؤشرات دائرية</div>
