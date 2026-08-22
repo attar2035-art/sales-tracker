@@ -60,6 +60,9 @@ export default function SupervisorFollowup() {
 
   const stats = summarizeVisits(visits);
   const supName = supervisors.find(s => s.id === supId)?.name || '';
+  const ratingOrder = ['VIP', 'ممتاز', 'جيد', 'متوسط', 'ضعيف جداً'];
+  const ratingCounts = ratingOrder.map(r => ({ r, n: visits.filter(v => v.customer_rating === r).length }));
+  const ratedTotal = ratingCounts.reduce((s, x) => s + x.n, 0);
 
   return (
     <div>
@@ -108,6 +111,23 @@ export default function SupervisorFollowup() {
           <div className="stat-label">التقارير</div>
           <div className="stat-value">{reports.length}</div>
         </div>
+      </div>
+
+      {/* Customer category distribution */}
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-title">🏷️ توزيع فئات العملاء {ratedTotal > 0 && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 400 }}>({ratedTotal} زيارة مقيّمة)</span>}</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
+          {ratingCounts.map(({ r, n }) => (
+            <div key={r} style={{
+              flex: '1 1 100px', minWidth: 100, textAlign: 'center',
+              background: '#0f172a', border: `1px solid ${RATING_COLORS[r]}`, borderRadius: 10, padding: '0.6rem',
+            }}>
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: RATING_COLORS[r] }}>{n}</div>
+              <div style={{ fontSize: '0.78rem', color: '#cbd5e1', marginTop: '0.15rem' }}>{r}</div>
+            </div>
+          ))}
+        </div>
+        {ratedTotal === 0 && <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.5rem' }}>لا توجد زيارات مقيّمة في هذه الفترة.</div>}
       </div>
 
       {/* Tabs */}
