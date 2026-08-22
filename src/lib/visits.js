@@ -61,7 +61,7 @@ export const listRepsForSupervisor = async (supervisorId) => {
   if (!supervisorId) return { data: [], error: null };
   return supabase
     .from('representatives')
-    .select('id, name')
+    .select('id, name, region_id')
     .eq('supervisor_id', supervisorId)
     .order('name');
 };
