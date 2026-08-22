@@ -94,9 +94,10 @@ function statusPillClass(status) {
   return 'warn';
 }
 
-// Dynamic, motivational lines tailored to the rep's numbers: a push toward the
-// sales target, a nudge when no new customers were added, and praise for the
-// indicators already hitting target.
+// Dynamic, motivational lines tailored to the rep's numbers — but HONEST: praise
+// is used only for indicators genuinely ahead of / hitting target (time-aware
+// status), while lagging indicators get a constructive "needs improvement" nudge
+// instead of false "ممتاز".
 function buildMotivation(metrics, remainingDays) {
   const b = Object.fromEntries((metrics.breakdown || []).map(r => [r.key, r]));
   const cur = (v) => formatCurrency(v);
@@ -106,39 +107,49 @@ function buildMotivation(metrics, remainingDays) {
   const name = metrics.rep?.name ? ` يا ${metrics.rep.name}` : '';
   msgs.push({ tone: 'greet', text: `صباح الخير${name} 🌞☕ — يوم عمل سعيد ومليان توفيق! وإنت في طريقك بالسيارة خلّي بالك من نفسك، ونتمنّى لك السلامة دائمًا 🚗💚` });
 
-  // Sales — the headline motivator.
+  // Sales — realistic per time-aware status (never call it "ممتاز" if behind).
   const s = b.sales;
   if (s && s.target > 0) {
     if (s.achieved >= s.target) {
       msgs.push({ tone: 'win', text: `🎉 ألف مبروك! حقّقت هدف المبيعات بالكامل (${s.percent}%). إنجاز يستحق الفخر — استمر في القمة! 🏆` });
+    } else if (s.status === 'متقدم') {
+      msgs.push({ tone: 'win', text: `🔥 مبيعاتك متقدّمة على المستهدف (${s.percent}%) وباقٍ ${cur(s.remaining)} فقط. أداء قوي — استمر بنفس القوة!` });
+    } else if (s.status === 'في المسار') {
+      msgs.push({ tone: 'push', text: `👍 مبيعاتك في المسار الصحيح (${s.percent}%). باقٍ ${cur(s.remaining)} بمعدل ${cur(s.dailyRequired)} يوميًا — ثبّت الإيقاع وكمّل للهدف!` });
     } else {
-      msgs.push({ tone: 'push', text: `🎯 باقٍ ${cur(s.remaining)} فقط للوصول لهدف المبيعات. بمعدل ${cur(s.dailyRequired)} يوميًا خلال ${formatNumber(remainingDays)} يوم عمل تقدر تحقّقه — أنت قادر عليها! 💪🔥` });
+      msgs.push({ tone: 'warn', text: `⚠️ مبيعاتك متأخرة عن المستهدف حتى الآن (${s.percent}%). محتاج تركيز: باقٍ ${cur(s.remaining)} بمعدل ${cur(s.dailyRequired)} يوميًا لتعويض الفارق — نقدر نلحقها معًا! 💪` });
     }
   }
 
-  // New customers — nudge hard when none were added this month.
+  // New customers — honest: nudge when none or when behind pace.
   const ncMonth = Number(metrics.month?.newCustomers) || 0;
+  const nc = b.newCustomers;
   if (ncMonth <= 0) {
-    msgs.push({ tone: 'warn', text: '🧲 لم تُسجّل أي عميل جديد هذا الشهر حتى الآن — وكل عميل جديد يعني مبيعات إضافية تتكرّر شهريًا. استهدف عميلًا واحدًا اليوم وابدأ سلسلة النمو!' });
+    msgs.push({ tone: 'warn', text: '🧲 لم تُسجّل أي عميل جديد هذا الشهر حتى الآن — وكل عميل جديد يعني مبيعات إضافية تتكرّر. استهدف عميلًا واحدًا اليوم وابدأ سلسلة النمو!' });
+  } else if (nc && nc.target > 0 && nc.status === 'متأخر') {
+    msgs.push({ tone: 'push', text: `🧲 أضفت ${formatNumber(ncMonth)} عميل جديد، لكن ما زلت خلف المستهدف — زوّد اكتساب العملاء الفترة الجاية.` });
   } else {
-    msgs.push({ tone: 'win', text: `👏 أضفت ${formatNumber(ncMonth)} عميل جديد هذا الشهر — توسيعك لقاعدة عملائك ممتاز، واصل الصيد! 🧲` });
+    msgs.push({ tone: 'win', text: `👏 أضفت ${formatNumber(ncMonth)} عميل جديد هذا الشهر — توسيعك لقاعدة عملائك في محلّه، واصل! 🧲` });
   }
 
-  // Praise every other indicator that already hit its target.
-  const goodLabels = (metrics.breakdown || [])
-    .filter(r => r.key !== 'sales' && r.key !== 'newCustomers' && r.target > 0 && r.achieved >= r.target)
-    .map(r => r.label);
-  if (goodLabels.length) {
-    msgs.push({ tone: 'win', text: `⭐ أداؤك ممتاز في: ${goodLabels.join('، ')} — حقّقت الهدف فيها. عمل رائع، حافظ على المستوى!` });
+  // Other indicators split honestly by realistic status: praise only what is
+  // genuinely ahead/achieved; flag what needs improvement without false praise.
+  const others = (metrics.breakdown || [])
+    .filter(r => r.key !== 'sales' && r.key !== 'newCustomers' && r.target > 0);
+  const ahead = others.filter(r => r.achieved >= r.target || r.status === 'متقدم').map(r => r.label);
+  const behind = others.filter(r => r.achieved < r.target && r.status === 'متأخر').map(r => r.label);
+  if (ahead.length) {
+    msgs.push({ tone: 'win', text: `⭐ أداؤك متقدّم في: ${ahead.join('، ')} — عمل رائع، حافظ على المستوى!` });
+  }
+  if (behind.length) {
+    msgs.push({ tone: 'warn', text: `📉 محتاج تحسين في: ${behind.join('، ')} — ركّز عليها الفترة الجاية لتعوّض الفارق.` });
   }
 
-  // Collection nudge if still behind.
-  const c = b.collection;
-  if (c && c.target > 0 && c.achieved < c.target) {
-    msgs.push({ tone: 'push', text: `💰 باقٍ ${cur(c.remaining)} على هدف التحصيل — متابعتك اليومية للتحصيل تحمي سيولة الشركة وتقرّبك من مكافأتك.` });
-  }
-
-  msgs.push({ tone: 'end', text: '🚀 كل إدخال يومي دقيق يقرّبك من هدفك. نثق فيك — لننهِ الشهر في المقدمة! 💚 فريق حوافل' });
+  // Closing — honest tone based on the overall sales pace.
+  const salesBehind = s && s.target > 0 && s.achieved < s.target && s.status === 'متأخر';
+  msgs.push({ tone: 'end', text: salesBehind
+    ? '🚀 لسه في وقت — كل زيارة وكل إدخال دقيق يقرّبك من الهدف. نثق إنك تقدر تعوّض الفارق! 💚 فريق حوافل'
+    : '🚀 استمر على نفس المستوى — إدخالك اليومي الدقيق هو سرّ التقدّم. للأمام دائمًا! 💚 فريق حوافل' });
   return msgs;
 }
 
