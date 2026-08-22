@@ -284,12 +284,59 @@ function buildRepEmail(metrics, email, reportDate, remainingDays) {
   return { to: email, subject, html, text };
 }
 
+// Motivational, per-region briefing for a supervisor: an honest status for each
+// of his regions, a reminder that his own score depends on logging visits/reports,
+// and a push to stand by and coach his team.
+function buildSupervisorMotivation(metricsList, supervisorName, remainingDays, monthProgress) {
+  const cur = formatCurrency;
+  const msgs = [];
+  const nm = supervisorName ? ` يا ${supervisorName}` : '';
+  msgs.push({ tone: 'greet', text: `صباح الخير${nm} 🌞☕ — يوم عمل موفّق لك ولفريقك! وإنت في طريقك خلّي بالك من نفسك، ونتمنّى لك السلامة دائمًا 🚗💚` });
+
+  // Aggregate the team's numbers per region.
+  const byRegion = {};
+  for (const m of metricsList) {
+    const region = m.rep.regions?.name || 'بدون منطقة';
+    const g = byRegion[region] || (byRegion[region] = { region, salesA: 0, salesT: 0, colA: 0, colT: 0, visA: 0, visT: 0, ncA: 0, reps: 0, noEntry: 0 });
+    g.salesA += m.month.sales; g.salesT += m.targets.sales;
+    g.colA += m.month.collection; g.colT += m.targets.collection;
+    g.visA += m.month.visits; g.visT += m.targets.visits;
+    g.ncA += m.month.newCustomers; g.reps += 1;
+    if (!m.hasEntryYesterday) g.noEntry += 1;
+  }
+  const pct = (a, t) => (t > 0 ? Math.round((a / t) * 100) : 0);
+  const stat = (a, t) => {
+    if (!t) return 'بدون هدف';
+    const r = (a / t) * 100;
+    if (r >= monthProgress + 5) return 'متقدّم ✅';
+    if (r >= monthProgress - 5) return 'في المسار 🟡';
+    return 'متأخر ⚠️';
+  };
+
+  msgs.push({ tone: 'push', text: '📊 موقف مناطقك حتى أمس:' });
+  Object.values(byRegion).forEach(g => {
+    const behind = g.salesT > 0 && (g.salesA / g.salesT) * 100 < monthProgress - 5;
+    const parts = [`مبيعات ${cur(g.salesA)}${g.salesT ? ` من ${cur(g.salesT)} (${pct(g.salesA, g.salesT)}%) — ${stat(g.salesA, g.salesT)}` : ''}`];
+    parts.push(`تحصيل ${cur(g.colA)}${g.colT ? ` (${pct(g.colA, g.colT)}%)` : ''}`);
+    parts.push(`زيارات ${formatNumber(g.visA)}${g.visT ? `/${formatNumber(g.visT)}` : ''}`);
+    parts.push(`عملاء جدد ${formatNumber(g.ncA)}`);
+    const warnEntry = g.noEntry > 0 ? ` · ⚠️ ${formatNumber(g.noEntry)} مندوب بدون إدخال أمس` : '';
+    msgs.push({ tone: behind ? 'warn' : 'push', text: `📍 ${g.region} (${formatNumber(g.reps)} مندوب): ${parts.join(' · ')}${warnEntry}` });
+  });
+
+  msgs.push({ tone: 'push', text: '🤝 كن بجانب فريقك اليوم — تابع معاهم، حفّزهم، وشِل عنهم المعوّقات. نجاح فريقك هو نجاحك.' });
+  msgs.push({ tone: 'warn', text: '📝 سجّل زياراتك وتقاريرك اليوم — أداؤك كمشرف بيتقاس على الزيارات والتقارير اللي بتدخلها. من غير إدخال، ما فيش تقييم يوثّق مجهودك.' });
+  msgs.push({ tone: 'end', text: '🚀 متابعتك اليومية ووقوفك جنب فريقك بيصنعوا الفرق. خلّينا ننهي الشهر بفريق في المقدمة! 💚 فريق حوافل' });
+  return msgs;
+}
+
 // Aggregate report for admins (all reps) or a supervisor (their team only).
-function buildSummaryEmail({ to, scopeName, metricsList, reportDate, remainingDays }) {
+function buildSummaryEmail({ to, scopeName, metricsList, reportDate, remainingDays, supervisorName, monthProgress }) {
   const [year, monthNum] = reportDate.split('-').map(Number);
   const agg = aggregateMetrics(metricsList);
   const rows = [...metricsList].sort((a, b) => b.month.sales - a.month.sales);
   const subject = `التقرير اليومي المجمّع - ${scopeName} - ${reportDate}`;
+  const supMotivation = supervisorName ? buildSupervisorMotivation(metricsList, supervisorName, remainingDays, monthProgress) : null;
 
   const textLines = [
     `التقرير اليومي المجمّع (${scopeName}) - ${reportDate}`,
@@ -304,6 +351,7 @@ function buildSummaryEmail({ to, scopeName, metricsList, reportDate, remainingDa
     '',
     APP_URL,
   ];
+  if (supMotivation) textLines.unshift('✦ رسالة اليوم:', ...supMotivation.map(m => `• ${m.text}`), '');
 
   const tableRows = rows.map(m => `
         <tr>
@@ -336,6 +384,14 @@ function buildSummaryEmail({ to, scopeName, metricsList, reportDate, remainingDa
         عدد المناديب: <strong>${formatNumber(agg.count)}</strong> · أدخلوا أمس: <strong>${formatNumber(agg.reported)}</strong> · أيام العمل المتبقية: <strong>${formatNumber(remainingDays)}</strong>
       </div>
     </div>
+${supMotivation ? `
+    <div class="card">
+      <h2>رسالة اليوم 💬</h2>
+      ${supMotivation.map(m => {
+        const st = MOTIV_STYLE[m.tone] || MOTIV_STYLE.end;
+        return `<div style="background:${st.bg};border-inline-start:4px solid ${st.bd};border-radius:8px;padding:10px 12px;margin:8px 0;color:${st.fg};font-size:14px;line-height:1.9;font-weight:600">${escapeHtml(m.text)}</div>`;
+      }).join('')}
+    </div>` : ''}
 
     <div class="card">
       <h2>إجمالي أمس</h2>
@@ -526,8 +582,9 @@ async function main() {
       console.log(`Skipped supervisor ${emailByUserId[role.user_id]}: no reps in team`);
       continue;
     }
-    const scopeName = `فريق ${teamMetrics[0].rep.supervisors?.name || 'المشرف'}`;
-    outbox.push({ ...buildSummaryEmail({ to: emailByUserId[role.user_id], scopeName, metricsList: teamMetrics, reportDate: REPORT_DATE, remainingDays }), kind: 'supervisor' });
+    const supervisorName = teamMetrics[0].rep.supervisors?.name || 'المشرف';
+    const scopeName = `فريق ${supervisorName}`;
+    outbox.push({ ...buildSummaryEmail({ to: emailByUserId[role.user_id], scopeName, metricsList: teamMetrics, reportDate: REPORT_DATE, remainingDays, supervisorName, monthProgress }), kind: 'supervisor' });
   }
 
   // Test mode: send one sample of each report type to a single address.
