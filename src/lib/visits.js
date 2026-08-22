@@ -105,6 +105,24 @@ export const getCurrentPosition = () => new Promise((resolve, reject) => {
 // Customer category ratings a supervisor can assign during a visit (best → weakest).
 export const CUSTOMER_RATINGS = ['VIP', 'ممتاز', 'جيد', 'متوسط', 'ضعيف جداً'];
 
+// Count of rated visits per customer category in a date range, optionally scoped
+// to one supervisor. RLS already limits what each role can read.
+export const getVisitRatingCounts = async (supervisorId, fromDate, toDate) => {
+  let rq = supabase.from('supervisor_routes').select('id')
+    .gte('route_date', fromDate).lte('route_date', toDate);
+  if (supervisorId) rq = rq.eq('supervisor_id', supervisorId);
+  const { data: routes } = await rq;
+  const ids = (routes || []).map(r => r.id);
+  if (!ids.length) return {};
+  const { data: visits } = await supabase
+    .from('supervisor_visits').select('customer_rating').in('route_id', ids);
+  const counts = {};
+  (visits || []).forEach(v => {
+    if (v.customer_rating) counts[v.customer_rating] = (counts[v.customer_rating] || 0) + 1;
+  });
+  return counts;
+};
+
 export const startVisit = async ({
   routeId, customerName, contactPerson, city, neighborhood, street, repName, gps, notes, customerRating,
 }) => {
