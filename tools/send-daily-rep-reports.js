@@ -102,6 +102,10 @@ function buildMotivation(metrics, remainingDays) {
   const cur = (v) => formatCurrency(v);
   const msgs = [];
 
+  // Warm morning greeting + a safety wish (reps are on the road).
+  const name = metrics.rep?.name ? ` يا ${metrics.rep.name}` : '';
+  msgs.push({ tone: 'greet', text: `صباح الخير${name} 🌞☕ — يوم عمل سعيد ومليان توفيق! وإنت في طريقك بالسيارة خلّي بالك من نفسك، ونتمنّى لك السلامة دائمًا 🚗💚` });
+
   // Sales — the headline motivator.
   const s = b.sales;
   if (s && s.target > 0) {
@@ -139,6 +143,7 @@ function buildMotivation(metrics, remainingDays) {
 }
 
 const MOTIV_STYLE = {
+  greet: { bg: '#fffbeb', bd: '#f59e0b', fg: '#92400e' },
   win: { bg: '#ecfdf5', bd: '#10b981', fg: '#065f46' },
   push: { bg: '#eff6ff', bd: '#3b82f6', fg: '#1e40af' },
   warn: { bg: '#fef2f2', bd: '#ef4444', fg: '#991b1b' },
