@@ -51,6 +51,19 @@ export default function FloatingVisitButton({ user, onVisitLogged }) {
     });
   }, [open, mode, user]);
 
+  // Auto-fill the rep from the chosen region so it isn't re-entered: a single
+  // rep in that region is selected outright; a rep left over from another region
+  // is cleared.
+  useEffect(() => {
+    if (!regionId) return;
+    const inRegion = reps.filter(r => r.region_id === regionId);
+    setForm(f => {
+      if (inRegion.length === 1) return { ...f, repName: inRegion[0].name };
+      if (f.repName && !inRegion.some(r => r.name === f.repName)) return { ...f, repName: '' };
+      return f;
+    });
+  }, [regionId, reps]);
+
   // Load the planned customers whenever the region or day changes.
   useEffect(() => {
     if (!open || mode !== 'visit' || !regionId || !day) { setRouteCustomers([]); return; }
@@ -301,7 +314,8 @@ export default function FloatingVisitButton({ user, onVisitLogged }) {
                   <label className="form-label">المندوب (في منطقتك)</label>
                   <select className="form-input" value={form.repName} onChange={e => set('repName', e.target.value)}>
                     <option value="">— اختر المندوب —</option>
-                    {reps.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+                    {(regionId ? reps.filter(r => r.region_id === regionId) : reps)
+                      .map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
