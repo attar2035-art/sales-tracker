@@ -102,8 +102,11 @@ export const getCurrentPosition = () => new Promise((resolve, reject) => {
 
 // A visit is now free-form: the supervisor types the customer/shop name and
 // address details by hand instead of picking an existing customer record.
+// Customer category ratings a supervisor can assign during a visit (best → weakest).
+export const CUSTOMER_RATINGS = ['VIP', 'ممتاز', 'جيد', 'متوسط', 'ضعيف جداً'];
+
 export const startVisit = async ({
-  routeId, customerName, contactPerson, city, neighborhood, street, repName, gps, notes,
+  routeId, customerName, contactPerson, city, neighborhood, street, repName, gps, notes, customerRating,
 }) => {
   return supabase
     .from('supervisor_visits')
@@ -116,6 +119,7 @@ export const startVisit = async ({
       neighborhood: neighborhood || null,
       street: street || null,
       rep_name: repName || null,
+      customer_rating: customerRating || null,
       visit_status: 'completed',
       check_in_time: new Date().toISOString(),
       gps_lat: gps?.lat ?? null,

@@ -102,7 +102,8 @@ serve(async (req) => {
       + row('المدينة', v.city)
       + row('الحي', v.neighborhood)
       + row('الشارع', v.street)
-      + row('المندوب', v.rep_name);
+      + row('المندوب', v.rep_name)
+      + row('فئة العميل', v.customer_rating);
   };
 
   // Resolve active recipients and pick the ones relevant to the involved regions.
@@ -209,8 +210,9 @@ serve(async (req) => {
         const name = v.customer_name || c?.customer_name || '—';
         const sub = [v.city, v.neighborhood].filter(Boolean).join(' — ');
         const rep = v.rep_name ? `<div style="font-size:11px;color:#94a3b8">مندوب: ${esc(v.rep_name)}</div>` : '';
+        const rating = v.customer_rating ? `<div style="font-size:11px;color:#94a3b8">فئة العميل: ${esc(v.customer_rating)}</div>` : '';
         return `<tr>
-          <td style="padding:6px 8px;border-bottom:1px solid #eef2f7"><b>${esc(name)}</b>${sub ? `<div style="font-size:11px;color:#94a3b8">${esc(sub)}</div>` : ''}${rep}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #eef2f7"><b>${esc(name)}</b>${sub ? `<div style="font-size:11px;color:#94a3b8">${esc(sub)}</div>` : ''}${rep}${rating}</td>
           <td style="padding:6px 8px;border-bottom:1px solid #eef2f7">${fmtTime(v.check_in_time)}</td>
           <td style="padding:6px 8px;border-bottom:1px solid #eef2f7">${esc(STATUS_AR[v.visit_status] || v.visit_status)}</td>
           <td style="padding:6px 8px;border-bottom:1px solid #eef2f7">${Array.isArray(v.photos) ? v.photos.length : 0}</td>

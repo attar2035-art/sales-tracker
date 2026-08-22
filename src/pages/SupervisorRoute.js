@@ -6,6 +6,7 @@ import {
 
 const STATUS_LABELS = { planned: 'مخططة', completed: 'مكتملة', cancelled: 'ملغاة' };
 const STATUS_COLORS = { planned: '#f59e0b', completed: '#10b981', cancelled: '#ef4444' };
+const RATING_COLORS = { 'VIP': '#a855f7', 'ممتاز': '#10b981', 'جيد': '#3b82f6', 'متوسط': '#f59e0b', 'ضعيف جداً': '#ef4444' };
 
 export default function SupervisorRoute({ user, refreshSignal }) {
   const [route, setRoute] = useState(null);
@@ -102,7 +103,14 @@ export default function SupervisorRoute({ user, refreshSignal }) {
                 <div key={v.id} style={{ padding: '1rem', borderBottom: '1px solid #334155' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                      <div style={{ fontWeight: 700 }}>{v.customer_name || 'عميل'}</div>
+                      <div style={{ fontWeight: 700 }}>
+                        {v.customer_name || 'عميل'}
+                        {v.customer_rating && (
+                          <span className="badge" style={{ background: RATING_COLORS[v.customer_rating] || '#64748b', color: '#fff', marginInlineStart: '0.5rem', fontSize: '0.7rem' }}>
+                            {v.customer_rating}
+                          </span>
+                        )}
+                      </div>
                       <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
                         {v.check_in_time ? new Date(v.check_in_time).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : '—'}
                         {v.gps_lat && v.gps_lng && (

@@ -5,6 +5,7 @@ import {
   listRepsForSupervisor, sendVisitReport,
   createReport, attachReportMedia, REPORT_TYPES,
   listRegionsForSupervisor, listRoutePlanCustomers, WEEKDAYS,
+  CUSTOMER_RATINGS,
 } from '../lib/visits';
 
 // Today's Arabic weekday, to pre-select the route-plan day.
@@ -12,7 +13,7 @@ const TODAY_WEEKDAY = WEEKDAYS[(new Date().getDay() + 1) % 7];
 
 const EMPTY_VISIT = {
   customerName: '', contactPerson: '', city: '', neighborhood: '', street: '',
-  repName: '', notes: '',
+  repName: '', notes: '', customerRating: '',
 };
 
 export default function FloatingVisitButton({ user, onVisitLogged }) {
@@ -110,6 +111,7 @@ export default function FloatingVisitButton({ user, onVisitLogged }) {
         repName: form.repName.trim(),
         gps,
         notes: form.notes.trim(),
+        customerRating: form.customerRating,
       });
       if (visitError || !visit) throw new Error(visitError?.message || 'تعذّر تسجيل الزيارة');
 
@@ -300,6 +302,13 @@ export default function FloatingVisitButton({ user, onVisitLogged }) {
                   <select className="form-input" value={form.repName} onChange={e => set('repName', e.target.value)}>
                     <option value="">— اختر المندوب —</option>
                     {reps.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">فئة العميل (تقييم)</label>
+                  <select className="form-input" value={form.customerRating} onChange={e => set('customerRating', e.target.value)}>
+                    <option value="">— اختر فئة العميل —</option>
+                    {CUSTOMER_RATINGS.map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
