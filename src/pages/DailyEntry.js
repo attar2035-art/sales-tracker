@@ -15,7 +15,17 @@ const EMPTY_ENTRY = {
   notes: '',
 };
 
-export default function DailyEntry() {
+// Entry fields that support per-field ownership/locking (form keys).
+const LOCKABLE_KEYS = [
+  'daily_sales', 'daily_returns', 'daily_collection', 'new_customers', 'new_customers_value',
+  'total_visits', 'shelf_photos', 'successful_visits', 'new_products_skus', 'new_products_qty',
+  'new_products_availability', 'working_hours', 'km', 'daily_expenses',
+  'overdue_total_input', 'overdue_collected', 'notes',
+];
+
+export default function DailyEntry({ user }) {
+  const isAdmin = user?.role === 'admin';
+  const myId = user?.id || null;
   const now = new Date();
   const pad2 = (n) => String(n).padStart(2, '0');
   // Local calendar date (not UTC) so the default day is correct near midnight.
@@ -29,11 +39,19 @@ export default function DailyEntry() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
   const [existingEntry, setExistingEntry] = useState(null);
+  const [fieldOwners, setFieldOwners] = useState({});
   const [errors, setErrors] = useState({});
   const containerRef = useRef(null);
 
+  // A field is locked when another user already filled it (owner + admin edit it).
+  const isLocked = (key) => !isAdmin && !!fieldOwners[key] && fieldOwners[key] !== myId;
+  const lockNote = (key) => (isLocked(key)
+    ? <div style={{ fontSize: '0.72rem', color: '#f59e0b', marginTop: '0.25rem' }}>🔒 مقفولة — أدخلها مستخدم آخر لهذا اليوم</div>
+    : null);
+
   // Update a field and clear its inline error as the user corrects it.
   const changeField = (key, value) => {
+    if (isLocked(key)) return; // guard: locked fields are read-only for others
     setForm(prev => ({ ...prev, [key]: value }));
     setErrors(prev => {
       if (!prev[key]) return prev;
@@ -78,6 +96,7 @@ export default function DailyEntry() {
       .select('*').eq('rep_id', selectedRep).eq('entry_date', selectedDate).maybeSingle();
     if (data) {
       setExistingEntry(data);
+      setFieldOwners(data.field_owners || {});
       setForm({
         // daily_sales stores NET; show gross (= net + returns) back in the البيع box.
         daily_sales: ((Number(data.daily_sales) || 0) + (Number(data.daily_returns) || 0)) || '',
@@ -100,6 +119,7 @@ export default function DailyEntry() {
       });
     } else {
       setExistingEntry(null);
+      setFieldOwners({});
       setForm({ ...EMPTY_ENTRY });
     }
   };
@@ -145,37 +165,69 @@ export default function DailyEntry() {
     }
     setErrors({});
 
-    if (existingEntry && !window.confirm('يوجد إدخال مسبق لهذا اليوم. سيتم استبداله بالقيم الجديدة. هل تريد المتابعة؟')) {
-      return;
+    setLoading(true);
+
+    // Re-read the freshest row so we merge onto whatever other data-entry users
+    // just saved, and NEVER overwrite a field owned by someone else.
+    const { data: fresh } = await supabase.from('daily_entries')
+      .select('*').eq('rep_id', selectedRep).eq('entry_date', selectedDate).maybeSingle();
+    const owners = { ...(fresh?.field_owners || {}) };
+    const num = (v) => parseFloat(v) || 0;
+    const dbReturns = num(fresh?.daily_returns);
+    // Current DB values as form-equivalents (gross for the البيع box).
+    const dbForm = {
+      daily_sales: num(fresh?.daily_sales) + dbReturns, daily_returns: dbReturns,
+      daily_collection: num(fresh?.daily_collection), new_customers: num(fresh?.new_customers),
+      new_customers_value: num(fresh?.new_customers_value), total_visits: num(fresh?.total_visits),
+      shelf_photos: num(fresh?.shelf_photos), successful_visits: num(fresh?.successful_visits),
+      new_products_skus: num(fresh?.new_products_skus), new_products_qty: num(fresh?.new_products_qty),
+      new_products_availability: num(fresh?.new_products_availability), working_hours: num(fresh?.working_hours),
+      km: num(fresh?.km), daily_expenses: num(fresh?.daily_expenses),
+      overdue_total_input: num(fresh?.overdue_total_input), overdue_collected: num(fresh?.overdue_collected),
+      notes: fresh?.notes || '',
+    };
+
+    // Merge each field: locked (owned by others) keeps the DB value; the user's
+    // own or empty fields are updated, claiming/releasing ownership as needed.
+    const v = {};
+    for (const key of LOCKABLE_KEYS) {
+      const owner = owners[key];
+      const canEdit = isAdmin || !owner || owner === myId;
+      const raw = form[key];
+      const provided = raw !== '' && raw !== null && raw !== undefined;
+      if (!canEdit) { v[key] = dbForm[key]; continue; }
+      if (provided) {
+        v[key] = key === 'notes' ? raw : num(raw);
+        if (!owner && myId) owners[key] = myId; // claim this field
+      } else {
+        v[key] = key === 'notes' ? '' : 0;
+        if (owner === myId) delete owners[key]; // release my own claim
+      }
     }
 
-    setLoading(true);
-    // NOTE: `year` and `month` are GENERATED ALWAYS columns in the database
-    // (derived from entry_date). Writing them explicitly makes every insert
-    // fail with "cannot insert a non-DEFAULT value into a generated column",
-    // so they are intentionally omitted here — the DB computes them.
+    // NOTE: `year`/`month` are GENERATED columns (from entry_date) — omitted.
     const payload = {
       rep_id: selectedRep,
       entry_date: selectedDate,
-      // Store NET sales (gross − returns) so every report reflects returns; keep
-      // the raw returns amount alongside it.
-      daily_sales: (parseFloat(form.daily_sales) || 0) - (parseFloat(form.daily_returns) || 0),
-      daily_returns: parseFloat(form.daily_returns) || 0,
-      daily_collection: parseFloat(form.daily_collection) || 0,
-      new_customers: parseInt(form.new_customers) || 0,
-      new_customers_value: parseFloat(form.new_customers_value) || 0,
-      total_visits: totalVisits,
-      shelf_photos: shelfPhotos,
-      successful_visits: successfulVisits,
-      new_products_skus: parseInt(form.new_products_skus) || 0,
-      new_products_qty: parseInt(form.new_products_qty) || 0,
-      new_products_availability: availability,
-      working_hours: parseFloat(form.working_hours) || 0,
-      km: parseFloat(form.km) || 0,
-      daily_expenses: parseFloat(form.daily_expenses) || 0,
-      overdue_total_input: parseFloat(form.overdue_total_input) || 0,
-      overdue_collected: parseFloat(form.overdue_collected) || 0,
-      notes: form.notes || '',
+      // Store NET sales (gross − returns); keep raw returns alongside.
+      daily_sales: v.daily_sales - v.daily_returns,
+      daily_returns: v.daily_returns,
+      daily_collection: v.daily_collection,
+      new_customers: Math.round(v.new_customers),
+      new_customers_value: v.new_customers_value,
+      total_visits: Math.round(v.total_visits),
+      shelf_photos: Math.round(v.shelf_photos),
+      successful_visits: Math.round(v.successful_visits),
+      new_products_skus: Math.round(v.new_products_skus),
+      new_products_qty: Math.round(v.new_products_qty),
+      new_products_availability: v.new_products_availability,
+      working_hours: v.working_hours,
+      km: v.km,
+      daily_expenses: v.daily_expenses,
+      overdue_total_input: v.overdue_total_input,
+      overdue_collected: v.overdue_collected,
+      notes: v.notes || '',
+      field_owners: owners,
       updated_at: new Date().toISOString(),
     };
     const { error } = await supabase.from('daily_entries')
@@ -275,7 +327,10 @@ export default function DailyEntry() {
         </div>
         {existingEntry && (
           <div className="alert alert-success" style={{ marginTop: '0.5rem' }}>
-            ✏️ يوجد إدخال مسبق لهذا اليوم — سيتم التحديث عند الحفظ
+            ✏️ يوجد إدخال مسبق لهذا اليوم.{' '}
+            {isAdmin
+              ? 'كمدير تقدر تعدّل كل الخانات.'
+              : 'الخانات المقفولة 🔒 أدخلها مستخدم آخر — إنت تكمّل الخانات المتاحة فقط، وعند الحفظ بيتدمج إدخالك مع الباقي.'}
           </div>
         )}
       </div>
@@ -290,11 +345,12 @@ export default function DailyEntry() {
                   <div className="form-group" key={f.key}>
                     <label className="form-label">{f.label}</label>
                     <input className={errCls(f.key)} type="number" min="0" inputMode="decimal"
-                      enterKeyHint="next" data-field={f.key}
+                      enterKeyHint="next" data-field={f.key} disabled={isLocked(f.key)}
                       value={form[f.key]}
                       onChange={e => changeField(f.key, e.target.value)}
                       placeholder={f.placeholder} />
-                    {f.hint && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>{f.hint}</div>}
+                    {f.hint && !isLocked(f.key) && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>{f.hint}</div>}
+                    {lockNote(f.key)}
                     {errors[f.key] && <div className="form-error">{errors[f.key]}</div>}
                   </div>
                 ))}
@@ -309,19 +365,21 @@ export default function DailyEntry() {
               <div className="form-group">
                 <label className="form-label">زيارات إجمالي</label>
                 <input className={errCls('total_visits')} type="number" min="0" inputMode="numeric"
-                  enterKeyHint="next" data-field="total_visits"
+                  enterKeyHint="next" data-field="total_visits" disabled={isLocked('total_visits')}
                   value={form.total_visits}
                   onChange={e => changeField('total_visits', e.target.value)}
                   placeholder="عدد" />
+                {lockNote('total_visits')}
                 {errors.total_visits && <div className="form-error">{errors.total_visits}</div>}
               </div>
               <div className="form-group">
                 <label className="form-label">صور الرف</label>
                 <input className={errCls('shelf_photos')} type="number" min="0" inputMode="numeric"
-                  enterKeyHint="next" data-field="shelf_photos"
+                  enterKeyHint="next" data-field="shelf_photos" disabled={isLocked('shelf_photos')}
                   value={form.shelf_photos}
                   onChange={e => changeField('shelf_photos', e.target.value)}
                   placeholder="عدد الصور" />
+                {lockNote('shelf_photos')}
                 {errors.shelf_photos && <div className="form-error">{errors.shelf_photos}</div>}
               </div>
               <div className="form-group">
@@ -336,10 +394,11 @@ export default function DailyEntry() {
               <div className="form-group">
                 <label className="form-label">زيارات ناجحة</label>
                 <input className={errCls('successful_visits')} type="number" min="0" inputMode="numeric"
-                  enterKeyHint="next" data-field="successful_visits"
+                  enterKeyHint="next" data-field="successful_visits" disabled={isLocked('successful_visits')}
                   value={form.successful_visits}
                   onChange={e => changeField('successful_visits', e.target.value)}
                   placeholder="عدد" />
+                {lockNote('successful_visits')}
                 {errors.successful_visits && <div className="form-error">{errors.successful_visits}</div>}
               </div>
             </div>
@@ -352,19 +411,21 @@ export default function DailyEntry() {
               <div className="form-group">
                 <label className="form-label">إجمالي المتأخرات فوق 60 يوم</label>
                 <input className={errCls('overdue_total_input')} type="number" min="0" inputMode="decimal"
-                  enterKeyHint="next" data-field="overdue_total_input"
+                  enterKeyHint="next" data-field="overdue_total_input" disabled={isLocked('overdue_total_input')}
                   value={form.overdue_total_input}
                   onChange={e => changeField('overdue_total_input', e.target.value)}
                   placeholder="المبلغ" />
+                {lockNote('overdue_total_input')}
                 {errors.overdue_total_input && <div className="form-error">{errors.overdue_total_input}</div>}
               </div>
               <div className="form-group">
                 <label className="form-label">المحصل من المتأخرات اليوم</label>
                 <input className={errCls('overdue_collected')} type="number" min="0" inputMode="decimal"
-                  enterKeyHint="done" data-field="overdue_collected"
+                  enterKeyHint="done" data-field="overdue_collected" disabled={isLocked('overdue_collected')}
                   value={form.overdue_collected}
                   onChange={e => changeField('overdue_collected', e.target.value)}
                   placeholder="المبلغ" />
+                {lockNote('overdue_collected')}
                 {errors.overdue_collected && <div className="form-error">{errors.overdue_collected}</div>}
               </div>
               <div className="form-group">
@@ -378,9 +439,10 @@ export default function DailyEntry() {
 
           <div className="card">
             <div className="card-title">📝 ملاحظات</div>
-            <textarea className="form-input" rows={3} value={form.notes}
-              onChange={e => setForm(prev => ({ ...prev, notes: e.target.value }))}
+            <textarea className="form-input" rows={3} value={form.notes} disabled={isLocked('notes')}
+              onChange={e => changeField('notes', e.target.value)}
               placeholder="ملاحظات اليوم..." style={{ resize: 'vertical' }} />
+            {lockNote('notes')}
           </div>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>

@@ -177,7 +177,7 @@ export default function App() {
     if (user.role === 'data_entry') {
       if (page === 'password') return <ChangePassword />;
       if (page === 'targets') return <Targets />;
-      return <DailyEntry />;
+      return <DailyEntry user={user} />;
     }
     if (user.role === 'manager') {
       // Company-wide, read-only.
@@ -201,7 +201,7 @@ export default function App() {
     if (user.role === 'admin') {
       switch (page) {
         case 'dashboard': return <Dashboard />;
-        case 'daily': return <DailyEntry />;
+        case 'daily': return <DailyEntry user={user} />;
         case 'targets': return <Targets />;
         case 'repdetails': return <RepDetails />;
         case 'supervisors': return <SupervisorFollowup />;
