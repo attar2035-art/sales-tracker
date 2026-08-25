@@ -49,6 +49,7 @@ const NAV_SUPERVISOR = [
 ];
 
 const NAV_DATA_ENTRY = [
+  { key: 'dashboard', label: 'لوحة المتابعة', icon: '📊' },
   { key: 'daily', label: 'الإدخال اليومي', icon: '📝' },
   { key: 'targets', label: 'الأهداف الشهرية', icon: '🎯' },
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
@@ -177,6 +178,8 @@ export default function App() {
     if (user.role === 'data_entry') {
       if (page === 'password') return <ChangePassword />;
       if (page === 'targets') return <Targets />;
+      // Company-wide, read-only view of all regions' numbers.
+      if (page === 'dashboard') return <Dashboard />;
       return <DailyEntry user={user} />;
     }
     if (user.role === 'manager') {
