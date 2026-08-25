@@ -262,6 +262,9 @@ export default function DailyEntry({ user }) {
 
   const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
 
+  // Live net sales = gross sales − returns (negative when it's a returns-only day).
+  const netSales = (parseFloat(form.daily_sales) || 0) - (parseFloat(form.daily_returns) || 0);
+
   const overdueRemaining = Math.max(0,
     (parseFloat(form.overdue_total_input) || 0) - (parseFloat(form.overdue_collected) || 0)
   );
@@ -273,7 +276,8 @@ export default function DailyEntry({ user }) {
   const sections = [
     { title: '💰 البيع والتحصيل', fields: [
       { key: 'daily_sales', label: 'مبيعات اليوم (البيع)', placeholder: 'قيمة البيع' },
-      { key: 'daily_returns', label: 'مردود اليوم', placeholder: 'قيمة المردود', hint: 'يُخصم من البيع — صافي المبيعات = البيع − المردود' },
+      { key: 'daily_returns', label: 'مردود اليوم', placeholder: 'قيمة المردود' },
+      { key: 'net_sales', label: 'صافي المبيعات (البيع − المردود)', computed: true },
       { key: 'daily_collection', label: 'تحصيل اليوم', placeholder: 'المبلغ' },
     ]},
     { title: '👥 العملاء الجدد', fields: [
@@ -344,11 +348,20 @@ export default function DailyEntry({ user }) {
                 {section.fields.map(f => (
                   <div className="form-group" key={f.key}>
                     <label className="form-label">{f.label}</label>
-                    <input className={errCls(f.key)} type="number" min="0" inputMode="decimal"
-                      enterKeyHint="next" data-field={f.key} disabled={isLocked(f.key)}
-                      value={form[f.key]}
-                      onChange={e => changeField(f.key, e.target.value)}
-                      placeholder={f.placeholder} />
+                    {f.computed ? (
+                      <div className="form-input" style={{
+                        fontWeight: 800,
+                        color: netSales > 0 ? '#10b981' : netSales < 0 ? '#ef4444' : 'var(--text-secondary)',
+                      }}>
+                        {netSales.toLocaleString('ar-EG')}{netSales < 0 ? ' (مرتجع صافي)' : ''}
+                      </div>
+                    ) : (
+                      <input className={errCls(f.key)} type="number" min="0" inputMode="decimal"
+                        enterKeyHint="next" data-field={f.key} disabled={isLocked(f.key)}
+                        value={form[f.key]}
+                        onChange={e => changeField(f.key, e.target.value)}
+                        placeholder={f.placeholder} />
+                    )}
                     {f.hint && !isLocked(f.key) && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>{f.hint}</div>}
                     {lockNote(f.key)}
                     {errors[f.key] && <div className="form-error">{errors[f.key]}</div>}
