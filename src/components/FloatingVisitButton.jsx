@@ -16,6 +16,28 @@ const EMPTY_VISIT = {
   repName: '', notes: '', customerRating: '',
 };
 
+// Draft persistence: on some devices opening the camera reloads the app and
+// wipes the form + photos before saving. We keep an auto-draft (text + photos as
+// data URLs) so the visit survives that reload and can still be saved.
+const DRAFT_KEY = 'hawafel_visit_draft';
+const DRAFT_TTL_MS = 3 * 60 * 60 * 1000; // 3 hours
+
+const readAsDataUrl = (file) => new Promise((resolve) => {
+  const r = new FileReader();
+  r.onload = () => resolve(r.result);
+  r.onerror = () => resolve(null);
+  r.readAsDataURL(file);
+});
+
+const dataUrlToFile = async (item) => {
+  if (item instanceof File) return item;
+  try {
+    const res = await fetch(item.dataUrl);
+    const blob = await res.blob();
+    return new File([blob], item.name || `photo-${Date.now()}.jpg`, { type: item.type || blob.type || 'image/jpeg' });
+  } catch { return null; }
+};
+
 export default function FloatingVisitButton({ user, onVisitLogged }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState('choose'); // 'choose' | 'visit' | 'report'
@@ -50,6 +72,36 @@ export default function FloatingVisitButton({ user, onVisitLogged }) {
       if (list.length === 1) setRegionId(list[0].id); // auto-pick the only region
     });
   }, [open, mode, user]);
+
+  // Restore an auto-saved draft when the visit sheet opens (e.g. after the app
+  // reloaded during camera capture) so the visit + photos aren't lost.
+  useEffect(() => {
+    if (!open || mode !== 'visit') return;
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (!d || (Date.now() - (d.ts || 0)) > DRAFT_TTL_MS) { localStorage.removeItem(DRAFT_KEY); return; }
+      if (d.form) setForm(f => ({ ...f, ...d.form }));
+      if (d.regionId) setRegionId(d.regionId);
+      if (d.day) setDay(d.day);
+      if (Array.isArray(d.photos) && d.photos.length) setPhotos(d.photos);
+    } catch { /* ignore corrupt draft */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, mode]);
+
+  // Auto-save the in-progress visit (text + photos as data URLs) so it survives
+  // an app reload triggered by opening the camera.
+  useEffect(() => {
+    if (!open || mode !== 'visit') return;
+    const hasContent = (form.customerName && form.customerName.trim()) || photos.length > 0;
+    try {
+      if (!hasContent) { localStorage.removeItem(DRAFT_KEY); return; }
+      const draft = { ts: Date.now(), form, regionId, day, photos };
+      try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); }
+      catch { try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...draft, photos: [] })); } catch { /* quota */ } }
+    } catch { /* storage unavailable */ }
+  }, [open, mode, form, regionId, day, photos]);
 
   // Auto-fill the rep from the chosen region so it isn't re-entered: a single
   // rep in that region is selected outright; a rep left over from another region
@@ -91,12 +143,16 @@ export default function FloatingVisitButton({ user, onVisitLogged }) {
     setRegionId(''); setDay(TODAY_WEEKDAY); setRouteCustomers([]);
     setReportType(REPORT_TYPES[0]); setReportContent(''); setReportPhotos([]); setReportFiles([]);
   };
-  const closeModal = () => { setOpen(false); reset(); };
+  const clearDraft = () => { try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ } };
+  const closeModal = () => { clearDraft(); setOpen(false); reset(); };
 
-  // Upload a list of files to storage, returning the stored paths.
-  const uploadAll = async (files) => {
+  // Upload a list of items (File objects or persisted {name,type,dataUrl})
+  // to storage, returning the stored paths.
+  const uploadAll = async (items) => {
     const paths = [];
-    for (const file of files) {
+    for (const item of items) {
+      const file = await dataUrlToFile(item);
+      if (!file) continue;
       const { path, error } = await uploadVisitPhoto(user.id, file);
       if (!error && path) paths.push(path);
     }
@@ -139,6 +195,7 @@ export default function FloatingVisitButton({ user, onVisitLogged }) {
 
       sendVisitReport({ type: 'single', visitId: visit.id }).catch(() => {});
 
+      clearDraft();
       setMsg({ text: '✓ تم تسجيل الزيارة بنجاح', type: 'success' });
       if (onVisitLogged) onVisitLogged();
       setTimeout(closeModal, 800);
@@ -328,7 +385,12 @@ export default function FloatingVisitButton({ user, onVisitLogged }) {
                 <div className="form-group">
                   <label className="form-label">📷 صور (كاميرا أو معرض — تقدر تضيف أكتر من صورة)</label>
                   <input type="file" accept="image/*" multiple className="form-input"
-                    onChange={e => { setPhotos(prev => [...prev, ...Array.from(e.target.files || [])]); e.target.value = ''; }} />
+                    onChange={async e => {
+                      const files = Array.from(e.target.files || []);
+                      e.target.value = '';
+                      const metas = await Promise.all(files.map(async f => ({ name: f.name, type: f.type, dataUrl: await readAsDataUrl(f) })));
+                      setPhotos(prev => [...prev, ...metas.filter(m => m.dataUrl)]);
+                    }} />
                   {photos.length > 0 && (
                     <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem' }}>
                       {photos.length} صورة مضافة
