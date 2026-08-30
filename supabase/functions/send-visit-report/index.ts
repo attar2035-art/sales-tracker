@@ -35,11 +35,14 @@ const shell = (title: string, inner: string) => `<!doctype html>
   <div style="text-align:center;color:#94a3b8;font-size:12px;padding:14px">رسالة تلقائية من نظام متابعة المبيعات</div>
 </div></body></html>`;
 
-async function sendEmail(resendKey: string, from: string, to: string[], subject: string, html: string) {
+async function sendEmail(resendKey: string, from: string, to: string[], subject: string, html: string, replyTo?: string | null) {
+  const body: Record<string, unknown> = { from, to, subject, html };
+  // Let managers reply straight to the supervisor from their inbox.
+  if (replyTo) body.reply_to = replyTo;
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from, to, subject, html }),
+    body: JSON.stringify(body),
   });
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(payload?.message || `Resend error ${res.status}`);
@@ -74,6 +77,17 @@ serve(async (req) => {
     resendKey = secret?.value || null;
   }
   if (!resendKey) return json({ error: 'RESEND_API_KEY is not configured' }, 500);
+
+  // The supervisor's own login email, used as reply-to so managers can reply
+  // to (or guide) the supervisor straight from the notification.
+  const supervisorEmail = async (supervisorId?: string | null): Promise<string | null> => {
+    if (!supervisorId) return null;
+    const { data: supRole } = await admin.from('user_roles')
+      .select('user_id').eq('supervisor_id', supervisorId).eq('role', 'supervisor').maybeSingle();
+    if (!supRole?.user_id) return null;
+    const { data: supUser } = await admin.auth.admin.getUserById(supRole.user_id);
+    return supUser?.user?.email || null;
+  };
 
   const { data: requester, error: reqErr } = await admin.auth.getUser(jwt);
   if (reqErr || !requester.user) return json({ error: 'Unauthorized' }, 401);
@@ -167,7 +181,8 @@ serve(async (req) => {
         </table>`;
       await sendEmail(resendKey, from, recipients,
         `زيارة جديدة — ${sup?.name || 'مشرف'} — ${custName}`,
-        shell('إشعار زيارة', inner));
+        shell('إشعار زيارة', inner),
+        await supervisorEmail(route.supervisor_id));
       return json({ sent: recipients.length });
     }
 
@@ -232,7 +247,8 @@ serve(async (req) => {
         <p style="margin-top:16px"><a href="${esc(appUrl)}" style="color:#3b82f6">فتح النظام</a></p>`;
       await sendEmail(resendKey, from, recipients,
         `تقرير زيارات اليوم — ${sup?.name || 'مشرف'} — ${route.route_date}`,
-        shell('تقرير اليوم', inner));
+        shell('تقرير اليوم', inner),
+        supEmail);
       return json({ sent: recipients.length });
     }
 
@@ -272,7 +288,8 @@ serve(async (req) => {
         ${report.content ? `<div style="margin-top:14px;padding:12px;background:#f8fafc;border-radius:8px;white-space:pre-wrap;font-size:14px">${contentHtml}</div>` : ''}`;
       await sendEmail(resendKey, from, recipients,
         `تقرير — ${report.report_type} — ${sup?.name || 'مشرف'}`,
-        shell('تقرير المشرف', inner));
+        shell('تقرير المشرف', inner),
+        await supervisorEmail(report.supervisor_id));
       return json({ sent: recipients.length });
     }
 
