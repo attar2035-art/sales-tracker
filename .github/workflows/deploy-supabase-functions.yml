@@ -19,3 +19,8 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: supabase functions deploy create-rep-account --project-ref dujwpemfdbxkqbjqmyot --no-verify-jwt
+
+      - name: Deploy send-visit-report function
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy send-visit-report --project-ref dujwpemfdbxkqbjqmyot --no-verify-jwt

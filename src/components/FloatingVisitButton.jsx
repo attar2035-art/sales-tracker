@@ -326,10 +326,18 @@ export default function FloatingVisitButton({ user, onVisitLogged }) {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">📷 صور (كاميرا مباشرة)</label>
-                  <input type="file" accept="image/*" capture="environment" multiple className="form-input"
-                    onChange={e => setPhotos(Array.from(e.target.files || []))} />
-                  {photos.length > 0 && <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem' }}>{photos.length} صورة من الكاميرا</div>}
+                  <label className="form-label">📷 صور (كاميرا أو معرض — تقدر تضيف أكتر من صورة)</label>
+                  <input type="file" accept="image/*" multiple className="form-input"
+                    onChange={e => { setPhotos(prev => [...prev, ...Array.from(e.target.files || [])]); e.target.value = ''; }} />
+                  {photos.length > 0 && (
+                    <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+                      {photos.length} صورة مضافة
+                      <button type="button" onClick={() => setPhotos([])}
+                        style={{ marginInlineStart: '0.5rem', background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.78rem' }}>
+                        مسح الكل
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="form-group">
                   <label className="form-label">📎 ملف مرفق (اختياري)</label>
@@ -366,8 +374,14 @@ export default function FloatingVisitButton({ user, onVisitLogged }) {
                 <div className="form-group">
                   <label className="form-label">📷 صور (اختياري)</label>
                   <input type="file" accept="image/*" multiple className="form-input"
-                    onChange={e => setReportPhotos(Array.from(e.target.files || []))} />
-                  {reportPhotos.length > 0 && <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem' }}>{reportPhotos.length} صورة</div>}
+                    onChange={e => { setReportPhotos(prev => [...prev, ...Array.from(e.target.files || [])]); e.target.value = ''; }} />
+                  {reportPhotos.length > 0 && (
+                    <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+                      {reportPhotos.length} صورة
+                      <button type="button" onClick={() => setReportPhotos([])}
+                        style={{ marginInlineStart: '0.5rem', background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.78rem' }}>مسح</button>
+                    </div>
+                  )}
                 </div>
                 <div className="form-group">
                   <label className="form-label">📎 ملفات جرد/مرفقات (اختياري)</label>
