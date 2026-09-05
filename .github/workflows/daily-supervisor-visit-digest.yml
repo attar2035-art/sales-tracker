@@ -1,0 +1,72 @@
+name: Daily supervisor visit digest
+
+on:
+  schedule:
+    # 05:00 UTC == 08:00 Asia/Riyadh (the reporting timezone used across the app)
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+    inputs:
+      report_date:
+        description: 'Optional report date in YYYY-MM-DD format (defaults to yesterday)'
+        required: false
+      supervisor_names:
+        description: 'Optional comma-separated supervisor name fragments (defaults to رامي,يحي)'
+        required: false
+      test_recipient:
+        description: 'Optional test email. When set, sends the digest to this address only.'
+        required: false
+
+jobs:
+  send-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check required secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          REPORTS_FROM_EMAIL: ${{ secrets.REPORTS_FROM_EMAIL }}
+          REPORTS_FROM_NAME: ${{ secrets.REPORTS_FROM_NAME }}
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          node - <<'NODE'
+          const required = [
+            'SUPABASE_URL',
+            'SUPABASE_SERVICE_ROLE_KEY',
+            'RESEND_API_KEY',
+            'REPORTS_FROM_EMAIL',
+            'REPORTS_FROM_NAME',
+            'APP_URL',
+          ];
+          for (const name of required) {
+            console.log(`${name}: ${process.env[name] ? 'set' : 'missing'}`);
+          }
+          const missing = required.filter((name) => !process.env[name]);
+          if (missing.length) {
+            throw new Error(`Missing secrets: ${missing.join(', ')}`);
+          }
+          NODE
+
+      - name: Send supervisor visit digest
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          REPORTS_FROM_EMAIL: ${{ secrets.REPORTS_FROM_EMAIL }}
+          REPORTS_FROM_NAME: ${{ secrets.REPORTS_FROM_NAME }}
+          APP_URL: ${{ secrets.APP_URL }}
+          REPORT_DATE: ${{ github.event.inputs.report_date }}
+          DIGEST_SUPERVISOR_NAMES: ${{ github.event.inputs.supervisor_names }}
+          TEST_RECIPIENT: ${{ github.event.inputs.test_recipient }}
+        run: node tools/send-supervisor-visit-digest.js
