@@ -43,8 +43,11 @@ export default function DailyEntry({ user }) {
   const [errors, setErrors] = useState({});
   const containerRef = useRef(null);
 
-  // A field is locked when another user already filled it (owner + admin edit it).
-  const isLocked = (key) => !isAdmin && !!fieldOwners[key] && fieldOwners[key] !== myId;
+  // A field is locked once another user has filled it — and it stays locked for
+  // EVERYONE else, admins included. Entered numbers belong to whoever entered
+  // them; no other account (not even an admin) may edit them. This is also
+  // enforced in the database by a trigger so it can't be bypassed.
+  const isLocked = (key) => !!fieldOwners[key] && fieldOwners[key] !== myId;
   const lockNote = (key) => (isLocked(key)
     ? <div style={{ fontSize: '0.72rem', color: '#f59e0b', marginTop: '0.25rem' }}>🔒 مقفولة — أدخلها مستخدم آخر لهذا اليوم</div>
     : null);
@@ -192,7 +195,9 @@ export default function DailyEntry({ user }) {
     const v = {};
     for (const key of LOCKABLE_KEYS) {
       const owner = owners[key];
-      const canEdit = isAdmin || !owner || owner === myId;
+      // Only the field's owner (or an unclaimed field) may be written — admins
+      // are NOT exempt, matching the DB trigger that enforces the same rule.
+      const canEdit = !owner || owner === myId;
       const raw = form[key];
       const provided = raw !== '' && raw !== null && raw !== undefined;
       if (!canEdit) { v[key] = dbForm[key]; continue; }
@@ -333,7 +338,7 @@ export default function DailyEntry({ user }) {
           <div className="alert alert-success" style={{ marginTop: '0.5rem' }}>
             ✏️ يوجد إدخال مسبق لهذا اليوم.{' '}
             {isAdmin
-              ? 'كمدير تقدر تعدّل كل الخانات.'
+              ? 'الخانات المقفولة 🔒 أدخلها مستخدم آخر ولا يمكن تعديلها — حتى للمدير. تقدر تدخل الخانات الفارغة فقط.'
               : 'الخانات المقفولة 🔒 أدخلها مستخدم آخر — إنت تكمّل الخانات المتاحة فقط، وعند الحفظ بيتدمج إدخالك مع الباقي.'}
           </div>
         )}
