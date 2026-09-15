@@ -8,6 +8,27 @@ const ROLE_LABELS = {
   other: 'أخرى',
 };
 
+// Daily-entry fields that can be assigned to a specific data-entry user.
+const ASSIGNABLE_FIELDS = [
+  { key: 'daily_sales', label: 'المبيعات (البيع)' },
+  { key: 'daily_returns', label: 'المردود' },
+  { key: 'daily_collection', label: 'التحصيل' },
+  { key: 'new_customers', label: 'عدد العملاء الجدد' },
+  { key: 'new_customers_value', label: 'قيمة فواتير العملاء الجدد' },
+  { key: 'total_visits', label: 'إجمالي الزيارات' },
+  { key: 'shelf_photos', label: 'صور الرف' },
+  { key: 'successful_visits', label: 'الزيارات الناجحة' },
+  { key: 'new_products_skus', label: 'عدد الأصناف الموزعة' },
+  { key: 'new_products_qty', label: 'عدد القطع الموزعة' },
+  { key: 'new_products_availability', label: 'نسبة توفر المنتجات' },
+  { key: 'working_hours', label: 'ساعات العمل' },
+  { key: 'km', label: 'الكيلومترات' },
+  { key: 'daily_expenses', label: 'المصروفات اليومية' },
+  { key: 'overdue_total_input', label: 'إجمالي المتأخرات' },
+  { key: 'overdue_collected', label: 'المحصل من المتأخرات' },
+  { key: 'notes', label: 'ملاحظات' },
+];
+
 export default function PermissionsCenter() {
   const [recipients, setRecipients] = useState([]);
   const [regions, setRegions] = useState([]);
@@ -15,6 +36,10 @@ export default function PermissionsCenter() {
   const [msg, setMsg] = useState(null);
   const [errors, setErrors] = useState({});
   const [form, setForm] = useState({ name: '', email: '', role: 'sales_manager', region_id: '' });
+  // Daily-entry field assignments: users list + { field_key: user_id } map.
+  const [entryUsers, setEntryUsers] = useState([]);
+  const [assignments, setAssignments] = useState({});
+  const [savingAssign, setSavingAssign] = useState(false);
   const containerRef = useRef(null);
 
   const showMsg = (text, type = 'success') => {
@@ -38,17 +63,45 @@ export default function PermissionsCenter() {
   };
 
   const fetchAll = useCallback(async () => {
-    const [{ data: recs, error: recErr }, { data: regs }] = await Promise.all([
+    const [{ data: recs, error: recErr }, { data: regs }, usersRes, assignRes] = await Promise.all([
       supabase.from('report_recipients').select('*, regions(name)').order('created_at', { ascending: false }),
       supabase.from('regions').select('id, name').order('name'),
+      supabase.rpc('list_data_entry_users'),
+      supabase.from('data_entry_field_assignments').select('field_key, user_id'),
     ]);
     if (recErr) showMsg('تعذّر تحميل المستلمين: ' + recErr.message, 'error');
     if (recs) setRecipients(recs);
     if (regs) setRegions(regs);
+    if (usersRes?.data) setEntryUsers(usersRes.data);
+    if (assignRes?.data) setAssignments(Object.fromEntries(assignRes.data.map(r => [r.field_key, r.user_id])));
   }, []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchAll(); }, []);
+
+  const saveAssignments = async () => {
+    setSavingAssign(true);
+    // Rows set to a user are upserted; rows set to "unassigned" are deleted.
+    const toUpsert = ASSIGNABLE_FIELDS
+      .filter(f => assignments[f.key])
+      .map(f => ({ field_key: f.key, user_id: assignments[f.key], updated_at: new Date().toISOString() }));
+    const toDelete = ASSIGNABLE_FIELDS.filter(f => !assignments[f.key]).map(f => f.key);
+    let ok = true;
+    if (toUpsert.length) {
+      const { error } = await supabase.from('data_entry_field_assignments').upsert(toUpsert, { onConflict: 'field_key' });
+      if (error) { ok = false; showMsg('خطأ في الحفظ: ' + error.message, 'error'); }
+    }
+    if (ok && toDelete.length) {
+      const { error } = await supabase.from('data_entry_field_assignments').delete().in('field_key', toDelete);
+      if (error) { ok = false; showMsg('خطأ في الحذف: ' + error.message, 'error'); }
+    }
+    if (ok) {
+      await logAuditEvent({ eventType: 'update', pageKey: 'permissions', entityType: 'data_entry_field_assignments', details: { assigned: toUpsert.length } });
+      showMsg('تم حفظ توزيع الخانات ✓');
+      fetchAll();
+    }
+    setSavingAssign(false);
+  };
 
   const addRecipient = async () => {
     const fieldErrors = {};
@@ -180,6 +233,40 @@ export default function PermissionsCenter() {
             </table>
           </div>
         )}
+      </div>
+
+      <div className="card">
+        <div className="card-title">🧮 توزيع خانات الإدخال اليومي</div>
+        <p className="muted-text" style={{ marginBottom: '1rem' }}>
+          حدّد مين المسؤول عن كل خانة. الخانة المخصّصة لمستخدم لا يقدر يدخلها أو يعدّلها أي حساب آخر (حتى المدير).
+          اترك «غير مخصّصة» لو عايز أي مدخِّل بيانات يقدر يملأها (أول من يدخلها يملكها).
+        </p>
+        <div className="table-wrapper">
+          <table className="responsive-cards">
+            <thead>
+              <tr><th>الخانة</th><th>المسؤول عنها</th></tr>
+            </thead>
+            <tbody>
+              {ASSIGNABLE_FIELDS.map(f => (
+                <tr key={f.key}>
+                  <td data-label="الخانة"><strong>{f.label}</strong></td>
+                  <td data-label="المسؤول عنها">
+                    <select className="form-select" value={assignments[f.key] || ''}
+                      onChange={e => setAssignments(prev => ({ ...prev, [f.key]: e.target.value }))}>
+                      <option value="">غير مخصّصة</option>
+                      {entryUsers.map(u => <option key={u.user_id} value={u.user_id}>{u.email}</option>)}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="btn-row" style={{ marginTop: '0.75rem' }}>
+          <button className="btn btn-success" onClick={saveAssignments} disabled={savingAssign}>
+            {savingAssign ? '⏳ جاري الحفظ...' : '💾 حفظ التوزيع'}
+          </button>
+        </div>
       </div>
     </div>
   );

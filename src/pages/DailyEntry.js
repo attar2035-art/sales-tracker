@@ -40,17 +40,26 @@ export default function DailyEntry({ user }) {
   const [msg, setMsg] = useState(null);
   const [existingEntry, setExistingEntry] = useState(null);
   const [fieldOwners, setFieldOwners] = useState({});
+  // Explicit per-field assignments: { field_key: user_id }. An assigned field
+  // may only be entered/edited by its assigned user.
+  const [assignments, setAssignments] = useState({});
   const [errors, setErrors] = useState({});
   const containerRef = useRef(null);
 
-  // A field is locked once another user has filled it — and it stays locked for
-  // EVERYONE else, admins included. Entered numbers belong to whoever entered
-  // them; no other account (not even an admin) may edit them. This is also
-  // enforced in the database by a trigger so it can't be bypassed.
-  const isLocked = (key) => !!fieldOwners[key] && fieldOwners[key] !== myId;
-  const lockNote = (key) => (isLocked(key)
-    ? <div style={{ fontSize: '0.72rem', color: '#f59e0b', marginTop: '0.25rem' }}>🔒 مقفولة — أدخلها مستخدم آخر لهذا اليوم</div>
-    : null);
+  // A field is locked when it belongs to someone else — and it stays locked for
+  // EVERYONE else, admins included. If the field is explicitly assigned, only the
+  // assigned user may touch it; otherwise it falls back to first-come ownership
+  // (whoever filled it first owns it). Also enforced by a DB trigger.
+  const isLocked = (key) => {
+    const assignee = assignments[key];
+    if (assignee) return assignee !== myId;
+    return !!fieldOwners[key] && fieldOwners[key] !== myId;
+  };
+  const lockNote = (key) => {
+    if (!isLocked(key)) return null;
+    const msg = assignments[key] ? '🔒 مخصّصة لمستخدم آخر' : '🔒 مقفولة — أدخلها مستخدم آخر لهذا اليوم';
+    return <div style={{ fontSize: '0.72rem', color: '#f59e0b', marginTop: '0.25rem' }}>{msg}</div>;
+  };
 
   // Update a field and clear its inline error as the user corrects it.
   const changeField = (key, value) => {
@@ -83,7 +92,7 @@ export default function DailyEntry({ user }) {
   const errCls = (key) => `form-input${errors[key] ? ' has-error' : ''}`;
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchReps(); }, []);
+  useEffect(() => { fetchReps(); fetchAssignments(); }, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (selectedRep && selectedDate) fetchEntry(); }, [selectedRep, selectedDate]);
 
@@ -92,6 +101,11 @@ export default function DailyEntry({ user }) {
       .select('*, supervisors(name), regions(name)')
       .eq('is_active', true).order('name');
     if (data) setReps(data);
+  };
+
+  const fetchAssignments = async () => {
+    const { data } = await supabase.from('data_entry_field_assignments').select('field_key, user_id');
+    if (data) setAssignments(Object.fromEntries(data.map(r => [r.field_key, r.user_id])));
   };
 
   const fetchEntry = async () => {
@@ -195,15 +209,17 @@ export default function DailyEntry({ user }) {
     const v = {};
     for (const key of LOCKABLE_KEYS) {
       const owner = owners[key];
-      // Only the field's owner (or an unclaimed field) may be written — admins
-      // are NOT exempt, matching the DB trigger that enforces the same rule.
-      const canEdit = !owner || owner === myId;
+      const assignee = assignments[key];
+      // An assigned field may only be written by its assignee; an unassigned one
+      // by its owner (or if still unclaimed). Admins are NOT exempt — this mirrors
+      // the DB trigger that enforces the same rule.
+      const canEdit = assignee ? assignee === myId : (!owner || owner === myId);
       const raw = form[key];
       const provided = raw !== '' && raw !== null && raw !== undefined;
       if (!canEdit) { v[key] = dbForm[key]; continue; }
       if (provided) {
         v[key] = key === 'notes' ? raw : num(raw);
-        if (!owner && myId) owners[key] = myId; // claim this field
+        if (myId) owners[key] = myId; // claim/record ownership
       } else {
         v[key] = key === 'notes' ? '' : 0;
         if (owner === myId) delete owners[key]; // release my own claim
@@ -338,8 +354,8 @@ export default function DailyEntry({ user }) {
           <div className="alert alert-success" style={{ marginTop: '0.5rem' }}>
             ✏️ يوجد إدخال مسبق لهذا اليوم.{' '}
             {isAdmin
-              ? 'الخانات المقفولة 🔒 أدخلها مستخدم آخر ولا يمكن تعديلها — حتى للمدير. تقدر تدخل الخانات الفارغة فقط.'
-              : 'الخانات المقفولة 🔒 أدخلها مستخدم آخر — إنت تكمّل الخانات المتاحة فقط، وعند الحفظ بيتدمج إدخالك مع الباقي.'}
+              ? 'الخانات المقفولة 🔒 مخصّصة لمستخدم آخر أو أدخلها غيرك، ولا يمكن تعديلها — حتى للمدير.'
+              : 'الخانات المقفولة 🔒 مخصّصة لغيرك أو أدخلها مستخدم آخر — إنت تدخل خاناتك فقط، وعند الحفظ بيتدمج إدخالك مع الباقي.'}
           </div>
         )}
       </div>
