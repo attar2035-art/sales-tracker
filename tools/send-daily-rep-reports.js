@@ -611,7 +611,9 @@ async function main() {
   const { data: debtEntries } = await supabase.from('daily_entries')
     .select('rep_id, entry_date, debt_total, debt_1_45, debt_over_60, debt_over_90, debt_over_120, debt_over_150')
     .lte('entry_date', REPORT_DATE)
-    .gt('debt_total', 0)
+    // Rows where debt was actually entered (owner recorded), so a rep who paid
+    // their debt down to zero shows 0 — not a stale older balance.
+    .not('field_owners->>debt_total', 'is', null)
     .order('entry_date', { ascending: false })
     .limit(20000);
   const debtByRep = {};
