@@ -161,7 +161,64 @@ const MOTIV_STYLE = {
   end: { bg: '#f8fafc', bd: '#94a3b8', fg: '#334155' },
 };
 
-function buildRepEmail(metrics, email, reportDate, remainingDays) {
+// --- Debt aging (accounts receivable) helpers ------------------------------
+const DEBT_BUCKETS = [
+  ['debt_1_45', '1-45 يوم'],
+  ['debt_over_60', 'فوق 60'],
+  ['debt_over_90', 'فوق 90'],
+  ['debt_over_120', 'فوق 120'],
+  ['debt_over_150', 'فوق 150'],
+];
+const debtPct = (part, whole) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
+const debtAgedOf = (d) => (Number(d?.debt_over_90) || 0) + (Number(d?.debt_over_120) || 0) + (Number(d?.debt_over_150) || 0);
+
+// One rep's debt aging card (skipped when the rep has no debt recorded).
+function debtBlockHtml(debt) {
+  const total = Number(debt?.debt_total) || 0;
+  if (total <= 0) return '';
+  const rows = DEBT_BUCKETS.map(([k, l]) =>
+    `<tr><td>${l}</td><td>${formatCurrency(Number(debt[k]) || 0)}</td><td>${debtPct(Number(debt[k]) || 0, total)}%</td></tr>`).join('');
+  return `
+    <div class="card">
+      <h2>أعمار الديون (المتأخرات)</h2>
+      <div class="muted">إجمالي الدين: <strong>${formatCurrency(total)}</strong>${debt.entry_date ? ` · حتى ${escapeHtml(debt.entry_date)}` : ''}</div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>الفترة</th><th>المبلغ</th><th>% من الإجمالي</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+    </div>`;
+}
+
+// Aggregate debt for a scope (all reps / a team), with per-rep breakdown.
+function debtAggregateHtml(rows, scopeLabel) {
+  const list = rows.filter(r => Number(r.debt?.debt_total) > 0);
+  if (!list.length) return '';
+  const agg = { debt_total: 0, debt_1_45: 0, debt_over_60: 0, debt_over_90: 0, debt_over_120: 0, debt_over_150: 0 };
+  for (const r of list) { agg.debt_total += Number(r.debt.debt_total) || 0; DEBT_BUCKETS.forEach(([k]) => { agg[k] += Number(r.debt[k]) || 0; }); }
+  const tiles = DEBT_BUCKETS.map(([k, l]) =>
+    `<div class="stat"><span>${l}</span><strong>${formatCurrency(agg[k])}</strong><div style="color:#3b82f6;font-size:12px;margin-top:4px">${debtPct(agg[k], agg.debt_total)}%</div></div>`).join('');
+  const repRows = [...list].sort((a, b) => (Number(b.debt.debt_total) || 0) - (Number(a.debt.debt_total) || 0))
+    .map(r => `<tr>
+        <td>${escapeHtml(r.name)}</td>
+        <td>${escapeHtml(r.region || '-')}</td>
+        <td>${formatCurrency(Number(r.debt.debt_total) || 0)}</td>
+        <td>${debtPct(Number(r.debt.debt_total) || 0, agg.debt_total)}%</td>
+        <td>${formatCurrency(debtAgedOf(r.debt))}</td>
+        <td>${debtPct(debtAgedOf(r.debt), Number(r.debt.debt_total) || 0)}%</td>
+      </tr>`).join('');
+  return `
+    <div class="card">
+      <h2>أعمار الديون — ${escapeHtml(scopeLabel)}</h2>
+      <div class="muted">إجمالي الديون: <strong>${formatCurrency(agg.debt_total)}</strong> · المتقادمة (90+): <strong>${formatCurrency(debtAgedOf(agg))}</strong> (${debtPct(debtAgedOf(agg), agg.debt_total)}%)</div>
+      <div class="grid" style="margin:12px 0">${tiles}</div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>المندوب</th><th>المنطقة</th><th>إجمالي الدين</th><th>% من ${escapeHtml(scopeLabel)}</th><th>متقادمة (90+)</th><th>% متقادم</th></tr></thead>
+        <tbody>${repRows}</tbody>
+      </table></div>
+    </div>`;
+}
+
+function buildRepEmail(metrics, email, reportDate, remainingDays, debt) {
   const { rep, yesterday, breakdown, requiredSalesDaily, requiredCollectionDaily, requiredVisitsDaily } = metrics;
   const [year, monthNum] = reportDate.split('-').map(Number);
   const fmt = (row, value) => (row.currency ? formatCurrency(value) : formatNumber(value));
@@ -253,6 +310,8 @@ function buildRepEmail(metrics, email, reportDate, remainingDays) {
       </div>
     </div>
 
+    ${debtBlockHtml(debt)}
+
     <div class="card">
       <h2>موقف الشهر حتى أمس — كل المؤشرات</h2>
       <div class="tablewrap">
@@ -331,9 +390,13 @@ function buildSupervisorMotivation(metricsList, supervisorName, remainingDays, m
 }
 
 // Aggregate report for admins (all reps) or a supervisor (their team only).
-function buildSummaryEmail({ to, scopeName, metricsList, reportDate, remainingDays, supervisorName, monthProgress }) {
+function buildSummaryEmail({ to, scopeName, metricsList, reportDate, remainingDays, supervisorName, monthProgress, debtByRep }) {
   const [year, monthNum] = reportDate.split('-').map(Number);
   const agg = aggregateMetrics(metricsList);
+  // Debt aging rows for this scope's reps (used by the debt section below).
+  const debtRows = metricsList.map(m => ({
+    name: m.rep.name, region: m.rep.regions?.name || '-', debt: (debtByRep && debtByRep[m.rep.id]) || null,
+  }));
   const rows = [...metricsList].sort((a, b) => b.month.sales - a.month.sales);
   const subject = `التقرير اليومي المجمّع - ${scopeName} - ${reportDate}`;
   const supMotivation = supervisorName ? buildSupervisorMotivation(metricsList, supervisorName, remainingDays, monthProgress) : null;
@@ -416,6 +479,8 @@ ${supMotivation ? `
         <tr><td>التحصيل</td><td>${formatCurrency(agg.month.collection)}</td><td>${formatCurrency(agg.targets.collection)}</td><td>${agg.collectionPercent}%</td></tr>
       </table>
     </div>
+
+    ${debtAggregateHtml(debtRows, scopeName)}
 
     <div class="card">
       <h2>تفصيل المناديب</h2>
@@ -540,6 +605,18 @@ async function main() {
     return computeRepMetrics({ rep, yesterdayRows, monthRows, target, remainingDays, monthProgress });
   });
 
+  // Latest debt-aging snapshot per rep (on/before the report date; the debt
+  // figures are a running balance, so the newest entry — even from an earlier
+  // month — is the current one).
+  const { data: debtEntries } = await supabase.from('daily_entries')
+    .select('rep_id, entry_date, debt_total, debt_1_45, debt_over_60, debt_over_90, debt_over_120, debt_over_150')
+    .lte('entry_date', REPORT_DATE)
+    .gt('debt_total', 0)
+    .order('entry_date', { ascending: false })
+    .limit(20000);
+  const debtByRep = {};
+  for (const d of (debtEntries || [])) { if (!debtByRep[d.rep_id]) debtByRep[d.rep_id] = d; }
+
   const outbox = [];
 
   // 1) Per-rep emails
@@ -549,7 +626,7 @@ async function main() {
       console.log(`Skipped rep ${metrics.rep.name}: no linked email`);
       continue;
     }
-    outbox.push({ ...buildRepEmail(metrics, email, REPORT_DATE, remainingDays), kind: 'rep' });
+    outbox.push({ ...buildRepEmail(metrics, email, REPORT_DATE, remainingDays, debtByRep[metrics.rep.id]), kind: 'rep' });
   }
 
   // 2) Full report (all reps) — for admins, data-entry users, AND every active
@@ -570,7 +647,7 @@ async function main() {
     console.log('No full-report recipients found (set ADMIN_REPORT_EMAILS or add an admin/data_entry role) — skipping full summary');
   } else {
     for (const to of fullReportEmails) {
-      outbox.push({ ...buildSummaryEmail({ to, scopeName: 'كل المناديب', metricsList: repMetrics, reportDate: REPORT_DATE, remainingDays }), kind: 'full' });
+      outbox.push({ ...buildSummaryEmail({ to, scopeName: 'كل المناديب', metricsList: repMetrics, reportDate: REPORT_DATE, remainingDays, debtByRep }), kind: 'full' });
     }
   }
 
@@ -584,7 +661,7 @@ async function main() {
     }
     const supervisorName = teamMetrics[0].rep.supervisors?.name || 'المشرف';
     const scopeName = `فريق ${supervisorName}`;
-    outbox.push({ ...buildSummaryEmail({ to: emailByUserId[role.user_id], scopeName, metricsList: teamMetrics, reportDate: REPORT_DATE, remainingDays, supervisorName, monthProgress }), kind: 'supervisor' });
+    outbox.push({ ...buildSummaryEmail({ to: emailByUserId[role.user_id], scopeName, metricsList: teamMetrics, reportDate: REPORT_DATE, remainingDays, supervisorName, monthProgress, debtByRep }), kind: 'supervisor' });
   }
 
   // Test mode: send one sample of each report type to a single address.
