@@ -17,6 +17,7 @@ import SupervisorRoute from './pages/SupervisorRoute';
 import SupervisorFollowup from './pages/SupervisorFollowup';
 import KnowledgeCenter from './pages/KnowledgeCenter';
 import PermissionsCenter from './pages/PermissionsCenter';
+import DebtAging from './pages/DebtAging';
 import FloatingVisitButton from './components/FloatingVisitButton';
 import InstallPrompt from './components/InstallPrompt';
 import { logAuditEvent } from './lib/audit';
@@ -27,6 +28,7 @@ const NAV_ADMIN = [
   { key: 'targets', label: 'الأهداف الشهرية', icon: '🎯' },
   { key: 'repdetails', label: 'تفاصيل المندوب', icon: '👤' },
   { key: 'supervisors', label: 'متابعة المشرفين', icon: '👔' },
+  { key: 'debt', label: 'تحليل المتأخرات', icon: '🏦' },
   { key: 'customers', label: 'العملاء', icon: '👥' },
   { key: 'analytics', label: 'تحليل العملاء', icon: '📈' },
   { key: 'segmentation', label: 'تقسيم العملاء', icon: '📊' },
@@ -66,6 +68,7 @@ const NAV_REP = [
 const NAV_MANAGER = [
   { key: 'dashboard', label: 'لوحة المتابعة', icon: '📊' },
   { key: 'supervisors', label: 'متابعة المشرفين', icon: '👔' },
+  { key: 'debt', label: 'تحليل المتأخرات', icon: '🏦' },
   { key: 'knowledge', label: 'مركز المعرفة', icon: '🧠' },
   { key: 'customers', label: 'العملاء', icon: '👥' },
   { key: 'analytics', label: 'تحليل العملاء', icon: '📈' },
@@ -186,6 +189,7 @@ export default function App() {
       // Company-wide, read-only.
       if (page === 'password') return <ChangePassword />;
       if (page === 'supervisors') return <SupervisorFollowup />;
+      if (page === 'debt') return <DebtAging />;
       if (page === 'knowledge') return <KnowledgeCenter user={user} />;
       if (page === 'customers') return <Customers user={user} />;
       if (page === 'analytics') return <CustomerAnalytics />;
@@ -208,6 +212,7 @@ export default function App() {
         case 'targets': return <Targets />;
         case 'repdetails': return <RepDetails />;
         case 'supervisors': return <SupervisorFollowup />;
+        case 'debt': return <DebtAging />;
         case 'customers': return <Customers user={user} />;
         case 'analytics': return <CustomerAnalytics />;
         case 'segmentation': return <CustomerSegmentation />;

@@ -26,6 +26,12 @@ const ASSIGNABLE_FIELDS = [
   { key: 'daily_expenses', label: 'المصروفات اليومية' },
   { key: 'overdue_total_input', label: 'إجمالي المتأخرات' },
   { key: 'overdue_collected', label: 'المحصل من المتأخرات' },
+  { key: 'debt_total', label: 'إجمالي الدين' },
+  { key: 'debt_1_45', label: 'دين ١-٤٥ يوم' },
+  { key: 'debt_over_60', label: 'دين فوق ٦٠ يوم' },
+  { key: 'debt_over_90', label: 'دين فوق ٩٠ يوم' },
+  { key: 'debt_over_120', label: 'دين فوق ١٢٠ يوم' },
+  { key: 'debt_over_150', label: 'دين فوق ١٥٠ يوم' },
   { key: 'notes', label: 'ملاحظات' },
 ];
 
