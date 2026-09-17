@@ -12,15 +12,28 @@ const EMPTY_ENTRY = {
   working_hours: '', km: '',
   daily_expenses: '',
   overdue_total_input: '', overdue_collected: '',
+  debt_total: '', debt_1_45: '', debt_over_60: '', debt_over_90: '', debt_over_120: '', debt_over_150: '',
   notes: '',
 };
+
+// Debt-aging buckets (entered per rep per day) + their labels for the form.
+const DEBT_FIELDS = [
+  { key: 'debt_total', label: 'إجمالي الدين' },
+  { key: 'debt_1_45', label: 'من ١ إلى ٤٥ يوم' },
+  { key: 'debt_over_60', label: 'فوق ٦٠ يوم' },
+  { key: 'debt_over_90', label: 'فوق ٩٠ يوم' },
+  { key: 'debt_over_120', label: 'فوق ١٢٠ يوم' },
+  { key: 'debt_over_150', label: 'فوق ١٥٠ يوم' },
+];
 
 // Entry fields that support per-field ownership/locking (form keys).
 const LOCKABLE_KEYS = [
   'daily_sales', 'daily_returns', 'daily_collection', 'new_customers', 'new_customers_value',
   'total_visits', 'shelf_photos', 'successful_visits', 'new_products_skus', 'new_products_qty',
   'new_products_availability', 'working_hours', 'km', 'daily_expenses',
-  'overdue_total_input', 'overdue_collected', 'notes',
+  'overdue_total_input', 'overdue_collected',
+  'debt_total', 'debt_1_45', 'debt_over_60', 'debt_over_90', 'debt_over_120', 'debt_over_150',
+  'notes',
 ];
 
 export default function DailyEntry({ user }) {
@@ -132,6 +145,12 @@ export default function DailyEntry({ user }) {
         daily_expenses: data.daily_expenses || '',
         overdue_total_input: data.overdue_total_input || '',
         overdue_collected: data.overdue_collected || '',
+        debt_total: data.debt_total || '',
+        debt_1_45: data.debt_1_45 || '',
+        debt_over_60: data.debt_over_60 || '',
+        debt_over_90: data.debt_over_90 || '',
+        debt_over_120: data.debt_over_120 || '',
+        debt_over_150: data.debt_over_150 || '',
         notes: data.notes || '',
       });
     } else {
@@ -161,6 +180,7 @@ export default function DailyEntry({ user }) {
       'total_visits', 'shelf_photos', 'successful_visits', 'new_products_skus',
       'new_products_qty', 'new_products_availability', 'working_hours', 'km',
       'daily_expenses', 'overdue_total_input', 'overdue_collected',
+      'debt_total', 'debt_1_45', 'debt_over_60', 'debt_over_90', 'debt_over_120', 'debt_over_150',
     ];
     const fieldErrors = {};
     // Both البيع (gross sales) and المردود (returns) are entered as non-negative
@@ -201,6 +221,9 @@ export default function DailyEntry({ user }) {
       new_products_availability: num(fresh?.new_products_availability), working_hours: num(fresh?.working_hours),
       km: num(fresh?.km), daily_expenses: num(fresh?.daily_expenses),
       overdue_total_input: num(fresh?.overdue_total_input), overdue_collected: num(fresh?.overdue_collected),
+      debt_total: num(fresh?.debt_total), debt_1_45: num(fresh?.debt_1_45),
+      debt_over_60: num(fresh?.debt_over_60), debt_over_90: num(fresh?.debt_over_90),
+      debt_over_120: num(fresh?.debt_over_120), debt_over_150: num(fresh?.debt_over_150),
       notes: fresh?.notes || '',
     };
 
@@ -247,6 +270,12 @@ export default function DailyEntry({ user }) {
       daily_expenses: v.daily_expenses,
       overdue_total_input: v.overdue_total_input,
       overdue_collected: v.overdue_collected,
+      debt_total: v.debt_total,
+      debt_1_45: v.debt_1_45,
+      debt_over_60: v.debt_over_60,
+      debt_over_90: v.debt_over_90,
+      debt_over_120: v.debt_over_120,
+      debt_over_150: v.debt_over_150,
       notes: v.notes || '',
       field_owners: owners,
       updated_at: new Date().toISOString(),
@@ -468,6 +497,38 @@ export default function DailyEntry({ user }) {
                   {overdueRemaining.toLocaleString('ar-SA')}
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* أعمار الديون (المتأخرات التفصيلية) */}
+          <div className="card">
+            <div className="card-title">🧾 أعمار الديون (المتأخرات التفصيلية)</div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '-0.25rem', marginBottom: '0.75rem' }}>
+              أدخل إجمالي دين المندوب وتوزيعه على الفترات. النسبة تحت كل خانة تُحسب من إجمالي الدين تلقائيًا.
+            </p>
+            <div className="form-grid">
+              {DEBT_FIELDS.map(f => {
+                const debtTotal = parseFloat(form.debt_total) || 0;
+                const val = parseFloat(form[f.key]) || 0;
+                const pct = f.key !== 'debt_total' && debtTotal > 0 ? Math.round((val / debtTotal) * 100) : null;
+                return (
+                  <div className="form-group" key={f.key}>
+                    <label className="form-label">{f.label}</label>
+                    <input className={errCls(f.key)} type="number" min="0" inputMode="decimal"
+                      enterKeyHint="next" data-field={f.key} disabled={isLocked(f.key)}
+                      value={form[f.key]}
+                      onChange={e => changeField(f.key, e.target.value)}
+                      placeholder="المبلغ" />
+                    {pct !== null && (
+                      <div style={{ fontSize: '0.72rem', color: '#3b82f6', marginTop: '0.25rem' }}>
+                        {pct}% من إجمالي الدين
+                      </div>
+                    )}
+                    {lockNote(f.key)}
+                    {errors[f.key] && <div className="form-error">{errors[f.key]}</div>}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
