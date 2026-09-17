@@ -40,12 +40,14 @@ export default function DebtAging() {
       supabase.from('representatives')
         .select('id, name, is_active, supervisor_id, supervisors(name), regions(name)')
         .eq('is_active', true),
-      // All rows that carry debt data, on or before the chosen date, newest first,
-      // so we can pick each rep's latest snapshot (and the one before it for the diff).
+      // Rows where debt was actually ENTERED (its owner is recorded in
+      // field_owners), on or before the chosen date, newest first — so each
+      // rep's latest snapshot is the current balance even if it was paid down
+      // to zero (a real 0 differs from "no debt entered", which we skip).
       supabase.from('daily_entries')
         .select('rep_id, entry_date, debt_total, debt_1_45, debt_over_60, debt_over_90, debt_over_120, debt_over_150')
         .lte('entry_date', asOf)
-        .gt('debt_total', 0)
+        .not('field_owners->>debt_total', 'is', null)
         .order('entry_date', { ascending: false })
         .limit(20000),
     ]);
