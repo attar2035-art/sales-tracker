@@ -19,10 +19,10 @@ const EMPTY_ENTRY = {
 // Debt-aging buckets (entered per rep per day) + their labels for the form.
 const DEBT_FIELDS = [
   { key: 'debt_total', label: 'إجمالي الدين' },
-  { key: 'debt_1_45', label: 'من ١ إلى ٤٥ يوم' },
-  { key: 'debt_over_60', label: 'فوق ٦٠ يوم' },
-  { key: 'debt_over_90', label: 'فوق ٩٠ يوم' },
-  { key: 'debt_over_120', label: 'فوق ١٢٠ يوم' },
+  { key: 'debt_1_45', label: 'من ٤٥ إلى ٦٠ يوم' },
+  { key: 'debt_over_60', label: 'من ٦١ إلى ٩٠ يوم' },
+  { key: 'debt_over_90', label: 'من ٩١ إلى ١٢٠ يوم' },
+  { key: 'debt_over_120', label: 'من ١٢١ إلى ١٥٠ يوم' },
   { key: 'debt_over_150', label: 'فوق ١٥٠ يوم' },
 ];
 

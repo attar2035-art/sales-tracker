@@ -163,10 +163,10 @@ const MOTIV_STYLE = {
 
 // --- Debt aging (accounts receivable) helpers ------------------------------
 const DEBT_BUCKETS = [
-  ['debt_1_45', '1-45 يوم'],
-  ['debt_over_60', 'فوق 60'],
-  ['debt_over_90', 'فوق 90'],
-  ['debt_over_120', 'فوق 120'],
+  ['debt_1_45', '45-60 يوم'],
+  ['debt_over_60', '61-90 يوم'],
+  ['debt_over_90', '91-120 يوم'],
+  ['debt_over_120', '121-150 يوم'],
   ['debt_over_150', 'فوق 150'],
 ];
 const debtPct = (part, whole) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
@@ -209,10 +209,10 @@ function debtAggregateHtml(rows, scopeLabel) {
   return `
     <div class="card">
       <h2>أعمار الديون — ${escapeHtml(scopeLabel)}</h2>
-      <div class="muted">إجمالي الديون: <strong>${formatCurrency(agg.debt_total)}</strong> · المتقادمة (90+): <strong>${formatCurrency(debtAgedOf(agg))}</strong> (${debtPct(debtAgedOf(agg), agg.debt_total)}%)</div>
+      <div class="muted">إجمالي الديون: <strong>${formatCurrency(agg.debt_total)}</strong> · المتقادمة (91+): <strong>${formatCurrency(debtAgedOf(agg))}</strong> (${debtPct(debtAgedOf(agg), agg.debt_total)}%)</div>
       <div class="grid" style="margin:12px 0">${tiles}</div>
       <div class="tablewrap"><table>
-        <thead><tr><th>المندوب</th><th>المنطقة</th><th>إجمالي الدين</th><th>% من ${escapeHtml(scopeLabel)}</th><th>متقادمة (90+)</th><th>% متقادم</th></tr></thead>
+        <thead><tr><th>المندوب</th><th>المنطقة</th><th>إجمالي الدين</th><th>% من ${escapeHtml(scopeLabel)}</th><th>متقادمة (91+)</th><th>% متقادم</th></tr></thead>
         <tbody>${repRows}</tbody>
       </table></div>
     </div>`;

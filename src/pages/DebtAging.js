@@ -4,13 +4,13 @@ import { formatCurrency, formatNumber } from '../lib/helpers';
 
 // Debt-aging buckets (order matters for the table columns).
 const BUCKETS = [
-  { key: 'debt_1_45', label: '١-٤٥ يوم' },
-  { key: 'debt_over_60', label: 'فوق ٦٠' },
-  { key: 'debt_over_90', label: 'فوق ٩٠' },
-  { key: 'debt_over_120', label: 'فوق ١٢٠' },
+  { key: 'debt_1_45', label: '٤٥-٦٠ يوم' },
+  { key: 'debt_over_60', label: '٦١-٩٠ يوم' },
+  { key: 'debt_over_90', label: '٩١-١٢٠ يوم' },
+  { key: 'debt_over_120', label: '١٢١-١٥٠ يوم' },
   { key: 'debt_over_150', label: 'فوق ١٥٠' },
 ];
-// "Aged" (harder) debt = everything 90 days and older.
+// "Aged" (harder) debt = everything 91 days and older.
 const AGED_KEYS = ['debt_over_90', 'debt_over_120', 'debt_over_150'];
 
 const pct = (part, whole) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
@@ -162,7 +162,7 @@ export default function DebtAging() {
               </div>}
             </div>
             <div className="card" style={{ margin: 0, background: '#fffbeb', borderInlineStart: '4px solid #f59e0b' }}>
-              <div style={{ color: '#92400e', fontWeight: 800, marginBottom: 4 }}>⏳ أكثر تأخيرًا (٩٠+ يوم)</div>
+              <div style={{ color: '#92400e', fontWeight: 800, marginBottom: 4 }}>⏳ أكثر تأخيرًا (٩١+ يوم)</div>
               {mostAged && <div style={{ fontSize: 14 }}>
                 <b>{mostAged.name}</b> — {mostAged.region}<br />
                 {formatCurrency(agedOf(mostAged))} متقادمة ({pct(agedOf(mostAged), mostAged.debt_total)}% من دينه)
@@ -212,7 +212,7 @@ export default function DebtAging() {
             <div className="table-wrapper">
               <table className="responsive-cards">
                 <thead>
-                  <tr><th>المنطقة</th><th>عدد المناديب</th><th>إجمالي الدين</th><th>% من الشركة</th><th>متقادمة (٩٠+)</th><th>% متقادم</th></tr>
+                  <tr><th>المنطقة</th><th>عدد المناديب</th><th>إجمالي الدين</th><th>% من الشركة</th><th>متقادمة (٩١+)</th><th>% متقادم</th></tr>
                 </thead>
                 <tbody>
                   {byRegion.map(g => (
@@ -221,7 +221,7 @@ export default function DebtAging() {
                       <td data-label="عدد المناديب">{formatNumber(g.reps)}</td>
                       <td data-label="إجمالي الدين"><strong>{formatCurrency(g.debt_total)}</strong></td>
                       <td data-label="% من الشركة"><span className="badge badge-info">{pct(g.debt_total, company.debt_total)}%</span></td>
-                      <td data-label="متقادمة (٩٠+)">{formatCurrency(agedOf(g))}</td>
+                      <td data-label="متقادمة (٩١+)">{formatCurrency(agedOf(g))}</td>
                       <td data-label="% متقادم">{pct(agedOf(g), g.debt_total)}%</td>
                     </tr>
                   ))}
@@ -236,7 +236,7 @@ export default function DebtAging() {
             <div className="table-wrapper">
               <table className="responsive-cards">
                 <thead>
-                  <tr><th>المشرف</th><th>عدد المناديب</th><th>إجمالي الدين</th><th>% من الشركة</th><th>متقادمة (٩٠+)</th><th>% متقادم</th></tr>
+                  <tr><th>المشرف</th><th>عدد المناديب</th><th>إجمالي الدين</th><th>% من الشركة</th><th>متقادمة (٩١+)</th><th>% متقادم</th></tr>
                 </thead>
                 <tbody>
                   {bySupervisor.map(g => (
@@ -245,7 +245,7 @@ export default function DebtAging() {
                       <td data-label="عدد المناديب">{formatNumber(g.reps)}</td>
                       <td data-label="إجمالي الدين"><strong>{formatCurrency(g.debt_total)}</strong></td>
                       <td data-label="% من الشركة"><span className="badge badge-info">{pct(g.debt_total, company.debt_total)}%</span></td>
-                      <td data-label="متقادمة (٩٠+)">{formatCurrency(agedOf(g))}</td>
+                      <td data-label="متقادمة (٩١+)">{formatCurrency(agedOf(g))}</td>
                       <td data-label="% متقادم">{pct(agedOf(g), g.debt_total)}%</td>
                     </tr>
                   ))}
