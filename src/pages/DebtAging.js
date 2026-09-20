@@ -30,6 +30,8 @@ export default function DebtAging() {
   const [reps, setReps] = useState([]);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(false);
+  // Which bucket box is expanded to show its per-rep breakdown.
+  const [openBucket, setOpenBucket] = useState(null);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [asOf]);
@@ -141,29 +143,77 @@ export default function DebtAging() {
           {/* Company summary */}
           <div className="card">
             <div className="card-title">إجمالي ديون الشركة — {formatCurrency(company.debt_total)}</div>
+            <p style={{ fontSize: 12, color: 'var(--text-muted, #64748b)', marginTop: '-0.25rem', marginBottom: '0.75rem' }}>
+              اضغط أي فترة لعرض تفاصيل المبالغ — مين عليه كام.
+            </p>
             <div className="form-grid">
-              {BUCKETS.map(b => (
-                <div key={b.key} className="stat" style={{ border: '1px solid var(--border, #e2e8f0)', borderRadius: 10, padding: 12, background: 'var(--surface-2, #f8fafc)' }}>
-                  <span style={{ display: 'block', color: '#64748b', fontSize: 13, marginBottom: 6 }}>{b.label}</span>
-                  <strong style={{ fontSize: 18 }}>{formatCurrency(company[b.key])}</strong>
-                  <div style={{ fontSize: 12, color: '#3b82f6', marginTop: 4 }}>{pct(company[b.key], company.debt_total)}% من الإجمالي</div>
-                </div>
-              ))}
+              {BUCKETS.map(b => {
+                const active = openBucket === b.key;
+                return (
+                  <div key={b.key} role="button" tabIndex={0}
+                    onClick={() => setOpenBucket(active ? null : b.key)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenBucket(active ? null : b.key); } }}
+                    style={{
+                      cursor: 'pointer', border: `1px solid ${active ? '#2563eb' : '#e2e8f0'}`,
+                      borderRadius: 10, padding: 12, background: active ? '#eff6ff' : '#ffffff',
+                      boxShadow: active ? '0 0 0 2px #bfdbfe' : 'none', textAlign: 'center',
+                    }}>
+                    <span style={{ display: 'block', color: '#64748b', fontSize: 13, marginBottom: 6 }}>{b.label}</span>
+                    <strong style={{ fontSize: 19, color: '#0f172a' }}>{formatCurrency(company[b.key])}</strong>
+                    <div style={{ fontSize: 12, color: '#2563eb', marginTop: 4, fontWeight: 700 }}>{pct(company[b.key], company.debt_total)}% من الإجمالي</div>
+                  </div>
+                );
+              })}
             </div>
           </div>
+
+          {/* Bucket breakdown (who owes what in the selected period) */}
+          {openBucket && (() => {
+            const label = BUCKETS.find(b => b.key === openBucket)?.label || '';
+            const bucketTotal = company[openBucket] || 0;
+            const list = rows.map(r => ({ name: r.name, region: r.region, supervisor: r.supervisor, amount: r[openBucket] }))
+              .filter(x => x.amount > 0).sort((a, b) => b.amount - a.amount);
+            return (
+              <div className="card" style={{ borderInlineStart: '4px solid #2563eb' }}>
+                <div className="card-title">تفاصيل «{label}» — عند مين ({formatCurrency(bucketTotal)})</div>
+                {list.length === 0 ? (
+                  <div style={{ color: '#64748b', fontSize: 14 }}>لا توجد مبالغ في هذه الفترة.</div>
+                ) : (
+                  <div className="table-wrapper">
+                    <table className="responsive-cards">
+                      <thead>
+                        <tr><th>المندوب</th><th>المنطقة</th><th>المشرف</th><th>المبلغ</th><th>% من الفترة</th></tr>
+                      </thead>
+                      <tbody>
+                        {list.map(x => (
+                          <tr key={x.name}>
+                            <td data-label="المندوب"><strong>{x.name}</strong></td>
+                            <td data-label="المنطقة">{x.region}</td>
+                            <td data-label="المشرف">{x.supervisor}</td>
+                            <td data-label="المبلغ"><strong>{formatCurrency(x.amount)}</strong></td>
+                            <td data-label="% من الفترة">{pct(x.amount, bucketTotal)}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Highlights */}
           <div className="form-grid" style={{ marginBottom: '1rem' }}>
             <div className="card" style={{ margin: 0, background: '#fef2f2', borderInlineStart: '4px solid #ef4444' }}>
               <div style={{ color: '#991b1b', fontWeight: 800, marginBottom: 4 }}>🔺 أعلى مديونية</div>
-              {topDebtor && <div style={{ fontSize: 14 }}>
+              {topDebtor && <div style={{ fontSize: 14, color: '#7f1d1d' }}>
                 <b>{topDebtor.name}</b> — {topDebtor.region}<br />
                 {formatCurrency(topDebtor.debt_total)} ({pct(topDebtor.debt_total, company.debt_total)}% من الشركة)
               </div>}
             </div>
             <div className="card" style={{ margin: 0, background: '#fffbeb', borderInlineStart: '4px solid #f59e0b' }}>
               <div style={{ color: '#92400e', fontWeight: 800, marginBottom: 4 }}>⏳ أكثر تأخيرًا (٩١+ يوم)</div>
-              {mostAged && <div style={{ fontSize: 14 }}>
+              {mostAged && <div style={{ fontSize: 14, color: '#78350f' }}>
                 <b>{mostAged.name}</b> — {mostAged.region}<br />
                 {formatCurrency(agedOf(mostAged))} متقادمة ({pct(agedOf(mostAged), mostAged.debt_total)}% من دينه)
               </div>}
