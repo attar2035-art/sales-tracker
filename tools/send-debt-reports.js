@@ -61,12 +61,12 @@ const STYLE = `
   .head{background:linear-gradient(135deg,#0f172a,#1e3a5f);color:#fff;border-radius:14px 14px 0 0;padding:22px 24px}
   .head h1{margin:0;font-size:20px}.head .sub{color:#cbd5e1;font-size:13px;margin-top:6px}
   .body{background:#fff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 14px 14px;padding:22px}
-  .total{background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:16px;text-align:center;margin-bottom:16px}
-  .total .lbl{color:#9a3412;font-size:13px}.total .val{color:#c2410c;font-size:30px;font-weight:800;margin-top:4px}
-  .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px}
-  .b{border:1px solid #e2e8f0;border-radius:10px;padding:10px;text-align:center;background:#f8fafc}
-  .b .l{color:#64748b;font-size:11px;display:block;margin-bottom:4px;min-height:28px}
-  .b .v{font-size:14px;font-weight:700}.b .p{color:#2563eb;font-size:12px;margin-top:2px}
+  .total{background:#fff7ed;border:1px solid #fed7aa;border-radius:14px;padding:20px;text-align:center;margin-bottom:18px}
+  .total .lbl{color:#9a3412;font-size:14px}.total .val{color:#c2410c;font-size:34px;font-weight:800;margin-top:6px}
+  .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px}
+  .b{border:1px solid #e2e8f0;border-radius:12px;padding:16px 10px;text-align:center;background:#f8fafc}
+  .b .l{color:#64748b;font-size:12px;display:block;margin-bottom:8px;min-height:32px}
+  .b .v{font-size:19px;font-weight:800}.b .p{color:#2563eb;font-size:13px;margin-top:4px;font-weight:700}
   .aged{background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:12px;color:#991b1b;font-size:14px;margin-bottom:16px}
   h2{font-size:15px;margin:18px 0 10px;color:#1e3a5f}
   table{width:100%;border-collapse:collapse;font-size:13px}
@@ -74,10 +74,19 @@ const STYLE = `
   thead th{background:#f1f5f9;color:#334155}
   tr.tot td{background:#f8fafc;font-weight:800}
   .tw{overflow-x:auto}
+  .ranks{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:8px}
+  .rc{border:1px solid #e2e8f0;border-radius:14px;padding:16px;background:#fff}
+  .rc.top{border-color:#fdba74;background:#fff7ed}
+  .rc .rk{display:inline-block;background:#1e3a5f;color:#fff;border-radius:8px;padding:3px 10px;font-size:12px;font-weight:800}
+  .rc.top .rk{background:#ea580c}
+  .rc .nm{font-weight:800;font-size:16px;margin:10px 0 2px}
+  .rc .rg{color:#64748b;font-size:12px}
+  .rc .amt{font-size:28px;font-weight:800;color:#c2410c;margin:10px 0 6px}
+  .rc .meta{font-size:12px;color:#475569;line-height:1.9}
   .up{color:#ef4444;font-weight:700}.dn{color:#10b981;font-weight:700}.flat{color:#94a3b8}
   .btn{display:inline-block;background:#2563eb;color:#fff;text-decoration:none;border-radius:10px;padding:11px 18px;font-weight:700;margin-top:14px}
   .foot{text-align:center;color:#94a3b8;font-size:12px;padding:14px}
-  @media(max-width:560px){.grid{grid-template-columns:1fr 1fr}}`;
+  @media(max-width:560px){.grid{grid-template-columns:1fr 1fr}.ranks{grid-template-columns:1fr}}`;
 
 const shell = (title, sub, inner) => `<!doctype html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8"/><style>${STYLE}</style></head>
@@ -105,21 +114,21 @@ const changeCell = (change) => {
     : `<span class="dn">▼ ${formatCurrency(Math.abs(change))}</span>`;
 };
 
-// A per-rep table (name/region/total/%/aged) for a scope; `share` divides by scope total.
-function repTable(rows, scopeTotal, { showRegion = true } = {}) {
-  const body = [...rows].sort((a, b) => n(b.d.debt_total) - n(a.d.debt_total)).map(r => `
-    <tr>
-      <td><b>${escapeHtml(r.name)}</b></td>
-      ${showRegion ? `<td>${escapeHtml(r.region || '-')}</td>` : ''}
-      <td>${formatCurrency(n(r.d.debt_total))}</td>
-      <td>${pct(n(r.d.debt_total), scopeTotal)}%</td>
-      <td>${formatCurrency(agedOf(r.d))}</td>
-      <td>${pct(agedOf(r.d), n(r.d.debt_total))}%</td>
-      <td>${changeCell(r.change)}</td>
-    </tr>`).join('');
-  return `<div class="tw"><table>
-    <thead><tr><th>المندوب</th>${showRegion ? '<th>المنطقة</th>' : ''}<th>إجمالي الدين</th><th>% من الإجمالي</th><th>متقادمة (٩١+)</th><th>% متقادم</th><th>التغيّر</th></tr></thead>
-    <tbody>${body}</tbody></table></div>`;
+// Big ranked cards for the reps in a scope — highest debt first.
+function rankCards(rows, scopeTotal) {
+  const sorted = [...rows].sort((a, b) => n(b.d.debt_total) - n(a.d.debt_total));
+  const cards = sorted.map((r, i) => `
+    <div class="rc${i < 3 ? ' top' : ''}">
+      <span class="rk">#${i + 1}</span>
+      <div class="nm">${escapeHtml(r.name)}</div>
+      <div class="rg">${escapeHtml(r.region || '-')}</div>
+      <div class="amt">${formatCurrency(n(r.d.debt_total))}</div>
+      <div class="meta">
+        ${pct(n(r.d.debt_total), scopeTotal)}% من الإجمالي · متقادمة (٩١+) ${pct(agedOf(r.d), n(r.d.debt_total))}%<br/>
+        التغيّر عن آخر إدخال: ${changeCell(r.change)}
+      </div>
+    </div>`).join('');
+  return `<div class="ranks">${cards}</div>`;
 }
 
 // Aggregate rows by a key (region/supervisor) into a summary table.
@@ -162,7 +171,7 @@ function scopeDebtEmail(to, title, subtitle, rows, date, { byRegion = false, byS
   let inner = totalsBlock(agg);
   if (byRegion) inner += groupTable(rows, 'region', 'المنطقة', agg.debt_total);
   if (bySupervisor) inner += groupTable(rows, 'supervisor', 'المشرف', agg.debt_total);
-  inner += `<h2>تفصيل المناديب (الأعلى مديونية أولًا)</h2>` + repTable(rows, agg.debt_total);
+  inner += `<h2>المناديب — الأعلى مديونية أولًا</h2>` + rankCards(rows, agg.debt_total);
   return { to, subject: `${title} — ${date}`, html: shell(title, `${subtitle} · ${date}`, inner), kind: bySupervisor ? 'company' : 'supervisor' };
 }
 
