@@ -187,6 +187,15 @@ export default function DailyEntry({ user }) {
     if (availability > 100) fieldErrors.new_products_availability = 'النسبة يجب أن تكون بين 0 و 100';
     if (successfulVisits > totalVisits) fieldErrors.successful_visits = 'لا يمكن أن تتجاوز إجمالي الزيارات';
     if (shelfPhotos > totalVisits) fieldErrors.shelf_photos = 'لا يمكن أن يتجاوز عدد الزيارات';
+    // Debt aging: the aging buckets are parts of the total debt, so their sum
+    // can never exceed إجمالي الدين. This catches mis-typed figures (e.g. a
+    // bucket larger than the whole debt).
+    const debtBucketsSum = ['debt_1_45', 'debt_over_60', 'debt_over_90', 'debt_over_120', 'debt_over_150']
+      .reduce((s, k) => s + (parseFloat(form[k]) || 0), 0);
+    const debtTotalVal = parseFloat(form.debt_total) || 0;
+    if (debtBucketsSum > debtTotalVal) {
+      fieldErrors.debt_total = `مجموع فترات التأخير (${debtBucketsSum.toLocaleString('en')}) أكبر من إجمالي الدين — راجع الأرقام`;
+    }
     if (Object.keys(fieldErrors).length > 0) {
       setErrors(fieldErrors);
       showMsg('صحّح الحقول المميّزة بالأحمر', 'error');
