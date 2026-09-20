@@ -25,9 +25,11 @@ const DEBT_FIELDS = [
   { key: 'debt_over_150', label: 'فوق ١٥٠ يوم' },
 ];
 const DEBT_KEYS = DEBT_FIELDS.map(f => f.key);
-// Debt boxes accept a "+"-sum so merged regions can be typed as two numbers
-// (e.g. "5000+3000") and stored as one total. Only digits and "+" are allowed.
-const sumExpr = (raw) => String(raw ?? '').split('+').reduce((a, p) => a + (parseInt(p.trim(), 10) || 0), 0);
+// Money fields that also accept a "+"-sum for merged regions (Amira's fields).
+const SUM_KEYS = [...DEBT_KEYS, 'daily_sales', 'daily_returns', 'daily_collection'];
+// A box may hold a "+"-sum so merged regions can be typed as two numbers
+// (e.g. "5000+3000") and stored as one total.
+const sumExpr = (raw) => String(raw ?? '').split('+').reduce((a, p) => a + (parseFloat(p.trim()) || 0), 0);
 
 // Entry fields that support per-field ownership/locking (form keys).
 const LOCKABLE_KEYS = [
@@ -249,7 +251,7 @@ export default function DailyEntry({ user }) {
       const provided = raw !== '' && raw !== null && raw !== undefined;
       if (!canEdit) { v[key] = dbForm[key]; continue; }
       if (provided) {
-        v[key] = key === 'notes' ? raw : (DEBT_KEYS.includes(key) ? sumExpr(raw) : num(raw));
+        v[key] = key === 'notes' ? raw : (SUM_KEYS.includes(key) ? sumExpr(raw) : num(raw));
         if (myId) owners[key] = myId; // claim/record ownership
       } else {
         v[key] = key === 'notes' ? '' : 0;
@@ -320,7 +322,7 @@ export default function DailyEntry({ user }) {
   const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
 
   // Live net sales = gross sales − returns (negative when it's a returns-only day).
-  const netSales = (parseFloat(form.daily_sales) || 0) - (parseFloat(form.daily_returns) || 0);
+  const netSales = sumExpr(form.daily_sales) - sumExpr(form.daily_returns);
 
   const shelfPhotosMissing = Math.max(0,
     (parseInt(form.total_visits) || 0) - (parseInt(form.shelf_photos) || 0)
@@ -408,6 +410,19 @@ export default function DailyEntry({ user }) {
                       }}>
                         {netSales.toLocaleString('ar-EG')}{netSales < 0 ? ' (مرتجع صافي)' : ''}
                       </div>
+                    ) : SUM_KEYS.includes(f.key) ? (
+                      <>
+                        <input className={errCls(f.key)} type="text" inputMode="decimal"
+                          enterKeyHint="next" data-field={f.key} disabled={isLocked(f.key)}
+                          value={form[f.key]}
+                          onChange={e => changeField(f.key, e.target.value.replace(/[^0-9.+ ]/g, ''))}
+                          placeholder={f.placeholder} />
+                        {String(form[f.key] || '').includes('+') && (
+                          <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '0.25rem', fontWeight: 700 }}>
+                            = {sumExpr(form[f.key]).toLocaleString('en')}
+                          </div>
+                        )}
+                      </>
                     ) : (
                       <input className={errCls(f.key)} type="number" min="0" inputMode="decimal"
                         enterKeyHint="next" data-field={f.key} disabled={isLocked(f.key)}
