@@ -135,7 +135,7 @@ export default function DebtAging() {
       const target = Number(tMap[r.repId]?.target_collection) || 0;
       const collected = collByRep[r.repId] || 0;
       const remaining = Math.max(0, target - collected);
-      const arrears = r.debt_total;
+      const arrears = dueOf(r); // المستحق تحصيله (61+ days) — the collectable pool
       return { ...r, target, collected, remaining, arrears };
     }).filter(x => x.target > 0);
     const totals = list.reduce((a, x) => {
@@ -276,15 +276,15 @@ export default function DebtAging() {
               <p style={{ fontSize: 12, color: 'var(--text-muted, #64748b)', marginTop: '-0.25rem', marginBottom: '0.75rem' }}>
                 «المطلوب تحصيله» = المتبقي على هدف التحصيل الشهري. حصّله من المتأخرات بالأولوية للأقدم (فوق ١٥٠ ← ١٢١-١٥٠ ← …).
                 إجمالي الشركة: هدف {formatCurrency(coverage.totals.target)} · محصّل {formatCurrency(coverage.totals.collected)} ·
-                متأخرات متاحة {formatCurrency(coverage.totals.arrears)}
-                {coverage.totals.remaining > 0 ? ` (تغطي ${pct(coverage.totals.arrears, coverage.totals.remaining)}% من المطلوب)` : ' — الهدف مغطّى ✅'}.
+                المستحق تحصيله (٦١+) {formatCurrency(coverage.totals.arrears)}
+                {coverage.totals.remaining > 0 ? ` (يغطّي ${pct(coverage.totals.arrears, coverage.totals.remaining)}% من المطلوب)` : ' — الهدف مغطّى ✅'}.
               </p>
               <div className="table-wrapper">
                 <table className="responsive-cards">
                   <thead>
                     <tr>
                       <th>المندوب</th><th>المنطقة</th><th>هدف التحصيل</th><th>المحصّل</th>
-                      <th>المطلوب تحصيله</th><th>المتأخرات المتاحة</th><th>الحالة</th>
+                      <th>المطلوب تحصيله</th><th>المستحق تحصيله (٦١+)</th><th>الحالة</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -297,7 +297,7 @@ export default function DebtAging() {
                           <td data-label="هدف التحصيل">{formatCurrency(x.target)}</td>
                           <td data-label="المحصّل">{formatCurrency(x.collected)}</td>
                           <td data-label="المطلوب تحصيله"><strong style={{ color: x.remaining > 0 ? '#b45309' : '#166534' }}>{formatCurrency(x.remaining)}</strong></td>
-                          <td data-label="المتأخرات المتاحة">{formatCurrency(x.arrears)}</td>
+                          <td data-label="المستحق تحصيله (٦١+)"><strong style={{ color: '#dc2626', fontSize: '1.05rem' }}>{formatCurrency(x.arrears)}</strong></td>
                           <td data-label="الحالة"><span style={{ color: st.color, fontWeight: 700 }}>{st.txt}</span></td>
                         </tr>
                       );
