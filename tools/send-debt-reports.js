@@ -114,9 +114,9 @@ const changeCell = (change) => {
     : `<span class="dn">▼ ${formatCurrency(Math.abs(change))}</span>`;
 };
 
-// Big ranked cards for the reps in a scope — highest debt first.
+// Big ranked cards for the reps in a scope — most overdue (91+) first.
 function rankCards(rows, scopeTotal) {
-  const sorted = [...rows].sort((a, b) => n(b.d.debt_total) - n(a.d.debt_total));
+  const sorted = [...rows].sort((a, b) => agedOf(b.d) - agedOf(a.d));
   const cards = sorted.map((r, i) => `
     <div class="rc${i < 3 ? ' top' : ''}">
       <span class="rk">#${i + 1}</span>
@@ -171,7 +171,7 @@ function scopeDebtEmail(to, title, subtitle, rows, date, { byRegion = false, byS
   let inner = totalsBlock(agg);
   if (byRegion) inner += groupTable(rows, 'region', 'المنطقة', agg.debt_total);
   if (bySupervisor) inner += groupTable(rows, 'supervisor', 'المشرف', agg.debt_total);
-  inner += `<h2>المناديب — الأعلى مديونية أولًا</h2>` + rankCards(rows, agg.debt_total);
+  inner += `<h2>المناديب — الأكثر تأخيرًا أولًا (٩١+ يوم)</h2>` + rankCards(rows, agg.debt_total);
   return { to, subject: `${title} — ${date}`, html: shell(title, `${subtitle} · ${date}`, inner), kind: bySupervisor ? 'company' : 'supervisor' };
 }
 

@@ -222,18 +222,18 @@ export default function DebtAging() {
 
           {/* Per-rep table */}
           <div className="card">
-            <div className="card-title">تفصيل المناديب (الأعلى مديونية أولًا)</div>
+            <div className="card-title">تفصيل المناديب (الأكثر تأخيرًا أولًا — ٩١+ يوم)</div>
             <div className="table-wrapper">
               <table className="responsive-cards">
                 <thead>
                   <tr>
                     <th>المندوب</th><th>المنطقة</th><th>المشرف</th><th>إجمالي الدين</th>
                     {BUCKETS.map(b => <th key={b.key}>{b.label}</th>)}
-                    <th>التغيّر</th>
+                    <th>متقادمة (٩١+)</th><th>التغيّر</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map(r => (
+                  {[...rows].sort((a, b) => agedOf(b) - agedOf(a)).map(r => (
                     <tr key={r.repId}>
                       <td data-label="المندوب"><strong>{r.name}</strong></td>
                       <td data-label="المنطقة">{r.region}</td>
@@ -245,6 +245,9 @@ export default function DebtAging() {
                           <div style={{ fontSize: 11, color: '#94a3b8' }}>{pct(r[b.key], r.debt_total)}%</div>
                         </td>
                       ))}
+                      <td data-label="متقادمة (٩١+)"><strong style={{ color: '#b45309' }}>{formatCurrency(agedOf(r))}</strong>
+                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{pct(agedOf(r), r.debt_total)}%</div>
+                      </td>
                       <td data-label="التغيّر">{changeCell(r.change)}</td>
                     </tr>
                   ))}
