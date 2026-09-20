@@ -49,9 +49,12 @@ const DEBT_BUCKETS = [
   ['debt_over_150', 'فوق ١٥٠ يوم'],
 ];
 const AGED_KEYS = ['debt_over_90', 'debt_over_120', 'debt_over_150'];
+// "Due to collect" = from 61 days and up (excludes the 45-60 bucket).
+const DUE_KEYS = ['debt_over_60', 'debt_over_90', 'debt_over_120', 'debt_over_150'];
 const pct = (p, w) => (w > 0 ? Math.round((p / w) * 100) : 0);
 const n = (v) => Number(v) || 0;
 const agedOf = (d) => AGED_KEYS.reduce((s, k) => s + n(d[k]), 0);
+const dueOf = (d) => DUE_KEYS.reduce((s, k) => s + n(d[k]), 0);
 const emptyDebt = () => ({ debt_total: 0, debt_1_45: 0, debt_over_60: 0, debt_over_90: 0, debt_over_120: 0, debt_over_150: 0 });
 const addDebt = (acc, d) => { acc.debt_total += n(d.debt_total); DEBT_BUCKETS.forEach(([k]) => { acc[k] += n(d[k]); }); return acc; };
 
@@ -102,6 +105,7 @@ function totalsBlock(agg) {
     `<div class="b"><span class="l">${l}</span><span class="v">${formatCurrency(agg[k])}</span><div class="p">${pct(agg[k], agg.debt_total)}%</div></div>`).join('');
   return `
     <div class="total"><div class="lbl">إجمالي الدين</div><div class="val">${formatCurrency(agg.debt_total)}</div></div>
+    <div class="aged" style="background:#fff7ed;border-color:#fed7aa;color:#9a3412">💰 المبلغ المستحق تحصيله (من ٦١ يوم فأكثر): <b>${formatCurrency(dueOf(agg))}</b> — ${pct(dueOf(agg), agg.debt_total)}% من إجمالي الدين</div>
     <div class="grid">${tiles}</div>
     <div class="aged">⏳ الديون المتقادمة (٩١+ يوم): <b>${formatCurrency(agedOf(agg))}</b> — ${pct(agedOf(agg), agg.debt_total)}% من إجمالي الدين</div>`;
 }

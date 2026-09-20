@@ -530,6 +530,13 @@ export default function DailyEntry({ user }) {
                 );
               })}
             </div>
+            {/* Computed: due-to-collect = from 61 days up (excludes 45-60). */}
+            <div style={{ marginTop: '0.75rem', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+              <span style={{ color: '#9a3412', fontWeight: 700 }}>💰 المبلغ المستحق تحصيله (من ٦١ يوم فأكثر)</span>
+              <strong style={{ color: '#c2410c', fontSize: '1.15rem' }}>
+                {(sumExpr(form.debt_over_60) + sumExpr(form.debt_over_90) + sumExpr(form.debt_over_120) + sumExpr(form.debt_over_150)).toLocaleString('en')}
+              </strong>
+            </div>
           </div>
 
           <div className="card">
