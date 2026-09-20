@@ -11,7 +11,6 @@ const EMPTY_ENTRY = {
   new_products_availability: '',
   working_hours: '', km: '',
   daily_expenses: '',
-  overdue_total_input: '', overdue_collected: '',
   debt_total: '', debt_1_45: '', debt_over_60: '', debt_over_90: '', debt_over_120: '', debt_over_150: '',
   notes: '',
 };
@@ -31,7 +30,6 @@ const LOCKABLE_KEYS = [
   'daily_sales', 'daily_returns', 'daily_collection', 'new_customers', 'new_customers_value',
   'total_visits', 'shelf_photos', 'successful_visits', 'new_products_skus', 'new_products_qty',
   'new_products_availability', 'working_hours', 'km', 'daily_expenses',
-  'overdue_total_input', 'overdue_collected',
   'debt_total', 'debt_1_45', 'debt_over_60', 'debt_over_90', 'debt_over_120', 'debt_over_150',
   'notes',
 ];
@@ -143,8 +141,6 @@ export default function DailyEntry({ user }) {
         working_hours: data.working_hours || '',
         km: data.km || '',
         daily_expenses: data.daily_expenses || '',
-        overdue_total_input: data.overdue_total_input || '',
-        overdue_collected: data.overdue_collected || '',
         debt_total: data.debt_total || '',
         debt_1_45: data.debt_1_45 || '',
         debt_over_60: data.debt_over_60 || '',
@@ -179,7 +175,7 @@ export default function DailyEntry({ user }) {
       'daily_sales', 'daily_returns', 'daily_collection', 'new_customers', 'new_customers_value',
       'total_visits', 'shelf_photos', 'successful_visits', 'new_products_skus',
       'new_products_qty', 'new_products_availability', 'working_hours', 'km',
-      'daily_expenses', 'overdue_total_input', 'overdue_collected',
+      'daily_expenses',
       'debt_total', 'debt_1_45', 'debt_over_60', 'debt_over_90', 'debt_over_120', 'debt_over_150',
     ];
     const fieldErrors = {};
@@ -220,7 +216,6 @@ export default function DailyEntry({ user }) {
       new_products_skus: num(fresh?.new_products_skus), new_products_qty: num(fresh?.new_products_qty),
       new_products_availability: num(fresh?.new_products_availability), working_hours: num(fresh?.working_hours),
       km: num(fresh?.km), daily_expenses: num(fresh?.daily_expenses),
-      overdue_total_input: num(fresh?.overdue_total_input), overdue_collected: num(fresh?.overdue_collected),
       debt_total: num(fresh?.debt_total), debt_1_45: num(fresh?.debt_1_45),
       debt_over_60: num(fresh?.debt_over_60), debt_over_90: num(fresh?.debt_over_90),
       debt_over_120: num(fresh?.debt_over_120), debt_over_150: num(fresh?.debt_over_150),
@@ -268,8 +263,6 @@ export default function DailyEntry({ user }) {
       working_hours: v.working_hours,
       km: v.km,
       daily_expenses: v.daily_expenses,
-      overdue_total_input: v.overdue_total_input,
-      overdue_collected: v.overdue_collected,
       debt_total: v.debt_total,
       debt_1_45: v.debt_1_45,
       debt_over_60: v.debt_over_60,
@@ -314,10 +307,6 @@ export default function DailyEntry({ user }) {
 
   // Live net sales = gross sales − returns (negative when it's a returns-only day).
   const netSales = (parseFloat(form.daily_sales) || 0) - (parseFloat(form.daily_returns) || 0);
-
-  const overdueRemaining = Math.max(0,
-    (parseFloat(form.overdue_total_input) || 0) - (parseFloat(form.overdue_collected) || 0)
-  );
 
   const shelfPhotosMissing = Math.max(0,
     (parseInt(form.total_visits) || 0) - (parseInt(form.shelf_photos) || 0)
@@ -463,39 +452,6 @@ export default function DailyEntry({ user }) {
                   placeholder="عدد" />
                 {lockNote('successful_visits')}
                 {errors.successful_visits && <div className="form-error">{errors.successful_visits}</div>}
-              </div>
-            </div>
-          </div>
-
-          {/* المتأخرات */}
-          <div className="card">
-            <div className="card-title">⚠️ المتأخرات</div>
-            <div className="form-grid">
-              <div className="form-group">
-                <label className="form-label">إجمالي المتأخرات فوق 60 يوم</label>
-                <input className={errCls('overdue_total_input')} type="number" min="0" inputMode="decimal"
-                  enterKeyHint="next" data-field="overdue_total_input" disabled={isLocked('overdue_total_input')}
-                  value={form.overdue_total_input}
-                  onChange={e => changeField('overdue_total_input', e.target.value)}
-                  placeholder="المبلغ" />
-                {lockNote('overdue_total_input')}
-                {errors.overdue_total_input && <div className="form-error">{errors.overdue_total_input}</div>}
-              </div>
-              <div className="form-group">
-                <label className="form-label">المحصل من المتأخرات اليوم</label>
-                <input className={errCls('overdue_collected')} type="number" min="0" inputMode="decimal"
-                  enterKeyHint="done" data-field="overdue_collected" disabled={isLocked('overdue_collected')}
-                  value={form.overdue_collected}
-                  onChange={e => changeField('overdue_collected', e.target.value)}
-                  placeholder="المبلغ" />
-                {lockNote('overdue_collected')}
-                {errors.overdue_collected && <div className="form-error">{errors.overdue_collected}</div>}
-              </div>
-              <div className="form-group">
-                <label className="form-label">المتبقي من المتأخرات</label>
-                <div className="form-input" style={{ color: overdueRemaining > 0 ? '#ef4444' : '#10b981', fontWeight: 700 }}>
-                  {overdueRemaining.toLocaleString('ar-SA')}
-                </div>
               </div>
             </div>
           </div>
