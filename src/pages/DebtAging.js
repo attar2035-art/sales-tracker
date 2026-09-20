@@ -13,6 +13,10 @@ const BUCKETS = [
 ];
 // "Aged" (harder) debt = everything 91 days and older.
 const AGED_KEYS = ['debt_over_90', 'debt_over_120', 'debt_over_150'];
+// "Due to collect" = everything from 61 days and up (61-90 → 150+), excluding
+// the 45-60 bucket. This is the actionable overdue amount.
+const DUE_KEYS = ['debt_over_60', 'debt_over_90', 'debt_over_120', 'debt_over_150'];
+const dueOf = (o) => DUE_KEYS.reduce((s, k) => s + (Number(o[k]) || 0), 0);
 
 const pct = (part, whole) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
 const emptyBuckets = () => ({ debt_total: 0, debt_1_45: 0, debt_over_60: 0, debt_over_90: 0, debt_over_120: 0, debt_over_150: 0 });
@@ -180,6 +184,12 @@ export default function DebtAging() {
           {/* Company summary */}
           <div className="card">
             <div className="card-title">إجمالي ديون الشركة — {formatCurrency(company.debt_total)}</div>
+            <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '12px 14px', marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+              <span style={{ color: '#9a3412', fontWeight: 800, fontSize: 15 }}>💰 المبلغ المستحق تحصيله (من ٦١ يوم فأكثر)</span>
+              <span style={{ color: '#c2410c', fontWeight: 800, fontSize: 22 }}>{formatCurrency(dueOf(company))}
+                <span style={{ fontSize: 12, fontWeight: 700, marginInlineStart: 6 }}>({pct(dueOf(company), company.debt_total)}% من الإجمالي)</span>
+              </span>
+            </div>
             <p style={{ fontSize: 12, color: 'var(--text-muted, #64748b)', marginTop: '-0.25rem', marginBottom: '0.75rem' }}>
               اضغط أي فترة لعرض تفاصيل المبالغ — مين عليه كام.
             </p>
@@ -305,7 +315,7 @@ export default function DebtAging() {
               <table className="responsive-cards">
                 <thead>
                   <tr>
-                    <th>المندوب</th><th>المنطقة</th><th>المشرف</th><th>إجمالي الدين</th>
+                    <th>المندوب</th><th>المنطقة</th><th>المشرف</th><th>إجمالي الدين</th><th>المستحق تحصيله (٦١+)</th>
                     {BUCKETS.map(b => <th key={b.key}>{b.label}</th>)}
                     <th>متقادمة (٩١+)</th><th>التغيّر</th>
                   </tr>
@@ -317,6 +327,7 @@ export default function DebtAging() {
                       <td data-label="المنطقة">{r.region}</td>
                       <td data-label="المشرف">{r.supervisor}</td>
                       <td data-label="إجمالي الدين"><strong>{formatCurrency(r.debt_total)}</strong></td>
+                      <td data-label="المستحق تحصيله (٦١+)"><strong style={{ color: '#c2410c' }}>{formatCurrency(dueOf(r))}</strong></td>
                       {BUCKETS.map(b => (
                         <td key={b.key} data-label={b.label}>
                           {formatCurrency(r[b.key])}
