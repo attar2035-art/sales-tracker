@@ -24,8 +24,6 @@ const ASSIGNABLE_FIELDS = [
   { key: 'working_hours', label: 'ساعات العمل' },
   { key: 'km', label: 'الكيلومترات' },
   { key: 'daily_expenses', label: 'المصروفات اليومية' },
-  { key: 'overdue_total_input', label: 'إجمالي المتأخرات' },
-  { key: 'overdue_collected', label: 'المحصل من المتأخرات' },
   { key: 'debt_total', label: 'إجمالي الدين' },
   { key: 'debt_1_45', label: 'دين ٤٥-٦٠ يوم' },
   { key: 'debt_over_60', label: 'دين ٦١-٩٠ يوم' },
