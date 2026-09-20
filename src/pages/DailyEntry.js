@@ -263,12 +263,13 @@ export default function DailyEntry({ user }) {
       working_hours: v.working_hours,
       km: v.km,
       daily_expenses: v.daily_expenses,
-      debt_total: v.debt_total,
-      debt_1_45: v.debt_1_45,
-      debt_over_60: v.debt_over_60,
-      debt_over_90: v.debt_over_90,
-      debt_over_120: v.debt_over_120,
-      debt_over_150: v.debt_over_150,
+      // Debt figures are whole riyals (rounded so stored == displayed).
+      debt_total: Math.round(v.debt_total),
+      debt_1_45: Math.round(v.debt_1_45),
+      debt_over_60: Math.round(v.debt_over_60),
+      debt_over_90: Math.round(v.debt_over_90),
+      debt_over_120: Math.round(v.debt_over_120),
+      debt_over_150: Math.round(v.debt_over_150),
       notes: v.notes || '',
       field_owners: owners,
       updated_at: new Date().toISOString(),
@@ -470,11 +471,11 @@ export default function DailyEntry({ user }) {
                 return (
                   <div className="form-group" key={f.key}>
                     <label className="form-label">{f.label}</label>
-                    <input className={errCls(f.key)} type="number" min="0" inputMode="decimal"
+                    <input className={errCls(f.key)} type="number" min="0" step="1" inputMode="numeric"
                       enterKeyHint="next" data-field={f.key} disabled={isLocked(f.key)}
                       value={form[f.key]}
                       onChange={e => changeField(f.key, e.target.value)}
-                      placeholder="المبلغ" />
+                      placeholder="المبلغ (ريال صحيح)" />
                     {pct !== null && (
                       <div style={{ fontSize: '0.72rem', color: '#3b82f6', marginTop: '0.25rem' }}>
                         {pct}% من إجمالي الدين
