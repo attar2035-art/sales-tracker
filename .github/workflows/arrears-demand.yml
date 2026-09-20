@@ -1,0 +1,33 @@
+name: Arrears collection demand (management)
+
+# Manual only — a firm official notice from management to each rep tying their
+# collection-target shortfall to the overdue amounts they must collect.
+on:
+  workflow_dispatch:
+    inputs:
+      report_date:
+        description: 'Optional date YYYY-MM-DD (defaults to today, Riyadh)'
+        required: false
+      test_recipient:
+        description: 'When set, sends ONE sample to this address only (review before the real send).'
+        required: false
+
+jobs:
+  send-demand:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - name: Send arrears demand
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          REPORTS_FROM_EMAIL: ${{ secrets.REPORTS_FROM_EMAIL }}
+          APP_URL: ${{ secrets.APP_URL }}
+          REPORT_DATE: ${{ github.event.inputs.report_date }}
+          TEST_RECIPIENT: ${{ github.event.inputs.test_recipient }}
+        run: node tools/send-arrears-demand.js
