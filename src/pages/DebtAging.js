@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { formatCurrency, formatNumber } from '../lib/helpers';
+import { buildEffectiveTargetsMap } from '../lib/targets';
 
 // Debt-aging buckets (order matters for the table columns).
 const BUCKETS = [
@@ -29,6 +30,8 @@ export default function DebtAging() {
   const [asOf, setAsOf] = useState(todayStr);
   const [reps, setReps] = useState([]);
   const [entries, setEntries] = useState([]);
+  const [targets, setTargets] = useState([]);
+  const [collections, setCollections] = useState([]); // {rep_id, daily_collection} this month
   const [loading, setLoading] = useState(false);
   // Which bucket box is expanded to show its per-rep breakdown.
   const [openBucket, setOpenBucket] = useState(null);
@@ -38,7 +41,8 @@ export default function DebtAging() {
 
   const load = async () => {
     setLoading(true);
-    const [repsRes, entriesRes] = await Promise.all([
+    const [y, m] = asOf.split('-').map(Number);
+    const [repsRes, entriesRes, targetsRes, collRes] = await Promise.all([
       supabase.from('representatives')
         .select('id, name, is_active, supervisor_id, supervisors(name), regions(name)')
         .eq('is_active', true),
@@ -52,9 +56,15 @@ export default function DebtAging() {
         .not('field_owners->>debt_total', 'is', null)
         .order('entry_date', { ascending: false })
         .limit(20000),
+      supabase.from('monthly_targets').select('*').limit(10000),
+      // Collection booked so far in the selected month (to date), per rep.
+      supabase.from('daily_entries').select('rep_id, daily_collection')
+        .eq('year', y).eq('month', m).lte('entry_date', asOf).limit(50000),
     ]);
     if (repsRes.data) setReps(repsRes.data);
     setEntries(entriesRes.data || []);
+    setTargets(targetsRes.data || []);
+    setCollections(collRes.data || []);
     setLoading(false);
   };
 
@@ -108,6 +118,33 @@ export default function DebtAging() {
 
   const topDebtor = rows[0];
   const mostAged = useMemo(() => [...rows].sort((a, b) => agedOf(b) - agedOf(a))[0], [rows]);
+
+  // Link arrears to the collection target: how much each rep still needs to
+  // collect to hit the monthly collection target, and whether the outstanding
+  // arrears cover that gap.
+  const coverage = useMemo(() => {
+    const [y, m] = asOf.split('-').map(Number);
+    const tMap = buildEffectiveTargetsMap(targets, y, m);
+    const collByRep = {};
+    for (const c of collections) collByRep[c.rep_id] = (collByRep[c.rep_id] || 0) + (Number(c.daily_collection) || 0);
+    const list = rows.map(r => {
+      const target = Number(tMap[r.repId]?.target_collection) || 0;
+      const collected = collByRep[r.repId] || 0;
+      const remaining = Math.max(0, target - collected);
+      const arrears = r.debt_total;
+      return { ...r, target, collected, remaining, arrears };
+    }).filter(x => x.target > 0);
+    const totals = list.reduce((a, x) => {
+      a.target += x.target; a.collected += x.collected; a.remaining += x.remaining; a.arrears += x.arrears; return a;
+    }, { target: 0, collected: 0, remaining: 0, arrears: 0 });
+    return { list: list.sort((a, b) => b.remaining - a.remaining), totals };
+  }, [rows, targets, collections, asOf]);
+
+  const covState = (x) => {
+    if (x.remaining <= 0) return { txt: '✅ الهدف مغطّى', color: '#166534' };
+    if (x.arrears >= x.remaining) return { txt: '🟢 المتأخرات تكفي', color: '#166534' };
+    return { txt: `🔴 غير كافية (${pct(x.arrears, x.remaining)}%)`, color: '#b91c1c' };
+  };
 
   const changeCell = (change) => {
     if (change == null) return <span style={{ color: '#94a3b8' }}>—</span>;
@@ -219,6 +256,47 @@ export default function DebtAging() {
               </div>}
             </div>
           </div>
+
+          {/* Arrears vs collection target */}
+          {coverage.list.length > 0 && (
+            <div className="card">
+              <div className="card-title">
+                ربط المتأخرات بهدف التحصيل — المطلوب تحصيله لتغطية الشركة: {formatCurrency(coverage.totals.remaining)}
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--text-muted, #64748b)', marginTop: '-0.25rem', marginBottom: '0.75rem' }}>
+                «المطلوب تحصيله» = المتبقي على هدف التحصيل الشهري. حصّله من المتأخرات بالأولوية للأقدم (فوق ١٥٠ ← ١٢١-١٥٠ ← …).
+                إجمالي الشركة: هدف {formatCurrency(coverage.totals.target)} · محصّل {formatCurrency(coverage.totals.collected)} ·
+                متأخرات متاحة {formatCurrency(coverage.totals.arrears)}
+                {coverage.totals.remaining > 0 ? ` (تغطي ${pct(coverage.totals.arrears, coverage.totals.remaining)}% من المطلوب)` : ' — الهدف مغطّى ✅'}.
+              </p>
+              <div className="table-wrapper">
+                <table className="responsive-cards">
+                  <thead>
+                    <tr>
+                      <th>المندوب</th><th>المنطقة</th><th>هدف التحصيل</th><th>المحصّل</th>
+                      <th>المطلوب تحصيله</th><th>المتأخرات المتاحة</th><th>الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {coverage.list.map(x => {
+                      const st = covState(x);
+                      return (
+                        <tr key={x.repId}>
+                          <td data-label="المندوب"><strong>{x.name}</strong></td>
+                          <td data-label="المنطقة">{x.region}</td>
+                          <td data-label="هدف التحصيل">{formatCurrency(x.target)}</td>
+                          <td data-label="المحصّل">{formatCurrency(x.collected)}</td>
+                          <td data-label="المطلوب تحصيله"><strong style={{ color: x.remaining > 0 ? '#b45309' : '#166534' }}>{formatCurrency(x.remaining)}</strong></td>
+                          <td data-label="المتأخرات المتاحة">{formatCurrency(x.arrears)}</td>
+                          <td data-label="الحالة"><span style={{ color: st.color, fontWeight: 700 }}>{st.txt}</span></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Per-rep table */}
           <div className="card">
