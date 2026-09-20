@@ -24,6 +24,10 @@ const DEBT_FIELDS = [
   { key: 'debt_over_120', label: 'من ١٢١ إلى ١٥٠ يوم' },
   { key: 'debt_over_150', label: 'فوق ١٥٠ يوم' },
 ];
+const DEBT_KEYS = DEBT_FIELDS.map(f => f.key);
+// Debt boxes accept a "+"-sum so merged regions can be typed as two numbers
+// (e.g. "5000+3000") and stored as one total. Only digits and "+" are allowed.
+const sumExpr = (raw) => String(raw ?? '').split('+').reduce((a, p) => a + (parseInt(p.trim(), 10) || 0), 0);
 
 // Entry fields that support per-field ownership/locking (form keys).
 const LOCKABLE_KEYS = [
@@ -191,8 +195,8 @@ export default function DailyEntry({ user }) {
     // can never exceed إجمالي الدين. This catches mis-typed figures (e.g. a
     // bucket larger than the whole debt).
     const debtBucketsSum = ['debt_1_45', 'debt_over_60', 'debt_over_90', 'debt_over_120', 'debt_over_150']
-      .reduce((s, k) => s + (parseFloat(form[k]) || 0), 0);
-    const debtTotalVal = parseFloat(form.debt_total) || 0;
+      .reduce((s, k) => s + sumExpr(form[k]), 0);
+    const debtTotalVal = sumExpr(form.debt_total);
     if (debtBucketsSum > debtTotalVal) {
       fieldErrors.debt_total = `مجموع فترات التأخير (${debtBucketsSum.toLocaleString('en')}) أكبر من إجمالي الدين — راجع الأرقام`;
     }
@@ -245,7 +249,7 @@ export default function DailyEntry({ user }) {
       const provided = raw !== '' && raw !== null && raw !== undefined;
       if (!canEdit) { v[key] = dbForm[key]; continue; }
       if (provided) {
-        v[key] = key === 'notes' ? raw : num(raw);
+        v[key] = key === 'notes' ? raw : (DEBT_KEYS.includes(key) ? sumExpr(raw) : num(raw));
         if (myId) owners[key] = myId; // claim/record ownership
       } else {
         v[key] = key === 'notes' ? '' : 0;
@@ -474,20 +478,26 @@ export default function DailyEntry({ user }) {
             </p>
             <div className="form-grid">
               {DEBT_FIELDS.map(f => {
-                const debtTotal = parseFloat(form.debt_total) || 0;
-                const val = parseFloat(form[f.key]) || 0;
-                const pct = f.key !== 'debt_total' && debtTotal > 0 ? Math.round((val / debtTotal) * 100) : null;
+                const debtTotal = sumExpr(form.debt_total);
+                const val = sumExpr(form[f.key]);
+                const pctOfTotal = f.key !== 'debt_total' && debtTotal > 0 ? Math.round((val / debtTotal) * 100) : null;
+                const isSum = String(form[f.key] || '').includes('+');
                 return (
                   <div className="form-group" key={f.key}>
                     <label className="form-label">{f.label}</label>
-                    <input className={errCls(f.key)} type="number" min="0" step="1" inputMode="numeric"
+                    <input className={errCls(f.key)} type="text" inputMode="numeric"
                       enterKeyHint="next" data-field={f.key} disabled={isLocked(f.key)}
                       value={form[f.key]}
-                      onChange={e => changeField(f.key, e.target.value)}
-                      placeholder="المبلغ (ريال صحيح)" />
-                    {pct !== null && (
+                      onChange={e => changeField(f.key, e.target.value.replace(/[^0-9+ ]/g, ''))}
+                      placeholder="المبلغ (أو 5000+3000 لدمج منطقتين)" />
+                    {isSum && (
+                      <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '0.25rem', fontWeight: 700 }}>
+                        = {val.toLocaleString('en')}
+                      </div>
+                    )}
+                    {pctOfTotal !== null && (
                       <div style={{ fontSize: '0.72rem', color: '#3b82f6', marginTop: '0.25rem' }}>
-                        {pct}% من إجمالي الدين
+                        {pctOfTotal}% من إجمالي الدين
                       </div>
                     )}
                     {lockNote(f.key)}
