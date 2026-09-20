@@ -25,8 +25,14 @@ const DEBT_FIELDS = [
   { key: 'debt_over_150', label: 'فوق ١٥٠ يوم' },
 ];
 const DEBT_KEYS = DEBT_FIELDS.map(f => f.key);
-// Money fields that also accept a "+"-sum for merged regions (Amira's fields).
-const SUM_KEYS = [...DEBT_KEYS, 'daily_sales', 'daily_returns', 'daily_collection'];
+// ALL numeric entry fields accept a "+"-sum for merged regions (everything the
+// lock system tracks except the free-text notes).
+const SUM_KEYS = [
+  'daily_sales', 'daily_returns', 'daily_collection', 'new_customers', 'new_customers_value',
+  'total_visits', 'shelf_photos', 'successful_visits', 'new_products_skus', 'new_products_qty',
+  'new_products_availability', 'working_hours', 'km', 'daily_expenses',
+  ...DEBT_KEYS,
+];
 // A box may hold a "+"-sum so merged regions can be typed as two numbers
 // (e.g. "5000+3000") and stored as one total.
 const sumExpr = (raw) => String(raw ?? '').split('+').reduce((a, p) => a + (parseFloat(p.trim()) || 0), 0);
@@ -169,10 +175,10 @@ export default function DailyEntry({ user }) {
 
   const handleSave = async () => {
     if (!selectedRep || !selectedDate) { showMsg('اختر المندوب والتاريخ', 'error'); return; }
-    const totalVisits = parseInt(form.total_visits) || 0;
-    const shelfPhotos = parseInt(form.shelf_photos) || 0;
-    const successfulVisits = parseInt(form.successful_visits) || 0;
-    const availability = parseFloat(form.new_products_availability) || 0;
+    const totalVisits = sumExpr(form.total_visits);
+    const shelfPhotos = sumExpr(form.shelf_photos);
+    const successfulVisits = sumExpr(form.successful_visits);
+    const availability = sumExpr(form.new_products_availability);
 
     // Validation (was UI-only min=0 before): reject negatives, out-of-range and
     // illogical cross-field values before persisting. Errors are attached to the
@@ -325,7 +331,7 @@ export default function DailyEntry({ user }) {
   const netSales = sumExpr(form.daily_sales) - sumExpr(form.daily_returns);
 
   const shelfPhotosMissing = Math.max(0,
-    (parseInt(form.total_visits) || 0) - (parseInt(form.shelf_photos) || 0)
+    sumExpr(form.total_visits) - sumExpr(form.shelf_photos)
   );
 
   const sections = [
@@ -445,21 +451,23 @@ export default function DailyEntry({ user }) {
             <div className="form-grid">
               <div className="form-group">
                 <label className="form-label">زيارات إجمالي</label>
-                <input className={errCls('total_visits')} type="number" min="0" inputMode="numeric"
+                <input className={errCls('total_visits')} type="text" inputMode="numeric"
                   enterKeyHint="next" data-field="total_visits" disabled={isLocked('total_visits')}
                   value={form.total_visits}
-                  onChange={e => changeField('total_visits', e.target.value)}
+                  onChange={e => changeField('total_visits', e.target.value.replace(/[^0-9.+ ]/g, ''))}
                   placeholder="عدد" />
+                {String(form.total_visits || '').includes('+') && <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '0.25rem', fontWeight: 700 }}>= {sumExpr(form.total_visits).toLocaleString('en')}</div>}
                 {lockNote('total_visits')}
                 {errors.total_visits && <div className="form-error">{errors.total_visits}</div>}
               </div>
               <div className="form-group">
                 <label className="form-label">صور الرف</label>
-                <input className={errCls('shelf_photos')} type="number" min="0" inputMode="numeric"
+                <input className={errCls('shelf_photos')} type="text" inputMode="numeric"
                   enterKeyHint="next" data-field="shelf_photos" disabled={isLocked('shelf_photos')}
                   value={form.shelf_photos}
-                  onChange={e => changeField('shelf_photos', e.target.value)}
+                  onChange={e => changeField('shelf_photos', e.target.value.replace(/[^0-9.+ ]/g, ''))}
                   placeholder="عدد الصور" />
+                {String(form.shelf_photos || '').includes('+') && <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '0.25rem', fontWeight: 700 }}>= {sumExpr(form.shelf_photos).toLocaleString('en')}</div>}
                 {lockNote('shelf_photos')}
                 {errors.shelf_photos && <div className="form-error">{errors.shelf_photos}</div>}
               </div>
@@ -474,11 +482,12 @@ export default function DailyEntry({ user }) {
               </div>
               <div className="form-group">
                 <label className="form-label">زيارات ناجحة</label>
-                <input className={errCls('successful_visits')} type="number" min="0" inputMode="numeric"
+                <input className={errCls('successful_visits')} type="text" inputMode="numeric"
                   enterKeyHint="next" data-field="successful_visits" disabled={isLocked('successful_visits')}
                   value={form.successful_visits}
-                  onChange={e => changeField('successful_visits', e.target.value)}
+                  onChange={e => changeField('successful_visits', e.target.value.replace(/[^0-9.+ ]/g, ''))}
                   placeholder="عدد" />
+                {String(form.successful_visits || '').includes('+') && <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '0.25rem', fontWeight: 700 }}>= {sumExpr(form.successful_visits).toLocaleString('en')}</div>}
                 {lockNote('successful_visits')}
                 {errors.successful_visits && <div className="form-error">{errors.successful_visits}</div>}
               </div>
