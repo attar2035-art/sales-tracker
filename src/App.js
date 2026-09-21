@@ -18,6 +18,7 @@ import SupervisorFollowup from './pages/SupervisorFollowup';
 import KnowledgeCenter from './pages/KnowledgeCenter';
 import PermissionsCenter from './pages/PermissionsCenter';
 import DebtAging from './pages/DebtAging';
+import RoutePlan from './pages/RoutePlan';
 import FloatingVisitButton from './components/FloatingVisitButton';
 import InstallPrompt from './components/InstallPrompt';
 import { logAuditEvent } from './lib/audit';
@@ -42,6 +43,7 @@ const NAV_ADMIN = [
 const NAV_SUPERVISOR = [
   { key: 'dashboard', label: 'لوحة المتابعة', icon: '📊' },
   { key: 'myroute', label: 'زياراتي اليوم', icon: '📍' },
+  { key: 'routeplan', label: 'خطة خط السير', icon: '🗺️' },
   { key: 'knowledge', label: 'مركز المعرفة', icon: '🧠' },
   { key: 'repdetails', label: 'تفاصيل المندوب', icon: '👤' },
   { key: 'customers', label: 'العملاء', icon: '👥' },
@@ -60,6 +62,7 @@ const NAV_DATA_ENTRY = [
 
 const NAV_REP = [
   { key: 'repdashboard', label: 'تقريري', icon: '📊' },
+  { key: 'routeplan', label: 'خطة خط السير', icon: '🗺️' },
   { key: 'customers', label: 'العملاء', icon: '👥' },
   { key: 'analytics', label: 'تحليل العملاء', icon: '📈' },
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
@@ -177,6 +180,7 @@ export default function App() {
       if (page === 'password') return <ChangePassword />;
       if (page === 'customers') return <Customers user={user} />;
       if (page === 'analytics') return <CustomerAnalytics />;
+      if (page === 'routeplan') return <RoutePlan user={user} />;
       return <RepDashboard repId={user.rep_id} />;
     }
     if (user.role === 'data_entry') {
@@ -200,6 +204,7 @@ export default function App() {
     if (user.role === 'supervisor') {
       if (page === 'password') return <ChangePassword />;
       if (page === 'myroute') return <SupervisorRoute user={user} refreshSignal={visitRefresh} />;
+      if (page === 'routeplan') return <RoutePlan user={user} />;
       if (page === 'knowledge') return <KnowledgeCenter user={user} />;
       if (page === 'repdetails') return <RepDetails supervisorId={user.supervisor_id} />;
       if (page === 'customers') return <Customers user={user} />;
