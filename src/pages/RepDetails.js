@@ -205,7 +205,7 @@ export default function RepDetails({ supervisorId }) {
                   <tbody>
                     {entries.map(e => (
                       <tr key={e.id}>
-                        <td data-label="التاريخ">{new Date(e.entry_date).toLocaleDateString('ar-SA-u-ca-gregory')}</td>
+                        <td data-label="التاريخ">{new Date(e.entry_date).toLocaleDateString('en-GB')}</td>
                         <td data-label="المبيعات">{formatCurrency(e.daily_sales)}</td>
                         <td data-label="التحصيل">{formatCurrency(e.daily_collection)}</td>
                         <td data-label="عملاء جدد">{e.new_customers}</td>

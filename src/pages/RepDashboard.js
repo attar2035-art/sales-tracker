@@ -733,7 +733,7 @@ export default function RepDashboard({ repId }) {
                   <tbody>
                     {entries.map(entry => (
                       <tr key={entry.id}>
-                        <td data-label="التاريخ">{new Date(entry.entry_date).toLocaleDateString('ar-SA-u-ca-gregory')}</td>
+                        <td data-label="التاريخ">{new Date(entry.entry_date).toLocaleDateString('en-GB')}</td>
                         <td data-label="مبيعات" style={{ color: '#10b981' }}>{formatCurrency(entry.daily_sales)}</td>
                         <td data-label="تحصيل" style={{ color: '#10b981' }}>{formatCurrency(entry.daily_collection)}</td>
                         <td data-label="عملاء">{entry.new_customers}</td>

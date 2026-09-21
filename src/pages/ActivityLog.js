@@ -13,8 +13,8 @@ const ACTION_EVENTS = ['create', 'update', 'delete', 'status_change', 'handover'
 
 const formatDateTime = (value) => {
   if (!value) return '-';
-  // Force the Gregorian calendar (ar-SA defaults to Hijri) for operator clarity.
-  return new Intl.DateTimeFormat('ar-SA-u-ca-gregory', {
+  // Gregorian calendar with Latin digits (en-GB, day-first) for operator clarity.
+  return new Intl.DateTimeFormat('en-GB', {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value));
