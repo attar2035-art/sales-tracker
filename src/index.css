@@ -212,11 +212,14 @@ tbody tr:last-child td { border-bottom: none; }
     display: flex; justify-content: space-between; align-items: center;
     gap: 1rem; padding: 0.55rem 0; border-bottom: 1px solid #1e293b;
     white-space: normal; text-align: left;
+    font-size: 1.1rem; font-weight: 600; /* make the values (numbers) larger/clearer */
   }
+  table.responsive-cards td strong { font-size: 1.15rem; }
   table.responsive-cards tr td:last-child { border-bottom: none; }
   table.responsive-cards td::before {
     content: attr(data-label); font-weight: 700; color: var(--text-secondary);
     text-align: right; flex-shrink: 0;
+    font-size: 0.85rem; /* keep labels compact so the numbers stand out */
   }
   table.responsive-cards td.no-label::before { content: none; }
   table.responsive-cards td.no-label { justify-content: stretch; }
