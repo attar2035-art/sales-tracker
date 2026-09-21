@@ -19,6 +19,7 @@ import KnowledgeCenter from './pages/KnowledgeCenter';
 import PermissionsCenter from './pages/PermissionsCenter';
 import DebtAging from './pages/DebtAging';
 import RoutePlan from './pages/RoutePlan';
+import RouteExecution from './pages/RouteExecution';
 import FloatingVisitButton from './components/FloatingVisitButton';
 import InstallPrompt from './components/InstallPrompt';
 import { logAuditEvent } from './lib/audit';
@@ -30,6 +31,7 @@ const NAV_ADMIN = [
   { key: 'repdetails', label: 'تفاصيل المندوب', icon: '👤' },
   { key: 'supervisors', label: 'متابعة المشرفين', icon: '👔' },
   { key: 'debt', label: 'تحليل المتأخرات', icon: '🏦' },
+  { key: 'routeexec', label: 'تنفيذ خط السير', icon: '✅' },
   { key: 'customers', label: 'العملاء', icon: '👥' },
   { key: 'analytics', label: 'تحليل العملاء', icon: '📈' },
   { key: 'segmentation', label: 'تقسيم العملاء', icon: '📊' },
@@ -55,6 +57,7 @@ const NAV_SUPERVISOR = [
 const NAV_DATA_ENTRY = [
   { key: 'dashboard', label: 'لوحة المتابعة', icon: '📊' },
   { key: 'daily', label: 'الإدخال اليومي', icon: '📝' },
+  { key: 'routeexec', label: 'تنفيذ خط السير', icon: '✅' },
   { key: 'targets', label: 'الأهداف الشهرية', icon: '🎯' },
   { key: 'debt', label: 'تحليل المتأخرات', icon: '🏦' },
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
@@ -187,6 +190,7 @@ export default function App() {
       if (page === 'password') return <ChangePassword />;
       if (page === 'targets') return <Targets />;
       if (page === 'debt') return <DebtAging />;
+      if (page === 'routeexec') return <RouteExecution user={user} />;
       // Company-wide, read-only view of all regions' numbers.
       if (page === 'dashboard') return <Dashboard />;
       return <DailyEntry user={user} />;
@@ -220,6 +224,7 @@ export default function App() {
         case 'repdetails': return <RepDetails />;
         case 'supervisors': return <SupervisorFollowup />;
         case 'debt': return <DebtAging />;
+        case 'routeexec': return <RouteExecution user={user} />;
         case 'customers': return <Customers user={user} />;
         case 'analytics': return <CustomerAnalytics />;
         case 'segmentation': return <CustomerSegmentation />;
