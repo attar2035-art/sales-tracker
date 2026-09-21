@@ -4,6 +4,7 @@ import { logAuditEvent } from '../lib/audit';
 
 const pad2 = (n) => String(n).padStart(2, '0');
 const dateStr = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const shiftDate = (s, days) => { const d = new Date(s); d.setDate(d.getDate() + days); return dateStr(d); };
 
 const EMPTY = {
   customer_id: null, customer_name: '', region_id: '', neighborhood: '',
@@ -19,6 +20,7 @@ export default function RoutePlan({ user }) {
 
   const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
   const [planDate, setPlanDate] = useState(dateStr(tomorrow));
+  const [sourceDate, setSourceDate] = useState(shiftDate(dateStr(tomorrow), -7));
   const [items, setItems] = useState([]);
   const [regions, setRegions] = useState([]);
   const [form, setForm] = useState({ ...EMPTY });
@@ -65,6 +67,27 @@ export default function RoutePlan({ user }) {
   };
 
   const resetForm = () => { setForm({ ...EMPTY }); setSearch(''); setResults([]); setEditId(null); };
+
+  // Weekly cycle: copy a previous day's planned customers into this plan_date.
+  const generateFromDate = async () => {
+    if (!owner) return;
+    let q = supabase.from('daily_route_plan').select('*').eq('plan_date', sourceDate).eq('off_plan', false);
+    q = ownerMatch(q);
+    const { data } = await q;
+    if (!data || !data.length) { showMsg('لا توجد خطة في التاريخ المصدر', 'error'); return; }
+    const rows = data.map((it, i) => ({
+      ...owner, plan_date: planDate, off_plan: false, visited: false,
+      customer_id: it.customer_id, customer_name: it.customer_name, region_id: it.region_id,
+      neighborhood: it.neighborhood, city: it.city, phone: it.phone, contact_person: it.contact_person,
+      customer_rating: it.customer_rating, notes: it.notes, created_by: user.id, sort_order: items.length + i,
+    }));
+    const { error } = await supabase.from('daily_route_plan').insert(rows);
+    if (error) showMsg('خطأ: ' + error.message, 'error');
+    else {
+      await logAuditEvent({ eventType: 'import', pageKey: 'routeplan', entityType: 'daily_route_plan', details: { from: sourceDate, to: planDate, count: rows.length } });
+      showMsg(`تم توليد ${rows.length} عميل من ${sourceDate} ✓`); fetchItems();
+    }
+  };
 
   const saveItem = async () => {
     if (!owner) { showMsg('هذه الصفحة للمندوب أو المشرف فقط', 'error'); return; }
@@ -127,11 +150,22 @@ export default function RoutePlan({ user }) {
         <h1 className="page-title">🗺️ خطة خط السير</h1>
         <div className="form-group" style={{ margin: 0 }}>
           <label className="form-label" style={{ display: 'inline-block', marginInlineEnd: '0.5rem' }}>تاريخ الخطة</label>
-          <input className="form-input" type="date" value={planDate} onChange={e => { setPlanDate(e.target.value); resetForm(); }}
+          <input className="form-input" type="date" value={planDate} onChange={e => { setPlanDate(e.target.value); setSourceDate(shiftDate(e.target.value, -7)); resetForm(); }}
             style={{ display: 'inline-block', width: 'auto' }} />
         </div>
       </div>
       {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
+
+      <div className="card">
+        <div className="card-title">🔁 توليد الخطة من يوم سابق (الدورة الأسبوعية)</div>
+        <p className="muted-text" style={{ fontSize: 12, marginBottom: '0.5rem' }}>
+          انسخ عملاء خطة يوم سابق (الأسبوع اللي فات مثلًا) لهذا اليوم، وعدّل عليها. لا يمسح المضاف حاليًا.
+        </p>
+        <div className="btn-row" style={{ alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <input className="form-input" type="date" value={sourceDate} onChange={e => setSourceDate(e.target.value)} style={{ width: 'auto' }} />
+          <button className="btn btn-ghost" onClick={generateFromDate}>🔁 توليد من هذا التاريخ</button>
+        </div>
+      </div>
 
       <div className="card">
         <div className="card-title">{editId ? '✏️ تعديل عميل في الخطة' : '➕ إضافة عميل للخطة'}</div>
