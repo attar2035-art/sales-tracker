@@ -11,6 +11,9 @@ on:
       test_recipient:
         description: 'When set, sends ONE sample to this address only (review before the real send).'
         required: false
+      manager_emails:
+        description: 'Comma-separated manager emails. When set, sends ONE company-level important notice to them instead of the per-rep demands.'
+        required: false
 
 jobs:
   send-demand:
@@ -30,4 +33,5 @@ jobs:
           APP_URL: ${{ secrets.APP_URL }}
           REPORT_DATE: ${{ github.event.inputs.report_date }}
           TEST_RECIPIENT: ${{ github.event.inputs.test_recipient }}
+          MANAGER_NOTICE_TO: ${{ github.event.inputs.manager_emails }}
         run: node tools/send-arrears-demand.js

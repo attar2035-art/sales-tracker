@@ -37,9 +37,14 @@ const DEBT_BUCKETS = [
   ['debt_over_120', '١٢١-١٥٠ يوم'], ['debt_over_150', 'فوق ١٥٠ يوم'],
 ];
 const DUE_KEYS = ['debt_over_60', 'debt_over_90', 'debt_over_120', 'debt_over_150'];
+const AGED_KEYS = ['debt_over_90', 'debt_over_120', 'debt_over_150'];
 const n = (v) => Number(v) || 0;
 const dueOf = (d) => DUE_KEYS.reduce((s, k) => s + n(d[k]), 0);
+const agedOf = (d) => AGED_KEYS.reduce((s, k) => s + n(d[k]), 0);
 const pct = (p, w) => (w > 0 ? Math.round((p / w) * 100) : 0);
+// Comma-separated manager emails; when set, a single company-level "important
+// notice" is sent to them instead of the per-rep demands.
+const MANAGER_NOTICE_TO = (process.env.MANAGER_NOTICE_TO || '').split(',').map(s => s.trim()).filter(Boolean);
 
 const STYLE = `
   body{margin:0;background:#f1f5f9;font-family:Tahoma,Arial,sans-serif;color:#0f172a}
@@ -102,6 +107,48 @@ function demandEmail(to, r, date) {
   };
 }
 
+// Company-level "important notice" for management — the whole-company arrears
+// and collection-shortfall picture, with a ranked list of the most-overdue reps.
+function managementNotice(to, agg, repList, date) {
+  const rows = [...repList].sort((a, b) => agedOf(b.debt) - agedOf(a.debt)).map((r, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td><b>${escapeHtml(r.name)}</b><div style="color:#94a3b8;font-size:11px">${escapeHtml(r.region || '-')}</div></td>
+      <td style="color:#c2410c;font-weight:700">${formatCurrency(dueOf(r.debt))}</td>
+      <td>${formatCurrency(agedOf(r.debt))}</td>
+      <td style="color:#b91c1c;font-weight:700">${formatCurrency(r.gap)}</td>
+    </tr>`).join('');
+  const inner = `
+    <p>هذا <b>إشعار هام من الإدارة</b> بموقف المتأخرات والتحصيل على مستوى الشركة حتى ${escapeHtml(date)}، للاطّلاع والمتابعة العاجلة.</p>
+    <div class="kpis">
+      <div class="k due"><span>المستحق تحصيله (٦١+ يوم)</span><b>${formatCurrency(agg.due)}</b></div>
+      <div class="k"><span>إجمالي ديون الشركة</span><b>${formatCurrency(agg.debt_total)}</b></div>
+      <div class="k gap"><span>العجز عن هدف التحصيل</span><b>${formatCurrency(agg.gap)}</b></div>
+      <div class="k"><span>الديون المتقادمة (٩١+)</span><b>${formatCurrency(agg.aged)}</b></div>
+    </div>
+    <div class="warn">⚠️ لدى الشركة <b>${formatCurrency(agg.due)}</b> مبالغ متأخرة مستحقة التحصيل، بينما يوجد عجز عن هدف التحصيل بقيمة <b>${formatCurrency(agg.gap)}</b> — أي أن العجز يمكن تغطيته بالتحصيل من المتأخرات القائمة.</div>
+    <p style="font-weight:700;margin-bottom:4px">أكثر المناديب تأخيرًا (الأولوية في المتابعة):</p>
+    <div class="tw"><table>
+      <thead><tr><th>#</th><th>المندوب</th><th>المستحق تحصيله (٦١+)</th><th>المتقادمة (٩١+)</th><th>العجز عن الهدف</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <p class="foot">المطلوب من الإدارة:</p>
+    <p>١) متابعة المناديب ومحاسبتهم على تحصيل المتأخرات (تم إشعارهم رسميًا بشكل فردي).<br/>
+       ٢) اعتماد خطة تحصيل للمبالغ المتقادمة بالأولوية للأقدم.<br/>
+       ٣) متابعة تغطية العجز عن هدف التحصيل من المتأخرات القائمة.</p>
+    <p class="sig">إدارة شركة حوافل</p>`;
+  return {
+    to,
+    subject: `🔴 إشعار هام — موقف المتأخرات والتحصيل بالشركة — ${date}`,
+    html: `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"/><style>${STYLE}</style></head>
+<body><div class="wrap">
+  <div class="head"><h1>إدارة شركة حوافل — إشعار هام بالمتأخرات</h1><div class="sub">${escapeHtml(date)}</div></div>
+  <div class="body">${inner}<p style="margin-top:14px"><a href="${escapeHtml(APP_URL)}">فتح تحليل المتأخرات</a></p></div>
+  <div class="note">رسالة رسمية من إدارة شركة حوافل</div>
+</div></body></html>`,
+  };
+}
+
 async function sendEmail(email) {
   if (DRY_RUN) { console.log(`[DRY_RUN] ${email.to} | ${email.subject}`); return; }
   const res = await fetch(EMAIL_API_URL, {
@@ -147,33 +194,51 @@ async function main() {
   const debtByRep = {};
   for (const d of (debtRes.data || [])) if (!debtByRep[d.rep_id]) debtByRep[d.rep_id] = d;
 
-  const outbox = [];
+  // Build the per-rep picture once (used by both modes).
+  const candidates = [];
   for (const rep of reps) {
-    const email = emailByRepId[rep.id];
-    if (!email) continue;
-    const debt = debtByRep[rep.id];
+    const debt = debtByRep[rep.id] || {};
     const target = n(tMap[rep.id]?.target_collection);
-    // Only notify reps who actually have arrears or a target shortfall.
-    const hasArrears = debt && dueOf(debt) > 0;
-    if (!hasArrears && target <= 0) continue;
-    outbox.push(demandEmail(email, {
-      name: rep.name, region: rep.regions?.name || '', target,
-      collected: collByRep[rep.id] || 0, debt: debt || {},
-    }, DATE));
+    const collected = collByRep[rep.id] || 0;
+    const gap = Math.max(0, target - collected);
+    if (dueOf(debt) <= 0 && target <= 0) continue; // nothing to say
+    candidates.push({ id: rep.id, name: rep.name, region: rep.regions?.name || '', email: emailByRepId[rep.id], target, collected, gap, debt });
   }
 
-  let toSend = outbox;
-  if (TEST_RECIPIENT) {
-    toSend = outbox.slice(0, 1).map(e => ({ ...e, to: TEST_RECIPIENT, subject: `[تجربة] ${e.subject}` }));
-    console.log(`TEST mode: ${toSend.length} sample -> ${TEST_RECIPIENT}`);
+  const outbox = [];
+  if (MANAGER_NOTICE_TO.length) {
+    // Company-level important notice to management.
+    const agg = candidates.reduce((a, c) => {
+      a.debt_total += n(c.debt.debt_total); a.due += dueOf(c.debt); a.aged += agedOf(c.debt);
+      a.target += c.target; a.collected += c.collected; return a;
+    }, { debt_total: 0, due: 0, aged: 0, target: 0, collected: 0 });
+    agg.gap = Math.max(0, agg.target - agg.collected);
+    const recipients = TEST_RECIPIENT ? [TEST_RECIPIENT] : MANAGER_NOTICE_TO;
+    for (const to of recipients) {
+      const e = managementNotice(to, agg, candidates, DATE);
+      outbox.push(TEST_RECIPIENT ? { ...e, subject: `[تجربة] ${e.subject}` } : e);
+    }
+    console.log(`Manager-notice mode: ${recipients.length} recipient(s)${TEST_RECIPIENT ? ' (TEST)' : ''}`);
+  } else {
+    // Per-rep firm demand (default).
+    for (const c of candidates) {
+      if (!c.email) continue;
+      outbox.push(demandEmail(c.email, { name: c.name, region: c.region, target: c.target, collected: c.collected, debt: c.debt }, DATE));
+    }
+    if (TEST_RECIPIENT) {
+      const one = outbox.slice(0, 1).map(e => ({ ...e, to: TEST_RECIPIENT, subject: `[تجربة] ${e.subject}` }));
+      console.log(`TEST mode: ${one.length} sample -> ${TEST_RECIPIENT}`);
+      outbox.length = 0; outbox.push(...one);
+    }
   }
+  const toSend = outbox;
 
   let sent = 0, failed = 0;
   for (const email of toSend) {
     try { await sendEmail(email); sent += 1; }
     catch (e) { failed += 1; console.error(`::error title=Demand email failed::${(e?.message || String(e)).replace(/\r?\n/g, ' ')}`); }
   }
-  console.log(`Arrears demand complete. date=${DATE} candidates=${outbox.length} queued=${toSend.length} sent=${sent} failed=${failed}`);
+  console.log(`Arrears notice complete. date=${DATE} mode=${MANAGER_NOTICE_TO.length ? 'managers' : 'reps'} candidates=${candidates.length} queued=${toSend.length} sent=${sent} failed=${failed}`);
   if (failed > 0) process.exit(1);
 }
 
@@ -182,4 +247,4 @@ if (require.main === module) {
   main().catch(e => { console.error(`::error title=Arrears demand failed::${(e?.message || String(e)).replace(/\r?\n/g, ' ')}`); console.error(e); process.exit(1); });
 }
 
-module.exports = { demandEmail };
+module.exports = { demandEmail, managementNotice };
