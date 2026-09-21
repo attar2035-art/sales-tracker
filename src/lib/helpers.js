@@ -47,14 +47,16 @@ export const getMonthPhase = (year, month, now = new Date()) => {
   return 'future';
 };
 
+// Numbers are shown with Western/Latin digits (0-9) and comma thousands
+// separators for clearer reading on phones — e.g. 189,076 instead of ١٨٩٬٠٧٦.
 export const formatNumber = (num) => {
   const value = Number(num);
-  return new Intl.NumberFormat('ar-SA').format(Math.round(Number.isFinite(value) ? value : 0));
+  return new Intl.NumberFormat('en-US').format(Math.round(Number.isFinite(value) ? value : 0));
 };
 
 export const formatCurrency = (num) => {
   const value = Number(num);
-  return new Intl.NumberFormat('ar-SA').format(Math.round(Number.isFinite(value) ? value : 0));
+  return new Intl.NumberFormat('en-US').format(Math.round(Number.isFinite(value) ? value : 0));
 };
 
 export const getAchievementStatus = (achieved, target, monthProgress) => {

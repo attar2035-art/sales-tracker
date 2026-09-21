@@ -58,7 +58,7 @@ export default function KnowledgeCenter({ user }) {
       'المشرف': v.supervisor_name,
       'العميل': v.customer_name || '',
       'الحالة': STATUS_LABELS[v.visit_status] || v.visit_status,
-      'وقت الدخول': v.check_in_time ? new Date(v.check_in_time).toLocaleString('ar-SA-u-ca-gregory') : '',
+      'وقت الدخول': v.check_in_time ? new Date(v.check_in_time).toLocaleString('en-GB') : '',
       'ملاحظات': v.visit_notes || '',
       'عدد الصور': Array.isArray(v.photos) ? v.photos.length : 0,
     }));
@@ -168,7 +168,7 @@ export default function KnowledgeCenter({ user }) {
                           <span className="badge badge-info">{STATUS_LABELS[v.visit_status] || v.visit_status}</span>
                         </td>
                         <td data-label="وقت الدخول">
-                          {v.check_in_time ? new Date(v.check_in_time).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                          {v.check_in_time ? new Date(v.check_in_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '—'}
                         </td>
                         <td data-label="صور">{Array.isArray(v.photos) ? v.photos.length : 0}</td>
                       </tr>

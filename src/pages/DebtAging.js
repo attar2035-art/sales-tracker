@@ -5,11 +5,11 @@ import { buildEffectiveTargetsMap } from '../lib/targets';
 
 // Debt-aging buckets (order matters for the table columns).
 const BUCKETS = [
-  { key: 'debt_1_45', label: '٤٥-٦٠ يوم' },
-  { key: 'debt_over_60', label: '٦١-٩٠ يوم' },
-  { key: 'debt_over_90', label: '٩١-١٢٠ يوم' },
-  { key: 'debt_over_120', label: '١٢١-١٥٠ يوم' },
-  { key: 'debt_over_150', label: 'فوق ١٥٠' },
+  { key: 'debt_1_45', label: '45-60 يوم' },
+  { key: 'debt_over_60', label: '61-90 يوم' },
+  { key: 'debt_over_90', label: '91-120 يوم' },
+  { key: 'debt_over_120', label: '121-150 يوم' },
+  { key: 'debt_over_150', label: 'فوق 150' },
 ];
 // "Aged" (harder) debt = everything 91 days and older.
 const AGED_KEYS = ['debt_over_90', 'debt_over_120', 'debt_over_150'];
@@ -185,7 +185,7 @@ export default function DebtAging() {
           <div className="card">
             <div className="card-title">إجمالي ديون الشركة — {formatCurrency(company.debt_total)}</div>
             <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '12px 14px', marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-              <span style={{ color: '#9a3412', fontWeight: 800, fontSize: 15 }}>💰 المبلغ المستحق تحصيله (من ٦١ يوم فأكثر)</span>
+              <span style={{ color: '#9a3412', fontWeight: 800, fontSize: 15 }}>💰 المبلغ المستحق تحصيله (من 61 يوم فأكثر)</span>
               <span style={{ color: '#c2410c', fontWeight: 800, fontSize: 22 }}>{formatCurrency(dueOf(company))}
                 <span style={{ fontSize: 12, fontWeight: 700, marginInlineStart: 6 }}>({pct(dueOf(company), company.debt_total)}% من الإجمالي)</span>
               </span>
@@ -259,7 +259,7 @@ export default function DebtAging() {
               </div>}
             </div>
             <div className="card" style={{ margin: 0, background: '#fffbeb', borderInlineStart: '4px solid #f59e0b' }}>
-              <div style={{ color: '#92400e', fontWeight: 800, marginBottom: 4 }}>⏳ أكثر تأخيرًا (٩١+ يوم)</div>
+              <div style={{ color: '#92400e', fontWeight: 800, marginBottom: 4 }}>⏳ أكثر تأخيرًا (91+ يوم)</div>
               {mostAged && <div style={{ fontSize: 14, color: '#78350f' }}>
                 <b>{mostAged.name}</b> — {mostAged.region}<br />
                 {formatCurrency(agedOf(mostAged))} متقادمة ({pct(agedOf(mostAged), mostAged.debt_total)}% من دينه)
@@ -274,9 +274,9 @@ export default function DebtAging() {
                 ربط المتأخرات بهدف التحصيل — المطلوب تحصيله لتغطية الشركة: {formatCurrency(coverage.totals.remaining)}
               </div>
               <p style={{ fontSize: 12, color: 'var(--text-muted, #64748b)', marginTop: '-0.25rem', marginBottom: '0.75rem' }}>
-                «المطلوب تحصيله» = المتبقي على هدف التحصيل الشهري. حصّله من المتأخرات بالأولوية للأقدم (فوق ١٥٠ ← ١٢١-١٥٠ ← …).
+                «المطلوب تحصيله» = المتبقي على هدف التحصيل الشهري. حصّله من المتأخرات بالأولوية للأقدم (فوق 150 ← 121-150 ← …).
                 إجمالي الشركة: هدف {formatCurrency(coverage.totals.target)} · محصّل {formatCurrency(coverage.totals.collected)} ·
-                المستحق تحصيله (٦١+) {formatCurrency(coverage.totals.arrears)}
+                المستحق تحصيله (61+) {formatCurrency(coverage.totals.arrears)}
                 {coverage.totals.remaining > 0 ? ` (يغطّي ${pct(coverage.totals.arrears, coverage.totals.remaining)}% من المطلوب)` : ' — الهدف مغطّى ✅'}.
               </p>
               <div className="table-wrapper">
@@ -284,7 +284,7 @@ export default function DebtAging() {
                   <thead>
                     <tr>
                       <th>المندوب</th><th>المنطقة</th><th>هدف التحصيل</th><th>المحصّل</th>
-                      <th>المطلوب تحصيله</th><th>المستحق تحصيله (٦١+)</th><th>الحالة</th>
+                      <th>المطلوب تحصيله</th><th>المستحق تحصيله (61+)</th><th>الحالة</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -297,7 +297,7 @@ export default function DebtAging() {
                           <td data-label="هدف التحصيل">{formatCurrency(x.target)}</td>
                           <td data-label="المحصّل">{formatCurrency(x.collected)}</td>
                           <td data-label="المطلوب تحصيله"><strong style={{ color: x.remaining > 0 ? '#b45309' : '#166534' }}>{formatCurrency(x.remaining)}</strong></td>
-                          <td data-label="المستحق تحصيله (٦١+)"><strong style={{ color: '#dc2626', fontSize: '1.05rem' }}>{formatCurrency(x.arrears)}</strong></td>
+                          <td data-label="المستحق تحصيله (61+)"><strong style={{ color: '#dc2626', fontSize: '1.05rem' }}>{formatCurrency(x.arrears)}</strong></td>
                           <td data-label="الحالة"><span style={{ color: st.color, fontWeight: 700 }}>{st.txt}</span></td>
                         </tr>
                       );
@@ -310,14 +310,14 @@ export default function DebtAging() {
 
           {/* Per-rep table */}
           <div className="card">
-            <div className="card-title">تفصيل المناديب (الأكثر تأخيرًا أولًا — ٩١+ يوم)</div>
+            <div className="card-title">تفصيل المناديب (الأكثر تأخيرًا أولًا — 91+ يوم)</div>
             <div className="table-wrapper">
               <table className="responsive-cards">
                 <thead>
                   <tr>
-                    <th>المندوب</th><th>المنطقة</th><th>المشرف</th><th>إجمالي الدين</th><th>المستحق تحصيله (٦١+)</th>
+                    <th>المندوب</th><th>المنطقة</th><th>المشرف</th><th>إجمالي الدين</th><th>المستحق تحصيله (61+)</th>
                     {BUCKETS.map(b => <th key={b.key}>{b.label}</th>)}
-                    <th>متقادمة (٩١+)</th><th>التغيّر</th>
+                    <th>متقادمة (91+)</th><th>التغيّر</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -327,14 +327,14 @@ export default function DebtAging() {
                       <td data-label="المنطقة">{r.region}</td>
                       <td data-label="المشرف">{r.supervisor}</td>
                       <td data-label="إجمالي الدين"><strong>{formatCurrency(r.debt_total)}</strong></td>
-                      <td data-label="المستحق تحصيله (٦١+)"><strong style={{ color: '#c2410c' }}>{formatCurrency(dueOf(r))}</strong></td>
+                      <td data-label="المستحق تحصيله (61+)"><strong style={{ color: '#c2410c' }}>{formatCurrency(dueOf(r))}</strong></td>
                       {BUCKETS.map(b => (
                         <td key={b.key} data-label={b.label}>
                           {formatCurrency(r[b.key])}
                           <div style={{ fontSize: 11, color: '#94a3b8' }}>{pct(r[b.key], r.debt_total)}%</div>
                         </td>
                       ))}
-                      <td data-label="متقادمة (٩١+)"><strong style={{ color: '#b45309' }}>{formatCurrency(agedOf(r))}</strong>
+                      <td data-label="متقادمة (91+)"><strong style={{ color: '#b45309' }}>{formatCurrency(agedOf(r))}</strong>
                         <div style={{ fontSize: 11, color: '#94a3b8' }}>{pct(agedOf(r), r.debt_total)}%</div>
                       </td>
                       <td data-label="التغيّر">{changeCell(r.change)}</td>
@@ -354,7 +354,7 @@ export default function DebtAging() {
             <div className="table-wrapper">
               <table className="responsive-cards">
                 <thead>
-                  <tr><th>المنطقة</th><th>عدد المناديب</th><th>إجمالي الدين</th><th>% من الشركة</th><th>متقادمة (٩١+)</th><th>% متقادم</th></tr>
+                  <tr><th>المنطقة</th><th>عدد المناديب</th><th>إجمالي الدين</th><th>% من الشركة</th><th>متقادمة (91+)</th><th>% متقادم</th></tr>
                 </thead>
                 <tbody>
                   {byRegion.map(g => (
@@ -363,7 +363,7 @@ export default function DebtAging() {
                       <td data-label="عدد المناديب">{formatNumber(g.reps)}</td>
                       <td data-label="إجمالي الدين"><strong>{formatCurrency(g.debt_total)}</strong></td>
                       <td data-label="% من الشركة"><span className="badge badge-info">{pct(g.debt_total, company.debt_total)}%</span></td>
-                      <td data-label="متقادمة (٩١+)">{formatCurrency(agedOf(g))}</td>
+                      <td data-label="متقادمة (91+)">{formatCurrency(agedOf(g))}</td>
                       <td data-label="% متقادم">{pct(agedOf(g), g.debt_total)}%</td>
                     </tr>
                   ))}
@@ -378,7 +378,7 @@ export default function DebtAging() {
             <div className="table-wrapper">
               <table className="responsive-cards">
                 <thead>
-                  <tr><th>المشرف</th><th>عدد المناديب</th><th>إجمالي الدين</th><th>% من الشركة</th><th>متقادمة (٩١+)</th><th>% متقادم</th></tr>
+                  <tr><th>المشرف</th><th>عدد المناديب</th><th>إجمالي الدين</th><th>% من الشركة</th><th>متقادمة (91+)</th><th>% متقادم</th></tr>
                 </thead>
                 <tbody>
                   {bySupervisor.map(g => (
@@ -387,7 +387,7 @@ export default function DebtAging() {
                       <td data-label="عدد المناديب">{formatNumber(g.reps)}</td>
                       <td data-label="إجمالي الدين"><strong>{formatCurrency(g.debt_total)}</strong></td>
                       <td data-label="% من الشركة"><span className="badge badge-info">{pct(g.debt_total, company.debt_total)}%</span></td>
-                      <td data-label="متقادمة (٩١+)">{formatCurrency(agedOf(g))}</td>
+                      <td data-label="متقادمة (91+)">{formatCurrency(agedOf(g))}</td>
                       <td data-label="% متقادم">{pct(agedOf(g), g.debt_total)}%</td>
                     </tr>
                   ))}

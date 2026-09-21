@@ -25,11 +25,11 @@ const ASSIGNABLE_FIELDS = [
   { key: 'km', label: 'الكيلومترات' },
   { key: 'daily_expenses', label: 'المصروفات اليومية' },
   { key: 'debt_total', label: 'إجمالي الدين' },
-  { key: 'debt_1_45', label: 'دين ٤٥-٦٠ يوم' },
-  { key: 'debt_over_60', label: 'دين ٦١-٩٠ يوم' },
-  { key: 'debt_over_90', label: 'دين ٩١-١٢٠ يوم' },
-  { key: 'debt_over_120', label: 'دين ١٢١-١٥٠ يوم' },
-  { key: 'debt_over_150', label: 'دين فوق ١٥٠ يوم' },
+  { key: 'debt_1_45', label: 'دين 45-60 يوم' },
+  { key: 'debt_over_60', label: 'دين 61-90 يوم' },
+  { key: 'debt_over_90', label: 'دين 91-120 يوم' },
+  { key: 'debt_over_120', label: 'دين 121-150 يوم' },
+  { key: 'debt_over_150', label: 'دين فوق 150 يوم' },
   { key: 'notes', label: 'ملاحظات' },
 ];
 

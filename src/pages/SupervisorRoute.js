@@ -112,7 +112,7 @@ export default function SupervisorRoute({ user, refreshSignal }) {
                         )}
                       </div>
                       <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                        {v.check_in_time ? new Date(v.check_in_time).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                        {v.check_in_time ? new Date(v.check_in_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '—'}
                         {v.gps_lat && v.gps_lng && (
                           <a
                             href={`https://www.google.com/maps?q=${v.gps_lat},${v.gps_lng}`}

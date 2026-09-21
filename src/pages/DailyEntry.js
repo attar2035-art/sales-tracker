@@ -18,11 +18,11 @@ const EMPTY_ENTRY = {
 // Debt-aging buckets (entered per rep per day) + their labels for the form.
 const DEBT_FIELDS = [
   { key: 'debt_total', label: 'إجمالي الدين' },
-  { key: 'debt_1_45', label: 'من ٤٥ إلى ٦٠ يوم' },
-  { key: 'debt_over_60', label: 'من ٦١ إلى ٩٠ يوم' },
-  { key: 'debt_over_90', label: 'من ٩١ إلى ١٢٠ يوم' },
-  { key: 'debt_over_120', label: 'من ١٢١ إلى ١٥٠ يوم' },
-  { key: 'debt_over_150', label: 'فوق ١٥٠ يوم' },
+  { key: 'debt_1_45', label: 'من 45 إلى 60 يوم' },
+  { key: 'debt_over_60', label: 'من 61 إلى 90 يوم' },
+  { key: 'debt_over_90', label: 'من 91 إلى 120 يوم' },
+  { key: 'debt_over_120', label: 'من 121 إلى 150 يوم' },
+  { key: 'debt_over_150', label: 'فوق 150 يوم' },
 ];
 const DEBT_KEYS = DEBT_FIELDS.map(f => f.key);
 // ALL numeric entry fields accept a "+"-sum for merged regions (everything the
@@ -414,7 +414,7 @@ export default function DailyEntry({ user }) {
                         fontWeight: 800,
                         color: netSales > 0 ? '#10b981' : netSales < 0 ? '#ef4444' : 'var(--text-secondary)',
                       }}>
-                        {netSales.toLocaleString('ar-EG')}{netSales < 0 ? ' (مرتجع صافي)' : ''}
+                        {netSales.toLocaleString('en-US')}{netSales < 0 ? ' (مرتجع صافي)' : ''}
                       </div>
                     ) : SUM_KEYS.includes(f.key) ? (
                       <>
@@ -532,7 +532,7 @@ export default function DailyEntry({ user }) {
             </div>
             {/* Computed: due-to-collect = from 61 days up (excludes 45-60). */}
             <div style={{ marginTop: '0.75rem', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-              <span style={{ color: '#9a3412', fontWeight: 700 }}>💰 المبلغ المستحق تحصيله (من ٦١ يوم فأكثر)</span>
+              <span style={{ color: '#9a3412', fontWeight: 700 }}>💰 المبلغ المستحق تحصيله (من 61 يوم فأكثر)</span>
               <strong style={{ color: '#c2410c', fontSize: '1.15rem' }}>
                 {(sumExpr(form.debt_over_60) + sumExpr(form.debt_over_90) + sumExpr(form.debt_over_120) + sumExpr(form.debt_over_150)).toLocaleString('en')}
               </strong>
