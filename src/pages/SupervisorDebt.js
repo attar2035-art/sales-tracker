@@ -122,7 +122,7 @@ export default function SupervisorDebt({ supervisorId }) {
                       ))}
                       <td data-label="٪ من هدف التحصيل">
                         {r.target > 0
-                          ? <strong style={{ fontWeight: 800 }}>{r.pctOfTarget}% من هدف التحصيل</strong>
+                          ? <strong style={{ fontWeight: 800, fontSize: '1.05rem' }}>{r.pctOfTarget}%</strong>
                           : <span style={{ color: '#94a3b8' }}>لا يوجد هدف</span>}
                       </td>
                     </tr>

@@ -218,7 +218,10 @@ tbody tr:last-child td { border-bottom: none; }
   table.responsive-cards tr td:last-child { border-bottom: none; }
   table.responsive-cards td::before {
     content: attr(data-label); font-weight: 700; color: var(--text-secondary);
-    text-align: right; flex-shrink: 0;
+    text-align: right;
+    /* allow a long label to shrink/wrap instead of squeezing the value into a
+       one-character-wide column (which stacked text vertically on phones) */
+    flex: 0 1 auto; min-width: 0; max-width: 62%; overflow-wrap: break-word;
     font-size: 0.85rem; /* keep labels compact so the numbers stand out */
   }
   table.responsive-cards td.no-label::before { content: none; }
