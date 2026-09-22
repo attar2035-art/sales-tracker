@@ -285,7 +285,7 @@ export default function DebtAging() {
                   <thead>
                     <tr>
                       <th>المندوب</th><th>المنطقة</th><th>هدف التحصيل</th><th>المحصّل</th>
-                      <th>المطلوب تحصيله</th><th>المستحق تحصيله (61+)</th><th>المديونية فوق 60 يوم ٪ من هدف التحصيل</th>
+                      <th>المطلوب تحصيله</th><th>المستحق تحصيله (61+)</th><th>المديونية فوق 60 يوم</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -299,7 +299,7 @@ export default function DebtAging() {
                           <td data-label="المحصّل">{formatCurrency(x.collected)}</td>
                           <td data-label="المطلوب تحصيله"><strong style={{ color: x.remaining > 0 ? '#b45309' : '#166534' }}>{formatCurrency(x.remaining)}</strong></td>
                           <td data-label="المستحق تحصيله (61+)"><strong style={{ color: '#dc2626', fontSize: '1.05rem' }}>{formatCurrency(x.arrears)}</strong></td>
-                          <td data-label="المديونية فوق 60 يوم ٪ من هدف التحصيل"><strong style={{ color: st.color, fontWeight: 800, fontSize: '1.05rem' }}>{st.txt}</strong></td>
+                          <td data-label="المديونية فوق 60 يوم"><strong style={{ color: st.color, fontWeight: 800, fontSize: '1.05rem' }}>{st.txt}</strong></td>
                         </tr>
                       );
                     })}
