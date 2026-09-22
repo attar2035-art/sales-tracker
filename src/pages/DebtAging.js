@@ -148,7 +148,6 @@ export default function DebtAging() {
   // واضحة من هدف التحصيل — رقم صريح بدون تفسير قد يُفهم خطأ.
   const covState = (x) => ({
     txt: `${pct(x.arrears, x.target)}% من هدف التحصيل`,
-    color: '#0f172a',
   });
 
   const changeCell = (change) => {
@@ -299,7 +298,9 @@ export default function DebtAging() {
                           <td data-label="المحصّل">{formatCurrency(x.collected)}</td>
                           <td data-label="المطلوب تحصيله"><strong style={{ color: x.remaining > 0 ? '#b45309' : '#166534' }}>{formatCurrency(x.remaining)}</strong></td>
                           <td data-label="المستحق تحصيله (61+)"><strong style={{ color: '#dc2626', fontSize: '1.05rem' }}>{formatCurrency(x.arrears)}</strong></td>
-                          <td data-label="المديونية فوق 60 يوم"><strong style={{ color: st.color, fontWeight: 800, fontSize: '1.05rem' }}>{st.txt}</strong></td>
+                          <td data-label="المديونية فوق 60 يوم">
+                            <span style={{ display: 'inline-block', background: '#2563eb', color: '#ffffff', fontWeight: 800, fontSize: '0.95rem', padding: '6px 12px', borderRadius: 8, lineHeight: 1.5 }}>{st.txt}</span>
+                          </td>
                         </tr>
                       );
                     })}
