@@ -10,6 +10,7 @@ import {
   getMonthPhase,
 } from '../lib/helpers';
 import { buildEffectiveTargetsMap } from '../lib/targets';
+import { DEBT_BUCKETS, DEBT_COLUMNS, debtDueOf, debtPct } from '../lib/debtAging';
 import {
   sumBy,
   getSixMonthWindow,
@@ -97,6 +98,7 @@ export default function RepDashboard({ repId }) {
   const [regionStrategy, setRegionStrategy] = useState(null);
   const [regionProfile, setRegionProfile] = useState({ customers: 0, products: 0, source: 'computed' });
   const [history, setHistory] = useState([]);
+  const [debtSnap, setDebtSnap] = useState(null); // latest debt-aging snapshot for this rep
   const [loading, setLoading] = useState(false);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,7 +126,7 @@ export default function RepDashboard({ repId }) {
   const fetchDetails = async (isCurrent = () => true) => {
     setLoading(true);
     const historyWindow = getSixMonthWindow(year, month);
-    const [entriesResult, targetsResult, historyResult] = await Promise.all([
+    const [entriesResult, targetsResult, historyResult, debtResult] = await Promise.all([
       supabase.from('daily_entries').select('*')
         .eq('rep_id', repId).eq('year', year).eq('month', month).order('entry_date'),
       supabase.from('monthly_targets').select('*')
@@ -134,12 +136,20 @@ export default function RepDashboard({ repId }) {
         .gte('entry_date', historyWindow.startDate)
         .lte('entry_date', historyWindow.endDate)
         .order('entry_date'),
+      // Latest debt-aging snapshot for this rep (the row where debt was actually
+      // entered), regardless of month — this is the current outstanding balance.
+      supabase.from('daily_entries').select(DEBT_COLUMNS)
+        .eq('rep_id', repId)
+        .not('field_owners->>debt_total', 'is', null)
+        .order('entry_date', { ascending: false })
+        .limit(1),
     ]);
     if (!isCurrent()) return; // a newer month/rep selection superseded this response
     if (entriesResult.data) setEntries(entriesResult.data);
     const targetMap = buildEffectiveTargetsMap(targetsResult.data || [], year, month);
     setTarget(targetMap[repId] || null);
     setHistory(buildHistoryRows(historyWindow.months, historyResult.data || [], targetsResult.data || [], repId));
+    setDebtSnap(debtResult.data?.[0] || null);
     setLoading(false);
   };
 
@@ -547,6 +557,41 @@ export default function RepDashboard({ repId }) {
                 monthProgress={monthProgress}
               />
             ))}
+          </div>
+
+          {/* مديونيتي — the rep's own debt-aging snapshot (own data only via RLS) */}
+          <div className="card" style={{ borderInlineStart: '4px solid #dc2626' }}>
+            <div className="card-title">🏦 مديونيتي</div>
+            {!debtSnap ? (
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+                لا توجد مديونية مسجّلة على حسابك حتى الآن.
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: '0.75rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 700 }}>إجمالي ديني</span>
+                  <strong style={{ fontSize: '1.45rem', color: 'var(--text-primary)' }}>{formatCurrency(debtSnap.debt_total)}</strong>
+                </div>
+                <div style={{ background: '#3a1d14', border: '1px solid #7c2d12', borderRadius: 10, padding: '12px 14px', marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                  <span style={{ color: '#fdba74', fontWeight: 800 }}>💰 المستحق تحصيله (فوق 60 يوم)</span>
+                  <span style={{ color: '#f87171', fontWeight: 800, fontSize: '1.4rem' }}>{formatCurrency(debtDueOf(debtSnap))}</span>
+                </div>
+                {target?.target_collection > 0 && (
+                  <div style={{ fontSize: '0.95rem', color: 'var(--text-primary)', marginBottom: '0.85rem', fontWeight: 700 }}>
+                    = {debtPct(debtDueOf(debtSnap), target.target_collection)}% من هدف التحصيل ({formatCurrency(target.target_collection)})
+                  </div>
+                )}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(95px, 1fr))', gap: 8 }}>
+                  {DEBT_BUCKETS.map(b => (
+                    <div key={b.key} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '10px 8px', textAlign: 'center', background: '#111827' }}>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: 4 }}>{b.label}</div>
+                      <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>{formatCurrency(debtSnap[b.key])}</strong>
+                      <div style={{ fontSize: '0.75rem', color: '#f59e0b', marginTop: 2, fontWeight: 700 }}>{debtPct(debtSnap[b.key], debtSnap.debt_total)}%</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
           <section className="rep-panel">

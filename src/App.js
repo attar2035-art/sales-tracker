@@ -18,6 +18,7 @@ import SupervisorFollowup from './pages/SupervisorFollowup';
 import KnowledgeCenter from './pages/KnowledgeCenter';
 import PermissionsCenter from './pages/PermissionsCenter';
 import DebtAging from './pages/DebtAging';
+import SupervisorDebt from './pages/SupervisorDebt';
 import RoutePlan from './pages/RoutePlan';
 import RouteExecution from './pages/RouteExecution';
 import RoutePlanFollowup from './pages/RoutePlanFollowup';
@@ -49,6 +50,7 @@ const NAV_SUPERVISOR = [
   { key: 'myroute', label: 'زياراتي اليوم', icon: '📍' },
   { key: 'routeplan', label: 'خطة خط السير', icon: '🗺️' },
   { key: 'routefollow', label: 'متابعة خط السير', icon: '📋' },
+  { key: 'teamdebt', label: 'مديونية مناديبي', icon: '🏦' },
   { key: 'knowledge', label: 'مركز المعرفة', icon: '🧠' },
   { key: 'repdetails', label: 'تفاصيل المندوب', icon: '👤' },
   { key: 'customers', label: 'العملاء', icon: '👥' },
@@ -215,6 +217,7 @@ export default function App() {
       if (page === 'myroute') return <SupervisorRoute user={user} refreshSignal={visitRefresh} />;
       if (page === 'routeplan') return <RoutePlan user={user} />;
       if (page === 'routefollow') return <RoutePlanFollowup />;
+      if (page === 'teamdebt') return <SupervisorDebt supervisorId={user.supervisor_id} />;
       if (page === 'knowledge') return <KnowledgeCenter user={user} />;
       if (page === 'repdetails') return <RepDetails supervisorId={user.supervisor_id} />;
       if (page === 'customers') return <Customers user={user} />;
