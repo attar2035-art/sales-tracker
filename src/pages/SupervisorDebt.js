@@ -113,7 +113,7 @@ export default function SupervisorDebt({ supervisorId }) {
                       <td data-label="المندوب"><strong>{r.name}</strong></td>
                       <td data-label="المنطقة">{r.region}</td>
                       <td data-label="إجمالي الدين"><strong>{formatCurrency(r.debt_total)}</strong></td>
-                      <td data-label="المستحق تحصيله (61+)"><strong style={{ color: '#dc2626', fontSize: '1.05rem' }}>{formatCurrency(r.due)}</strong></td>
+                      <td className="due-band" data-label="المستحق تحصيله (61+)"><strong className="due-amount" style={{ fontSize: '1.05rem' }}>{formatCurrency(r.due)}</strong></td>
                       {DEBT_BUCKETS.map(b => (
                         <td key={b.key} data-label={b.label}>
                           {formatCurrency(r.buckets[b.key])}

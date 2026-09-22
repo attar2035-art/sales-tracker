@@ -297,7 +297,7 @@ export default function DebtAging() {
                           <td data-label="هدف التحصيل">{formatCurrency(x.target)}</td>
                           <td data-label="المحصّل">{formatCurrency(x.collected)}</td>
                           <td data-label="المطلوب تحصيله"><strong style={{ color: x.remaining > 0 ? '#b45309' : '#166534' }}>{formatCurrency(x.remaining)}</strong></td>
-                          <td data-label="المستحق تحصيله (61+)"><strong style={{ color: '#dc2626', fontSize: '1.05rem' }}>{formatCurrency(x.arrears)}</strong></td>
+                          <td className="due-band" data-label="المستحق تحصيله (61+)"><strong className="due-amount" style={{ fontSize: '1.05rem' }}>{formatCurrency(x.arrears)}</strong></td>
                           <td className="debt-ratio" data-label="المديونية فوق 60 يوم">
                             <span className="ratio-chip">{st.txt}</span>
                           </td>
@@ -329,7 +329,7 @@ export default function DebtAging() {
                       <td data-label="المنطقة">{r.region}</td>
                       <td data-label="المشرف">{r.supervisor}</td>
                       <td data-label="إجمالي الدين"><strong>{formatCurrency(r.debt_total)}</strong></td>
-                      <td data-label="المستحق تحصيله (61+)"><strong style={{ color: '#c2410c' }}>{formatCurrency(dueOf(r))}</strong></td>
+                      <td className="due-band" data-label="المستحق تحصيله (61+)"><strong className="due-amount">{formatCurrency(dueOf(r))}</strong></td>
                       {BUCKETS.map(b => (
                         <td key={b.key} data-label={b.label}>
                           {formatCurrency(r[b.key])}
