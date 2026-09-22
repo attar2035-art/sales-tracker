@@ -237,6 +237,14 @@ tbody tr:last-child td { border-bottom: none; }
     background: transparent; color: #ffffff; padding: 0; border-radius: 0;
     font-size: 1.05rem; text-align: left;
   }
+  /* "Due to collect" cell: whole row becomes one solid red band with the
+     label and the amount both white inside it. */
+  table.responsive-cards td.due-band {
+    background: #dc2626; border-radius: 10px; padding: 12px 14px;
+    margin: 4px 0; border-bottom: none; gap: 0.75rem;
+  }
+  table.responsive-cards td.due-band::before { color: #ffffff; max-width: 55%; }
+  table.responsive-cards td.due-band .due-amount { color: #ffffff; font-size: 1.25rem; }
 }
 
 /* Blue "% of collection target" chip (desktop table view) */
@@ -245,6 +253,9 @@ tbody tr:last-child td { border-bottom: none; }
   font-weight: 800; font-size: 0.95rem; padding: 6px 12px;
   border-radius: 8px; line-height: 1.5;
 }
+
+/* "Due to collect" amount — red on desktop, turns white inside the red band on mobile */
+.due-amount { color: #dc2626; }
 
 /* ---- Progress / badges -------------------------------------------------- */
 .progress-bar { height: 6px; background: #334155; border-radius: 99px; overflow: hidden; margin-top: 4px; }
