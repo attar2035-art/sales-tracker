@@ -298,8 +298,8 @@ export default function DebtAging() {
                           <td data-label="المحصّل">{formatCurrency(x.collected)}</td>
                           <td data-label="المطلوب تحصيله"><strong style={{ color: x.remaining > 0 ? '#b45309' : '#166534' }}>{formatCurrency(x.remaining)}</strong></td>
                           <td data-label="المستحق تحصيله (61+)"><strong style={{ color: '#dc2626', fontSize: '1.05rem' }}>{formatCurrency(x.arrears)}</strong></td>
-                          <td data-label="المديونية فوق 60 يوم">
-                            <span style={{ display: 'inline-block', background: '#2563eb', color: '#ffffff', fontWeight: 800, fontSize: '0.95rem', padding: '6px 12px', borderRadius: 8, lineHeight: 1.5 }}>{st.txt}</span>
+                          <td className="debt-ratio" data-label="المديونية فوق 60 يوم">
+                            <span className="ratio-chip">{st.txt}</span>
                           </td>
                         </tr>
                       );

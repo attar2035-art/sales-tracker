@@ -226,6 +226,24 @@ tbody tr:last-child td { border-bottom: none; }
   }
   table.responsive-cards td.no-label::before { content: none; }
   table.responsive-cards td.no-label { justify-content: stretch; }
+  /* Ratio cell: the whole row becomes one solid blue band with the label AND
+     the value both in white inside it (a complete coloured rectangle). */
+  table.responsive-cards td.debt-ratio {
+    background: #2563eb; border-radius: 10px; padding: 12px 14px;
+    margin: 4px 0; border-bottom: none; gap: 0.75rem;
+  }
+  table.responsive-cards td.debt-ratio::before { color: #ffffff; max-width: 55%; }
+  table.responsive-cards td.debt-ratio .ratio-chip {
+    background: transparent; color: #ffffff; padding: 0; border-radius: 0;
+    font-size: 1.05rem; text-align: left;
+  }
+}
+
+/* Blue "% of collection target" chip (desktop table view) */
+.ratio-chip {
+  display: inline-block; background: #2563eb; color: #ffffff;
+  font-weight: 800; font-size: 0.95rem; padding: 6px 12px;
+  border-radius: 8px; line-height: 1.5;
 }
 
 /* ---- Progress / badges -------------------------------------------------- */

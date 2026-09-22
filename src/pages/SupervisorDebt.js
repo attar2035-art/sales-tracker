@@ -120,9 +120,9 @@ export default function SupervisorDebt({ supervisorId }) {
                           <div style={{ fontSize: 11, color: '#94a3b8' }}>{debtPct(r.buckets[b.key], r.debt_total)}%</div>
                         </td>
                       ))}
-                      <td data-label="٪ من هدف التحصيل">
+                      <td className={r.target > 0 ? 'debt-ratio' : ''} data-label="٪ من هدف التحصيل">
                         {r.target > 0
-                          ? <span style={{ display: 'inline-block', background: '#2563eb', color: '#ffffff', fontWeight: 800, fontSize: '0.95rem', padding: '6px 12px', borderRadius: 8, lineHeight: 1.5 }}>{r.pctOfTarget}%</span>
+                          ? <span className="ratio-chip">{r.pctOfTarget}%</span>
                           : <span style={{ color: '#94a3b8' }}>لا يوجد هدف</span>}
                       </td>
                     </tr>
