@@ -144,11 +144,12 @@ export default function DebtAging() {
     return { list: list.sort((a, b) => b.remaining - a.remaining), totals };
   }, [rows, targets, collections, asOf]);
 
-  const covState = (x) => {
-    if (x.remaining <= 0) return { txt: '✅ الهدف مغطّى', color: '#166534' };
-    if (x.arrears >= x.remaining) return { txt: '🟢 المتأخرات تكفي', color: '#166534' };
-    return { txt: `🔴 غير كافية (${pct(x.arrears, x.remaining)}%)`, color: '#b91c1c' };
-  };
+  // بدل حكم «كافية/غير كافية» (كان بيلخبط): نعرض المديونية فوق 60 يوم كنسبة
+  // واضحة من هدف التحصيل — رقم صريح بدون تفسير قد يُفهم خطأ.
+  const covState = (x) => ({
+    txt: `${pct(x.arrears, x.target)}% من هدف التحصيل`,
+    color: '#0f172a',
+  });
 
   const changeCell = (change) => {
     if (change == null) return <span style={{ color: '#94a3b8' }}>—</span>;
@@ -284,7 +285,7 @@ export default function DebtAging() {
                   <thead>
                     <tr>
                       <th>المندوب</th><th>المنطقة</th><th>هدف التحصيل</th><th>المحصّل</th>
-                      <th>المطلوب تحصيله</th><th>المستحق تحصيله (61+)</th><th>الحالة</th>
+                      <th>المطلوب تحصيله</th><th>المستحق تحصيله (61+)</th><th>المديونية فوق 60 يوم ٪ من هدف التحصيل</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -298,7 +299,7 @@ export default function DebtAging() {
                           <td data-label="المحصّل">{formatCurrency(x.collected)}</td>
                           <td data-label="المطلوب تحصيله"><strong style={{ color: x.remaining > 0 ? '#b45309' : '#166534' }}>{formatCurrency(x.remaining)}</strong></td>
                           <td data-label="المستحق تحصيله (61+)"><strong style={{ color: '#dc2626', fontSize: '1.05rem' }}>{formatCurrency(x.arrears)}</strong></td>
-                          <td data-label="الحالة"><span style={{ color: st.color, fontWeight: 700 }}>{st.txt}</span></td>
+                          <td data-label="المديونية فوق 60 يوم ٪ من هدف التحصيل"><strong style={{ color: st.color, fontWeight: 800, fontSize: '1.05rem' }}>{st.txt}</strong></td>
                         </tr>
                       );
                     })}
