@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { logAuditEvent } from '../lib/audit';
+import { formatCurrency } from '../lib/helpers';
+import { debtDueOf } from '../lib/debtAging';
 
 const pad2 = (n) => String(n).padStart(2, '0');
 const dateStr = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -13,7 +15,7 @@ const EMPTY = {
 };
 
 // Columns pulled for a customer so route planning can auto-fill contact + location.
-const CUSTOMER_COLS = 'id, customer_name, region_id, phone, neighborhood, city, contact_person, customer_rating, address, location_url, regions(name)';
+const CUSTOMER_COLS = 'id, customer_code, customer_name, region_id, phone, neighborhood, city, contact_person, customer_rating, address, location_url, debt_total, debt_1_45, debt_over_60, debt_over_90, debt_over_120, debt_over_150, regions(name)';
 
 // خطة خط السير اليومية — كل مندوب/مشرف يسجّل خطته بنفسه ليوم قادم.
 export default function RoutePlan({ user }) {
@@ -28,6 +30,7 @@ export default function RoutePlan({ user }) {
   const [items, setItems] = useState([]);
   const [regions, setRegions] = useState([]);
   const [scopeRegionIds, setScopeRegionIds] = useState([]); // customer search is limited to these regions
+  const [custInfo, setCustInfo] = useState({}); // customer_id -> { code + debt } for plan rows
   const [form, setForm] = useState({ ...EMPTY });
   const [search, setSearch] = useState('');
   const [results, setResults] = useState([]);
@@ -45,7 +48,18 @@ export default function RoutePlan({ user }) {
     let q = supabase.from('daily_route_plan').select('*').eq('plan_date', planDate).order('sort_order').order('created_at');
     q = ownerMatch(q);
     const { data } = await q;
-    setItems(data || []);
+    const list = data || [];
+    setItems(list);
+    // Pull each linked customer's code + debt-aging so the plan table can show them.
+    const ids = [...new Set(list.map(i => i.customer_id).filter(Boolean))];
+    if (ids.length) {
+      const { data: cust } = await supabase.from('customers')
+        .select('id, customer_code, debt_total, debt_1_45, debt_over_60, debt_over_90, debt_over_120, debt_over_150')
+        .in('id', ids);
+      const map = {};
+      (cust || []).forEach(c => { map[c.id] = c; });
+      setCustInfo(map);
+    } else setCustInfo({});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planDate, user]);
 
@@ -223,7 +237,11 @@ export default function RoutePlan({ user }) {
               {results.map(c => (
                 <div key={c.id} onClick={() => pickCustomer(c)}
                   style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', color: '#0f172a' }}>
-                  <b>{c.customer_name}</b> <span style={{ color: '#64748b', fontSize: 12 }}>— {c.regions?.name || 'بدون منطقة'}</span>
+                  <b>{c.customer_name}</b>
+                  <span style={{ color: '#64748b', fontSize: 12 }}> — {c.customer_code ? `كود ${c.customer_code} · ` : ''}{c.regions?.name || 'بدون منطقة'}</span>
+                  {Number(c.debt_total) > 0 && (
+                    <span style={{ color: '#b91c1c', fontSize: 12, fontWeight: 700 }}> · دين {formatCurrency(c.debt_total)}{debtDueOf(c) > 0 ? ` (مستحق ${formatCurrency(debtDueOf(c))})` : ''}</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -274,16 +292,23 @@ export default function RoutePlan({ user }) {
         ) : (
           <div className="table-wrapper">
             <table className="responsive-cards">
-              <thead><tr><th>#</th><th>العميل</th><th>المنطقة</th><th>الحي</th><th>التليفون</th><th>الموقع</th><th>المسؤول</th><th>الفئة</th><th>الإجراءات</th></tr></thead>
+              <thead><tr><th>#</th><th>رقم العميل</th><th>العميل</th><th>المنطقة</th><th>الحي</th><th>التليفون</th><th>الموقع</th><th>دين العميل</th><th>المسؤول</th><th>الفئة</th><th>الإجراءات</th></tr></thead>
               <tbody>
                 {items.map((it, i) => (
                   <tr key={it.id}>
                     <td data-label="#">{i + 1}</td>
+                    <td data-label="رقم العميل">{custInfo[it.customer_id]?.customer_code || '—'}</td>
                     <td data-label="العميل"><strong>{it.customer_name}</strong>{!it.customer_id && <span style={{ color: '#f59e0b', fontSize: 11 }}> (جديد)</span>}</td>
                     <td data-label="المنطقة">{regionName(it.region_id)}</td>
                     <td data-label="الحي">{it.neighborhood || '—'}</td>
                     <td data-label="التليفون">{it.phone || '—'}</td>
                     <td data-label="الموقع">{it.location_url ? <a href={it.location_url} target="_blank" rel="noreferrer" style={{ color: '#2563eb', fontWeight: 700 }}>📍 فتح</a> : (it.address || '—')}</td>
+                    <td data-label="دين العميل">{(() => {
+                      const c = custInfo[it.customer_id];
+                      if (!c || !(Number(c.debt_total) > 0)) return '—';
+                      const due = debtDueOf(c);
+                      return <span>{formatCurrency(c.debt_total)}{due > 0 && <span style={{ color: '#b91c1c', fontWeight: 700 }}> · مستحق {formatCurrency(due)}</span>}</span>;
+                    })()}</td>
                     <td data-label="المسؤول">{it.contact_person || '—'}</td>
                     <td data-label="الفئة">{it.customer_rating || '—'}</td>
                     <td className="no-label"><div className="btn-row">
