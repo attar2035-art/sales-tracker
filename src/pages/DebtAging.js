@@ -384,7 +384,7 @@ export default function DebtAging() {
           {/* Off-book customers (نون/أمازون …) — in the company total, not on a rep */}
           {offbook.length > 0 && (
             <div className="card" style={{ borderInlineStart: '4px solid #7c3aed' }}>
-              <div className="card-title">🛒 أسواق إلكترونية (خارج حساب المناديب) — {formatCurrency(offbookAgg.debt_total)}</div>
+              <div className="card-title">🚫 عملاء خارج حساب المناديب — {formatCurrency(offbookAgg.debt_total)}</div>
               <p style={{ fontSize: 12, color: 'var(--text-muted, #64748b)', marginTop: '-0.25rem', marginBottom: '0.75rem' }}>
                 داخلة في إجمالي ديون الشركة بالأعلى، لكنها <b>غير محسوبة على أي مندوب</b> — معروضة لوحدها.
               </p>
@@ -415,7 +415,7 @@ export default function DebtAging() {
 
           <p className="muted-text" style={{ fontSize: 12, marginTop: 8 }}>
             الأرقام من مديونية العملاء لكل منطقة (تُحدَّث يوميًا برفع إكسل من «تحديث ديون العملاء»).
-            «مركز مبيعات» مستبعد تمامًا من الإجمالي. «أسواق إلكترونية» (نون/أمازون) داخلة في الإجمالي لكن غير محسوبة على مندوب ومعروضة لوحدها بالأسفل.
+            «مركز مبيعات» مستبعد تمامًا من الإجمالي. «عملاء خارج حساب المناديب» (نون/أمازون/كنوز الحكمة …) داخلون في الإجمالي لكن غير محسوبين على مندوب ومعروضون لوحدهم بالأسفل.
           </p>
         </>
       )}
