@@ -2,61 +2,44 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { formatCurrency } from '../lib/helpers';
 import { buildEffectiveTargetsMap } from '../lib/targets';
-import { DEBT_BUCKETS, DEBT_COLUMNS, debtDueOf, debtPct } from '../lib/debtAging';
+import { DEBT_BUCKETS, debtDueOf, debtPct } from '../lib/debtAging';
 
-// مديونية مناديبي — the supervisor sees the latest debt-aging snapshot for each
-// rep on their team (row-level security already limits reads to their team).
+// مديونية مناديبي — the supervisor sees the current debt of each rep on their
+// team, computed from the per-customer debt snapshot (same source as «تحليل
+// المتأخرات»), honoring debt exclusions. The scoped RPC returns only this
+// supervisor's regions.
 export default function SupervisorDebt({ supervisorId }) {
-  const [reps, setReps] = useState([]);
-  const [snaps, setSnaps] = useState([]); // latest debt row per rep
+  const [snaps, setSnaps] = useState([]); // per-region/rep debt row for the team
   const [targetMap, setTargetMap] = useState({});
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
     if (!supervisorId) return;
     setLoading(true);
-    const { data: repRows } = await supabase.from('representatives')
-      .select('id, name, is_active, regions(name)')
-      .eq('supervisor_id', supervisorId).eq('is_active', true);
-    const repList = repRows || [];
-    const repIds = repList.map(r => r.id);
-    setReps(repList);
-
-    if (repIds.length === 0) { setSnaps([]); setTargetMap({}); setLoading(false); return; }
+    const { data: debtRows } = await supabase.rpc('get_debt_aging');
+    const list = debtRows || [];
+    const repIds = [...new Set(list.map(r => r.rep_id).filter(Boolean))];
 
     const now = new Date();
-    const [debtRes, targetsRes] = await Promise.all([
-      supabase.from('daily_entries').select(`rep_id, ${DEBT_COLUMNS}`)
-        .in('rep_id', repIds)
-        .not('field_owners->>debt_total', 'is', null)
-        .order('entry_date', { ascending: false })
-        .limit(20000),
-      supabase.from('monthly_targets').select('*').in('rep_id', repIds).limit(10000),
-    ]);
+    const targetsRes = repIds.length
+      ? await supabase.from('monthly_targets').select('*').in('rep_id', repIds).limit(10000)
+      : { data: [] };
 
-    // Keep the newest debt row per rep (rows already sorted date desc).
-    const latest = new Map();
-    for (const row of (debtRes.data || [])) {
-      if (!latest.has(row.rep_id)) latest.set(row.rep_id, row);
-    }
-    setSnaps([...latest.values()]);
+    setSnaps(list);
     setTargetMap(buildEffectiveTargetsMap(targetsRes.data || [], now.getFullYear(), now.getMonth() + 1));
     setLoading(false);
   }, [supervisorId]);
 
   useEffect(() => { load(); }, [load]);
 
-  const repById = useMemo(() => new Map(reps.map(r => [r.id, r])), [reps]);
-
   const rows = useMemo(() => {
     const list = snaps.map(s => {
-      const rep = repById.get(s.rep_id);
       const due = debtDueOf(s);
       const target = Number(targetMap[s.rep_id]?.target_collection) || 0;
       return {
-        repId: s.rep_id,
-        name: rep?.name || 'مندوب',
-        region: rep?.regions?.name || 'بدون منطقة',
+        repId: s.rep_id || s.region_id,
+        name: s.rep_name || 'مندوب',
+        region: s.region_name || 'بدون منطقة',
         debt_total: Number(s.debt_total) || 0,
         due,
         target,
@@ -65,7 +48,7 @@ export default function SupervisorDebt({ supervisorId }) {
       };
     });
     return list.sort((a, b) => b.due - a.due); // most to collect first
-  }, [snaps, repById, targetMap]);
+  }, [snaps, targetMap]);
 
   const totals = useMemo(() => rows.reduce((a, r) => {
     a.debt_total += r.debt_total; a.due += r.due; return a;
