@@ -19,6 +19,7 @@ const findCol = (headers, test) => headers.findIndex(h => test(norm(h)));
 
 const TARGETS = [
   { key: 'code', label: 'رقم العميل (الكود)', guess: (h) => h.includes('رقم العميل') || h === 'كود' || h.includes('كود العميل') },
+  { key: 'name', label: 'اسم العميل', guess: (h) => h.includes('اسم العميل') || h === 'الاسم' || h === 'اسم' },
   { key: 'debt_total', label: 'إجمالي الدين (المبلغ)', guess: (h) => (h === 'المبلغ' || h.includes('اجمالي') || h.includes('إجمالي')) && !h.includes('حد') },
   { key: 'debt_1_45', label: '45-60 يوم', guess: (h) => h.includes('45') && h.includes('60') },
   { key: 'debt_over_60', label: '61-90 يوم', guess: (h) => h.includes('61') && h.includes('90') },
@@ -73,6 +74,7 @@ export default function CustomerDebtUpload() {
     if (!dataRows.length || map.code == null) return { rows: [], total: 0, count: 0 };
     const rows = dataRows.map(r => ({
       code: norm(r[map.code]),
+      name: map.name != null ? norm(r[map.name]) : '',
       debt_total: map.debt_total != null ? num(r[map.debt_total]) : 0,
       debt_1_45: map.debt_1_45 != null ? num(r[map.debt_1_45]) : 0,
       debt_over_60: map.debt_over_60 != null ? num(r[map.debt_over_60]) : 0,
@@ -87,13 +89,13 @@ export default function CustomerDebtUpload() {
   const apply = async () => {
     if (!regionId) { showMsg('اختر المنطقة أولًا', 'error'); return; }
     if (!preview.count) { showMsg('لا توجد صفوف صالحة — تأكد من عمود رقم العميل', 'error'); return; }
-    if (!window.confirm(`تحديث ديون ${preview.count} عميل لمنطقة «${regions.find(r => r.id === regionId)?.name}»؟\nالعملاء غير الموجودين في الملف سيصبح دينهم صفر (لقطة جديدة).`)) return;
+    if (!window.confirm(`تحديث ديون ${preview.count} عميل لمنطقة «${regions.find(r => r.id === regionId)?.name}»؟\nالعملاء غير الموجودين في الملف سيصبح دينهم صفر (لقطة جديدة). أي كود جديد في الملف سيُضاف كعميل جديد للمنطقة.`)) return;
     setBusy(true); setResult(null);
     const { data, error } = await supabase.rpc('import_customer_debt', { p_rows: preview.rows, p_region_id: regionId });
     if (error) { showMsg('خطأ: ' + error.message, 'error'); setBusy(false); return; }
     setResult(data);
-    await logAuditEvent({ eventType: 'import', pageKey: 'debtupload', entityType: 'customers', details: { region: regionId, updated: data?.updated, rows: preview.count } });
-    showMsg(`✓ تم تحديث ${data?.updated || 0} عميل`, 'success');
+    await logAuditEvent({ eventType: 'import', pageKey: 'debtupload', entityType: 'customers', details: { region: regionId, updated: data?.updated, inserted: data?.inserted, rows: preview.count } });
+    showMsg(`✓ تم تحديث ${data?.updated || 0} عميل${data?.inserted ? ` وإضافة ${data.inserted} عميل جديد` : ''}`, 'success');
     setBusy(false);
   };
 
@@ -157,12 +159,13 @@ export default function CustomerDebtUpload() {
           <div className="table-wrapper">
             <table className="responsive-cards">
               <thead><tr>
-                <th>رقم العميل</th><th>الإجمالي</th><th>45-60</th><th>61-90</th><th>91-120</th><th>121-150</th><th>فوق 150</th>
+                <th>رقم العميل</th><th>الاسم</th><th>الإجمالي</th><th>45-60</th><th>61-90</th><th>91-120</th><th>121-150</th><th>فوق 150</th>
               </tr></thead>
               <tbody>
                 {preview.rows.slice(0, 8).map((x, i) => (
                   <tr key={i}>
                     <td data-label="رقم العميل"><strong>{x.code}</strong></td>
+                    <td data-label="الاسم">{x.name || '—'}</td>
                     <td data-label="الإجمالي">{formatCurrency(x.debt_total)}</td>
                     <td data-label="45-60">{formatCurrency(x.debt_1_45)}</td>
                     <td data-label="61-90">{formatCurrency(x.debt_over_60)}</td>
@@ -186,10 +189,11 @@ export default function CustomerDebtUpload() {
       {result && (
         <div className="card" style={{ borderInlineStart: '4px solid #16a34a' }}>
           <div className="card-title">نتيجة التحديث</div>
-          <div style={{ fontSize: 15 }}>✅ تم تحديث <strong>{result.updated}</strong> عميل.</div>
+          <div style={{ fontSize: 15 }}>✅ تم تحديث <strong>{result.updated}</strong> عميل
+            {result.inserted ? <> · وإضافة <strong>{result.inserted}</strong> عميل جديد</> : null}.</div>
           {Array.isArray(result.unmatched) && result.unmatched.length > 0 && (
             <div style={{ marginTop: 8, color: '#b45309' }}>
-              ⚠️ {result.unmatched.length} رقم عميل في الملف غير موجود في النظام (لم يُحدَّث):
+              ⚠️ {result.unmatched.length} رقم عميل بدون منطقة محددة (لم يُحدَّث):
               <div style={{ fontSize: 12, marginTop: 4, wordBreak: 'break-word' }}>{result.unmatched.slice(0, 30).join('، ')}{result.unmatched.length > 30 ? ' …' : ''}</div>
             </div>
           )}
