@@ -27,13 +27,21 @@ const addInto = (acc, row) => {
 };
 const agedOf = (o) => AGED_KEYS.reduce((s, k) => s + (Number(o[k]) || 0), 0);
 
+const fmtDate = (d) => {
+  if (!d) return '—';
+  const dt = new Date(d);
+  if (isNaN(dt)) return '—';
+  const pad2 = (n) => String(n).padStart(2, '0');
+  return `${dt.getFullYear()}/${pad2(dt.getMonth() + 1)}/${pad2(dt.getDate())}`;
+};
+
 export default function DebtAging() {
   const today = new Date();
   const pad2 = (n) => String(n).padStart(2, '0');
   const todayStr = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}-${pad2(today.getDate())}`;
-  const [asOf, setAsOf] = useState(todayStr);
-  const [reps, setReps] = useState([]);
-  const [entries, setEntries] = useState([]);
+  // Per-region debt aggregates (from the per-customer debt snapshot that data
+  // entry refreshes daily via «تحديث ديون العملاء»). One row per region/rep.
+  const [regionRows, setRegionRows] = useState([]);
   const [targets, setTargets] = useState([]);
   const [collections, setCollections] = useState([]); // {rep_id, daily_collection} this month
   const [loading, setLoading] = useState(false);
@@ -41,93 +49,72 @@ export default function DebtAging() {
   const [openBucket, setOpenBucket] = useState(null);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [asOf]);
+  useEffect(() => { load(); }, []);
 
   const load = async () => {
     setLoading(true);
-    const [y, m] = asOf.split('-').map(Number);
-    const [repsRes, entriesRes, targetsRes, collRes] = await Promise.all([
-      supabase.from('representatives')
-        .select('id, name, is_active, supervisor_id, supervisors(name), regions(name)')
-        .eq('is_active', true),
-      // Rows where debt was actually ENTERED (its owner is recorded in
-      // field_owners), on or before the chosen date, newest first — so each
-      // rep's latest snapshot is the current balance even if it was paid down
-      // to zero (a real 0 differs from "no debt entered", which we skip).
-      supabase.from('daily_entries')
-        .select('rep_id, entry_date, debt_total, debt_1_45, debt_over_60, debt_over_90, debt_over_120, debt_over_150')
-        .lte('entry_date', asOf)
-        .not('field_owners->>debt_total', 'is', null)
-        .order('entry_date', { ascending: false })
-        .limit(20000),
+    const [y, m] = todayStr.split('-').map(Number);
+    const [debtRes, targetsRes, collRes] = await Promise.all([
+      // Company debt aging from the per-customer snapshot (SECURITY DEFINER RPC
+      // → consistent company totals for every authorized viewer; excludes
+      // regions flagged out of the company total, e.g. مركز مبيعات).
+      supabase.rpc('get_company_debt_aging'),
       supabase.from('monthly_targets').select('*').limit(10000),
-      // Collection booked so far in the selected month (to date), per rep.
+      // Collection booked so far this month (to date), per rep.
       supabase.from('daily_entries').select('rep_id, daily_collection')
-        .eq('year', y).eq('month', m).lte('entry_date', asOf).limit(50000),
+        .eq('year', y).eq('month', m).lte('entry_date', todayStr).limit(50000),
     ]);
-    if (repsRes.data) setReps(repsRes.data);
-    setEntries(entriesRes.data || []);
+    if (debtRes.error) console.error('debt aging:', debtRes.error);
+    setRegionRows(debtRes.data || []);
     setTargets(targetsRes.data || []);
     setCollections(collRes.data || []);
     setLoading(false);
   };
 
-  // Per-rep latest snapshot (+ previous for the day-over-day change).
+  // Normalise the RPC rows into the shape the tables use (one row per rep).
   const rows = useMemo(() => {
-    const repById = new Map(reps.map(r => [r.id, r]));
-    const byRep = new Map();
-    for (const e of entries) {
-      const list = byRep.get(e.rep_id) || [];
-      list.push(e); // already sorted date desc
-      byRep.set(e.rep_id, list);
-    }
-    const out = [];
-    for (const [repId, list] of byRep.entries()) {
-      const rep = repById.get(repId);
-      if (!rep) continue; // inactive/unknown rep
-      const cur = list[0];
-      const prev = list[1];
-      out.push({
-        repId,
-        name: rep.name,
-        region: rep.regions?.name || 'بدون منطقة',
-        supervisor: rep.supervisors?.name || 'بدون مشرف',
-        date: cur.entry_date,
-        debt_total: Number(cur.debt_total) || 0,
-        debt_1_45: Number(cur.debt_1_45) || 0,
-        debt_over_60: Number(cur.debt_over_60) || 0,
-        debt_over_90: Number(cur.debt_over_90) || 0,
-        debt_over_120: Number(cur.debt_over_120) || 0,
-        debt_over_150: Number(cur.debt_over_150) || 0,
-        change: prev != null ? (Number(cur.debt_total) || 0) - (Number(prev.debt_total) || 0) : null,
-      });
-    }
-    return out.sort((a, b) => b.debt_total - a.debt_total);
-  }, [entries, reps]);
+    return (regionRows || []).map(r => ({
+      repId: r.rep_id,
+      name: r.rep_name || 'بدون مندوب',
+      region: r.region_name || 'بدون منطقة',
+      supervisor: r.supervisor_name || 'بدون مشرف',
+      customerCount: Number(r.customer_count) || 0,
+      asOf: r.debt_as_of,
+      debt_total: Number(r.debt_total) || 0,
+      debt_1_45: Number(r.debt_1_45) || 0,
+      debt_over_60: Number(r.debt_over_60) || 0,
+      debt_over_90: Number(r.debt_over_90) || 0,
+      debt_over_120: Number(r.debt_over_120) || 0,
+      debt_over_150: Number(r.debt_over_150) || 0,
+    })).sort((a, b) => b.debt_total - a.debt_total);
+  }, [regionRows]);
 
   const company = useMemo(() => rows.reduce((acc, r) => addInto(acc, r), emptyBuckets()), [rows]);
+  const lastUpdated = useMemo(() => {
+    const dates = rows.map(r => r.asOf).filter(Boolean).sort();
+    return dates.length ? dates[dates.length - 1] : null;
+  }, [rows]);
+  const totalCustomers = useMemo(() => rows.reduce((s, r) => s + r.customerCount, 0), [rows]);
 
-  const groupBy = (field) => {
+  // Group the per-region rows by supervisor (each rep belongs to one region).
+  const bySupervisor = useMemo(() => {
     const map = new Map();
     for (const r of rows) {
-      const key = r[field];
-      const g = map.get(key) || { name: key, reps: 0, ...emptyBuckets() };
+      const g = map.get(r.supervisor) || { name: r.supervisor, reps: 0, ...emptyBuckets() };
       addInto(g, r); g.reps += 1;
-      map.set(key, g);
+      map.set(r.supervisor, g);
     }
     return [...map.values()].sort((a, b) => b.debt_total - a.debt_total);
-  };
-  const byRegion = useMemo(() => groupBy('region'), [rows]); // eslint-disable-line react-hooks/exhaustive-deps
-  const bySupervisor = useMemo(() => groupBy('supervisor'), [rows]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rows]);
 
   const topDebtor = rows[0];
   const mostAged = useMemo(() => [...rows].sort((a, b) => agedOf(b) - agedOf(a))[0], [rows]);
 
   // Link arrears to the collection target: how much each rep still needs to
-  // collect to hit the monthly collection target, and whether the outstanding
-  // arrears cover that gap.
+  // collect to hit the monthly collection target, and how much overdue debt
+  // (61+ days) is available to collect against it.
   const coverage = useMemo(() => {
-    const [y, m] = asOf.split('-').map(Number);
+    const [y, m] = todayStr.split('-').map(Number);
     const tMap = buildEffectiveTargetsMap(targets, y, m);
     const collByRep = {};
     for (const c of collections) collByRep[c.rep_id] = (collByRep[c.rep_id] || 0) + (Number(c.daily_collection) || 0);
@@ -142,33 +129,17 @@ export default function DebtAging() {
       a.target += x.target; a.collected += x.collected; a.remaining += x.remaining; a.arrears += x.arrears; return a;
     }, { target: 0, collected: 0, remaining: 0, arrears: 0 });
     return { list: list.sort((a, b) => b.remaining - a.remaining), totals };
-  }, [rows, targets, collections, asOf]);
+  }, [rows, targets, collections, todayStr]);
 
-  // بدل حكم «كافية/غير كافية» (كان بيلخبط): نعرض المديونية فوق 60 يوم كنسبة
-  // واضحة من هدف التحصيل — رقم صريح بدون تفسير قد يُفهم خطأ.
-  const covState = (x) => ({
-    txt: `${pct(x.arrears, x.target)}% من هدف التحصيل`,
-  });
-
-  const changeCell = (change) => {
-    if (change == null) return <span style={{ color: '#94a3b8' }}>—</span>;
-    if (change === 0) return <span style={{ color: '#94a3b8' }}>ثابت</span>;
-    const up = change > 0; // debt went up = bad
-    return (
-      <span style={{ color: up ? '#ef4444' : '#10b981', fontWeight: 700 }}>
-        {up ? '▲' : '▼'} {formatCurrency(Math.abs(change))}
-      </span>
-    );
-  };
+  // نعرض المديونية فوق 60 يوم كنسبة واضحة من هدف التحصيل — رقم صريح.
+  const covState = (x) => ({ txt: `${pct(x.arrears, x.target)}% من هدف التحصيل` });
 
   return (
     <div>
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
         <h1 className="page-title">🏦 تحليل المتأخرات (أعمار الديون)</h1>
-        <div className="form-group" style={{ margin: 0 }}>
-          <label className="form-label" style={{ display: 'inline-block', marginInlineEnd: '0.5rem' }}>حتى تاريخ</label>
-          <input className="form-input" type="date" value={asOf} max={todayStr}
-            onChange={e => setAsOf(e.target.value)} style={{ display: 'inline-block', width: 'auto' }} />
+        <div style={{ fontSize: 13, color: 'var(--text-muted, #64748b)', fontWeight: 700 }}>
+          آخر تحديث للمديونية: {fmtDate(lastUpdated)}
         </div>
       </div>
 
@@ -177,7 +148,7 @@ export default function DebtAging() {
       ) : rows.length === 0 ? (
         <div className="card"><div className="empty-state">
           <div className="empty-state-icon">🏦</div>
-          <div className="empty-state-text">لا توجد بيانات ديون مسجّلة حتى هذا التاريخ. أدخِلها من شاشة الإدخال اليومي (قسم أعمار الديون).</div>
+          <div className="empty-state-text">لا توجد بيانات ديون بعد. تُحدَّث من شاشة «تحديث ديون العملاء» برفع ملف إكسل لكل منطقة.</div>
         </div></div>
       ) : (
         <>
@@ -191,6 +162,7 @@ export default function DebtAging() {
               </span>
             </div>
             <p style={{ fontSize: 12, color: 'var(--text-muted, #64748b)', marginTop: '-0.25rem', marginBottom: '0.75rem' }}>
+              الأرقام محسوبة من مديونية كل عميل (المرفوعة عبر «تحديث ديون العملاء») — {formatNumber(totalCustomers)} عميل عليه مديونية.
               اضغط أي فترة لعرض تفاصيل المبالغ — مين عليه كام.
             </p>
             <div className="form-grid">
@@ -317,17 +289,18 @@ export default function DebtAging() {
               <table className="responsive-cards">
                 <thead>
                   <tr>
-                    <th>المندوب</th><th>المنطقة</th><th>المشرف</th><th>إجمالي الدين</th><th>المستحق تحصيله (61+)</th>
+                    <th>المندوب</th><th>المنطقة</th><th>المشرف</th><th>عملاء</th><th>إجمالي الدين</th><th>المستحق تحصيله (61+)</th>
                     {BUCKETS.map(b => <th key={b.key}>{b.label}</th>)}
-                    <th>متقادمة (91+)</th><th>التغيّر</th>
+                    <th>متقادمة (91+)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {[...rows].sort((a, b) => agedOf(b) - agedOf(a)).map(r => (
-                    <tr key={r.repId}>
+                    <tr key={r.repId || r.region}>
                       <td data-label="المندوب"><strong>{r.name}</strong></td>
                       <td data-label="المنطقة">{r.region}</td>
                       <td data-label="المشرف">{r.supervisor}</td>
+                      <td data-label="عملاء">{formatNumber(r.customerCount)}</td>
                       <td data-label="إجمالي الدين"><strong>{formatCurrency(r.debt_total)}</strong></td>
                       <td className="due-band" data-label="المستحق تحصيله (61+)"><strong className="due-amount">{formatCurrency(dueOf(r))}</strong></td>
                       {BUCKETS.map(b => (
@@ -339,15 +312,11 @@ export default function DebtAging() {
                       <td data-label="متقادمة (91+)"><strong style={{ color: '#b45309' }}>{formatCurrency(agedOf(r))}</strong>
                         <div style={{ fontSize: 11, color: '#94a3b8' }}>{pct(agedOf(r), r.debt_total)}%</div>
                       </td>
-                      <td data-label="التغيّر">{changeCell(r.change)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p className="muted-text" style={{ fontSize: 12, marginTop: 8 }}>
-              التغيّر = فرق إجمالي الدين عن آخر إدخال سابق للمندوب (🔺 زيادة الدين، 🔻 انخفاضه).
-            </p>
           </div>
 
           {/* By region */}
@@ -356,13 +325,13 @@ export default function DebtAging() {
             <div className="table-wrapper">
               <table className="responsive-cards">
                 <thead>
-                  <tr><th>المنطقة</th><th>عدد المناديب</th><th>إجمالي الدين</th><th>% من الشركة</th><th>متقادمة (91+)</th><th>% متقادم</th></tr>
+                  <tr><th>المنطقة</th><th>المندوب</th><th>إجمالي الدين</th><th>% من الشركة</th><th>متقادمة (91+)</th><th>% متقادم</th></tr>
                 </thead>
                 <tbody>
-                  {byRegion.map(g => (
-                    <tr key={g.name}>
-                      <td data-label="المنطقة"><strong>{g.name}</strong></td>
-                      <td data-label="عدد المناديب">{formatNumber(g.reps)}</td>
+                  {rows.map(g => (
+                    <tr key={g.region}>
+                      <td data-label="المنطقة"><strong>{g.region}</strong></td>
+                      <td data-label="المندوب">{g.name}</td>
                       <td data-label="إجمالي الدين"><strong>{formatCurrency(g.debt_total)}</strong></td>
                       <td data-label="% من الشركة"><span className="badge badge-info">{pct(g.debt_total, company.debt_total)}%</span></td>
                       <td data-label="متقادمة (91+)">{formatCurrency(agedOf(g))}</td>
@@ -397,6 +366,11 @@ export default function DebtAging() {
               </table>
             </div>
           </div>
+
+          <p className="muted-text" style={{ fontSize: 12, marginTop: 8 }}>
+            الأرقام من مديونية العملاء لكل منطقة (تُحدَّث يوميًا برفع إكسل من «تحديث ديون العملاء»).
+            «مركز مبيعات» (حسابات الجملة المركزية) مستبعد من إجمالي ديون الشركة.
+          </p>
         </>
       )}
     </div>
