@@ -42,6 +42,8 @@ export default function DebtAging() {
   // Per-region debt aggregates (from the per-customer debt snapshot that data
   // entry refreshes daily via «تحديث ديون العملاء»). One row per region/rep.
   const [regionRows, setRegionRows] = useState([]);
+  // Off-book customers (نون/أمازون …): in the company total but not on any rep.
+  const [offbook, setOffbook] = useState([]);
   const [targets, setTargets] = useState([]);
   const [collections, setCollections] = useState([]); // {rep_id, daily_collection} this month
   const [loading, setLoading] = useState(false);
@@ -54,11 +56,15 @@ export default function DebtAging() {
   const load = async () => {
     setLoading(true);
     const [y, m] = todayStr.split('-').map(Number);
-    const [debtRes, targetsRes, collRes] = await Promise.all([
+    const [debtRes, offRes, targetsRes, collRes] = await Promise.all([
       // Company debt aging from the per-customer snapshot (SECURITY DEFINER RPC
       // → consistent company totals for every authorized viewer; excludes
-      // regions flagged out of the company total, e.g. مركز مبيعات).
+      // regions flagged out of the company total, e.g. مركز مبيعات، وعملاء
+      // «خارج حساب المناديب»).
       supabase.rpc('get_company_debt_aging'),
+      // Off-book customers (نون/أمازون …) — counted in the company total but
+      // shown separately, not on any rep.
+      supabase.rpc('get_offbook_debt'),
       supabase.from('monthly_targets').select('*').limit(10000),
       // Collection booked so far this month (to date), per rep.
       supabase.from('daily_entries').select('rep_id, daily_collection')
@@ -66,6 +72,7 @@ export default function DebtAging() {
     ]);
     if (debtRes.error) console.error('debt aging:', debtRes.error);
     setRegionRows(debtRes.data || []);
+    setOffbook(offRes.data || []);
     setTargets(targetsRes.data || []);
     setCollections(collRes.data || []);
     setLoading(false);
@@ -89,12 +96,19 @@ export default function DebtAging() {
     })).sort((a, b) => b.debt_total - a.debt_total);
   }, [regionRows]);
 
-  const company = useMemo(() => rows.reduce((acc, r) => addInto(acc, r), emptyBuckets()), [rows]);
+  // Off-book aggregate (نون/أمازون …) — added into the company total below.
+  const offbookAgg = useMemo(() => (offbook || []).reduce((acc, r) => addInto(acc, r), emptyBuckets()), [offbook]);
+  const offbookCount = useMemo(() => (offbook || []).filter(r => Number(r.debt_total) > 0).length, [offbook]);
+  // Company total = all region (rep) rows + the off-book customers.
+  const company = useMemo(() => {
+    const acc = rows.reduce((a, r) => addInto(a, r), emptyBuckets());
+    return addInto(acc, offbookAgg);
+  }, [rows, offbookAgg]);
   const lastUpdated = useMemo(() => {
-    const dates = rows.map(r => r.asOf).filter(Boolean).sort();
+    const dates = [...rows.map(r => r.asOf), ...(offbook || []).map(r => r.debt_as_of)].filter(Boolean).sort();
     return dates.length ? dates[dates.length - 1] : null;
-  }, [rows]);
-  const totalCustomers = useMemo(() => rows.reduce((s, r) => s + r.customerCount, 0), [rows]);
+  }, [rows, offbook]);
+  const totalCustomers = useMemo(() => rows.reduce((s, r) => s + r.customerCount, 0) + offbookCount, [rows, offbookCount]);
 
   // Group the per-region rows by supervisor (each rep belongs to one region).
   const bySupervisor = useMemo(() => {
@@ -367,9 +381,41 @@ export default function DebtAging() {
             </div>
           </div>
 
+          {/* Off-book customers (نون/أمازون …) — in the company total, not on a rep */}
+          {offbook.length > 0 && (
+            <div className="card" style={{ borderInlineStart: '4px solid #7c3aed' }}>
+              <div className="card-title">🛒 أسواق إلكترونية (خارج حساب المناديب) — {formatCurrency(offbookAgg.debt_total)}</div>
+              <p style={{ fontSize: 12, color: 'var(--text-muted, #64748b)', marginTop: '-0.25rem', marginBottom: '0.75rem' }}>
+                داخلة في إجمالي ديون الشركة بالأعلى، لكنها <b>غير محسوبة على أي مندوب</b> — معروضة لوحدها.
+              </p>
+              <div className="table-wrapper">
+                <table className="responsive-cards">
+                  <thead>
+                    <tr>
+                      <th>العميل</th><th>المنطقة</th><th>إجمالي الدين</th><th>المستحق تحصيله (61+)</th>
+                      {BUCKETS.map(b => <th key={b.key}>{b.label}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {offbook.map(c => (
+                      <tr key={c.customer_code}>
+                        <td data-label="العميل"><strong>{c.customer_name}</strong>
+                          <div style={{ fontSize: 11, color: '#94a3b8' }}>كود {c.customer_code}</div></td>
+                        <td data-label="المنطقة">{c.region_name}</td>
+                        <td data-label="إجمالي الدين"><strong>{formatCurrency(c.debt_total)}</strong></td>
+                        <td className="due-band" data-label="المستحق تحصيله (61+)"><strong className="due-amount">{formatCurrency(dueOf(c))}</strong></td>
+                        {BUCKETS.map(b => <td key={b.key} data-label={b.label}>{formatCurrency(c[b.key])}</td>)}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           <p className="muted-text" style={{ fontSize: 12, marginTop: 8 }}>
             الأرقام من مديونية العملاء لكل منطقة (تُحدَّث يوميًا برفع إكسل من «تحديث ديون العملاء»).
-            «مركز مبيعات» (حسابات الجملة المركزية) مستبعد من إجمالي ديون الشركة.
+            «مركز مبيعات» مستبعد تمامًا من الإجمالي. «أسواق إلكترونية» (نون/أمازون) داخلة في الإجمالي لكن غير محسوبة على مندوب ومعروضة لوحدها بالأسفل.
           </p>
         </>
       )}
