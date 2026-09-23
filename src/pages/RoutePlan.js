@@ -9,7 +9,11 @@ const shiftDate = (s, days) => { const d = new Date(s); d.setDate(d.getDate() + 
 const EMPTY = {
   customer_id: null, customer_name: '', region_id: '', neighborhood: '',
   city: '', phone: '', contact_person: '', customer_rating: '', notes: '',
+  address: '', location_url: '',
 };
+
+// Columns pulled for a customer so route planning can auto-fill contact + location.
+const CUSTOMER_COLS = 'id, customer_name, region_id, phone, neighborhood, city, contact_person, customer_rating, address, location_url, regions(name)';
 
 // خطة خط السير اليومية — كل مندوب/مشرف يسجّل خطته بنفسه ليوم قادم.
 export default function RoutePlan({ user }) {
@@ -23,6 +27,7 @@ export default function RoutePlan({ user }) {
   const [sourceDate, setSourceDate] = useState(shiftDate(dateStr(tomorrow), -7));
   const [items, setItems] = useState([]);
   const [regions, setRegions] = useState([]);
+  const [scopeRegionIds, setScopeRegionIds] = useState([]); // customer search is limited to these regions
   const [form, setForm] = useState({ ...EMPTY });
   const [search, setSearch] = useState('');
   const [results, setResults] = useState([]);
@@ -47,22 +52,57 @@ export default function RoutePlan({ user }) {
   useEffect(() => {
     supabase.from('regions').select('id, name').order('name').then(({ data }) => setRegions(data || []));
   }, []);
+
+  // Limit the customer search to the current user's own region(s): a rep sees
+  // their region's customers, a supervisor sees all their team's regions.
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      let ids = [];
+      if (isRep && user?.rep_id) {
+        const { data } = await supabase.from('representatives').select('region_id').eq('id', user.rep_id).single();
+        if (data?.region_id) ids = [data.region_id];
+      } else if (isSup && user?.supervisor_id) {
+        const { data } = await supabase.from('representatives').select('region_id').eq('supervisor_id', user.supervisor_id);
+        ids = [...new Set((data || []).map(r => r.region_id).filter(Boolean))];
+      }
+      if (!ignore) setScopeRegionIds(ids);
+    })();
+    return () => { ignore = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
-  // Search the customer database (name contains), to pre-fill from an existing customer.
+  // Search the customer database (name contains, within the user's regions) to
+  // pre-fill contact + location from an existing customer.
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     if (!search.trim()) { setResults([]); return; }
     searchTimer.current = setTimeout(async () => {
-      const { data } = await supabase.from('customers')
-        .select('id, customer_name, region_id, regions(name)')
-        .eq('is_active', true).ilike('customer_name', `%${search.trim()}%`).limit(15);
+      let q = supabase.from('customers').select(CUSTOMER_COLS)
+        .eq('is_active', true).ilike('customer_name', `%${search.trim()}%`);
+      if (scopeRegionIds.length) q = q.in('region_id', scopeRegionIds);
+      const { data } = await q.limit(15);
       setResults(data || []);
     }, 250);
-  }, [search]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, scopeRegionIds]);
 
   const pickCustomer = (c) => {
-    setForm(prev => ({ ...prev, customer_id: c.id, customer_name: c.customer_name, region_id: c.region_id || '' }));
+    setForm(prev => ({
+      ...prev,
+      customer_id: c.id,
+      customer_name: c.customer_name,
+      region_id: c.region_id || '',
+      phone: c.phone || '',
+      neighborhood: c.neighborhood || '',
+      city: c.city || '',
+      contact_person: c.contact_person || '',
+      customer_rating: c.customer_rating || '',
+      address: c.address || '',
+      location_url: c.location_url || '',
+    }));
     setSearch(c.customer_name); setResults([]);
   };
 
@@ -79,7 +119,8 @@ export default function RoutePlan({ user }) {
       ...owner, plan_date: planDate, off_plan: false, visited: false,
       customer_id: it.customer_id, customer_name: it.customer_name, region_id: it.region_id,
       neighborhood: it.neighborhood, city: it.city, phone: it.phone, contact_person: it.contact_person,
-      customer_rating: it.customer_rating, notes: it.notes, created_by: user.id, sort_order: items.length + i,
+      customer_rating: it.customer_rating, address: it.address, location_url: it.location_url,
+      notes: it.notes, created_by: user.id, sort_order: items.length + i,
     }));
     const { error } = await supabase.from('daily_route_plan').insert(rows);
     if (error) showMsg('خطأ: ' + error.message, 'error');
@@ -103,6 +144,8 @@ export default function RoutePlan({ user }) {
       phone: form.phone.trim() || null,
       contact_person: form.contact_person.trim() || null,
       customer_rating: form.customer_rating.trim() || null,
+      address: form.address.trim() || null,
+      location_url: form.location_url.trim() || null,
       notes: form.notes.trim() || null,
       created_by: user.id,
       updated_at: new Date().toISOString(),
@@ -124,6 +167,7 @@ export default function RoutePlan({ user }) {
       customer_id: it.customer_id, customer_name: it.customer_name, region_id: it.region_id || '',
       neighborhood: it.neighborhood || '', city: it.city || '', phone: it.phone || '',
       contact_person: it.contact_person || '', customer_rating: it.customer_rating || '', notes: it.notes || '',
+      address: it.address || '', location_url: it.location_url || '',
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -209,6 +253,10 @@ export default function RoutePlan({ user }) {
               <option value="C">C — عادي</option>
               <option value="D">D — ضعيف</option>
             </select></div>
+          <div className="form-group"><label className="form-label">العنوان</label>
+            <input className="form-input" value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} placeholder="العنوان / وصف الموقع" /></div>
+          <div className="form-group"><label className="form-label">رابط الموقع (خرائط جوجل)</label>
+            <input className="form-input" type="url" inputMode="url" value={form.location_url} onChange={e => setForm(p => ({ ...p, location_url: e.target.value }))} placeholder="https://maps.google.com/..." /></div>
         </div>
         <div className="form-group"><label className="form-label">ملاحظات</label>
           <input className="form-input" value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="ملاحظات (اختياري)" /></div>
@@ -226,7 +274,7 @@ export default function RoutePlan({ user }) {
         ) : (
           <div className="table-wrapper">
             <table className="responsive-cards">
-              <thead><tr><th>#</th><th>العميل</th><th>المنطقة</th><th>الحي</th><th>التليفون</th><th>المسؤول</th><th>الفئة</th><th>الإجراءات</th></tr></thead>
+              <thead><tr><th>#</th><th>العميل</th><th>المنطقة</th><th>الحي</th><th>التليفون</th><th>الموقع</th><th>المسؤول</th><th>الفئة</th><th>الإجراءات</th></tr></thead>
               <tbody>
                 {items.map((it, i) => (
                   <tr key={it.id}>
@@ -235,6 +283,7 @@ export default function RoutePlan({ user }) {
                     <td data-label="المنطقة">{regionName(it.region_id)}</td>
                     <td data-label="الحي">{it.neighborhood || '—'}</td>
                     <td data-label="التليفون">{it.phone || '—'}</td>
+                    <td data-label="الموقع">{it.location_url ? <a href={it.location_url} target="_blank" rel="noreferrer" style={{ color: '#2563eb', fontWeight: 700 }}>📍 فتح</a> : (it.address || '—')}</td>
                     <td data-label="المسؤول">{it.contact_person || '—'}</td>
                     <td data-label="الفئة">{it.customer_rating || '—'}</td>
                     <td className="no-label"><div className="btn-row">
