@@ -19,6 +19,7 @@ import KnowledgeCenter from './pages/KnowledgeCenter';
 import PermissionsCenter from './pages/PermissionsCenter';
 import DebtAging from './pages/DebtAging';
 import SupervisorDebt from './pages/SupervisorDebt';
+import CustomerDebtUpload from './pages/CustomerDebtUpload';
 import RoutePlan from './pages/RoutePlan';
 import RouteExecution from './pages/RouteExecution';
 import RoutePlanFollowup from './pages/RoutePlanFollowup';
@@ -33,6 +34,7 @@ const NAV_ADMIN = [
   { key: 'repdetails', label: 'تفاصيل المندوب', icon: '👤' },
   { key: 'supervisors', label: 'متابعة المشرفين', icon: '👔' },
   { key: 'debt', label: 'تحليل المتأخرات', icon: '🏦' },
+  { key: 'debtupload', label: 'تحديث ديون العملاء', icon: '📥' },
   { key: 'routeexec', label: 'تنفيذ خط السير', icon: '✅' },
   { key: 'routefollow', label: 'متابعة خط السير', icon: '📋' },
   { key: 'customers', label: 'العملاء', icon: '👥' },
@@ -65,6 +67,7 @@ const NAV_DATA_ENTRY = [
   { key: 'routeexec', label: 'تنفيذ خط السير', icon: '✅' },
   { key: 'targets', label: 'الأهداف الشهرية', icon: '🎯' },
   { key: 'debt', label: 'تحليل المتأخرات', icon: '🏦' },
+  { key: 'debtupload', label: 'تحديث ديون العملاء', icon: '📥' },
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
 ];
 
@@ -196,6 +199,7 @@ export default function App() {
       if (page === 'password') return <ChangePassword />;
       if (page === 'targets') return <Targets />;
       if (page === 'debt') return <DebtAging />;
+      if (page === 'debtupload') return <CustomerDebtUpload />;
       if (page === 'routeexec') return <RouteExecution user={user} />;
       // Company-wide, read-only view of all regions' numbers.
       if (page === 'dashboard') return <Dashboard />;
@@ -233,6 +237,7 @@ export default function App() {
         case 'repdetails': return <RepDetails />;
         case 'supervisors': return <SupervisorFollowup />;
         case 'debt': return <DebtAging />;
+        case 'debtupload': return <CustomerDebtUpload />;
         case 'routeexec': return <RouteExecution user={user} />;
         case 'routefollow': return <RoutePlanFollowup />;
         case 'customers': return <Customers user={user} />;
