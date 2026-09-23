@@ -10,7 +10,7 @@ import {
   getMonthPhase,
 } from '../lib/helpers';
 import { buildEffectiveTargetsMap } from '../lib/targets';
-import { DEBT_BUCKETS, DEBT_COLUMNS, debtDueOf, debtPct } from '../lib/debtAging';
+import { DEBT_BUCKETS, debtDueOf, debtPct } from '../lib/debtAging';
 import {
   sumBy,
   getSixMonthWindow,
@@ -136,13 +136,10 @@ export default function RepDashboard({ repId }) {
         .gte('entry_date', historyWindow.startDate)
         .lte('entry_date', historyWindow.endDate)
         .order('entry_date'),
-      // Latest debt-aging snapshot for this rep (the row where debt was actually
-      // entered), regardless of month — this is the current outstanding balance.
-      supabase.from('daily_entries').select(DEBT_COLUMNS)
-        .eq('rep_id', repId)
-        .not('field_owners->>debt_total', 'is', null)
-        .order('entry_date', { ascending: false })
-        .limit(1),
+      // Current outstanding balance for this rep's region, computed from the
+      // per-customer debt snapshot (same source as «تحليل المتأخرات»), honoring
+      // debt exclusions (marketplace accounts نون/أمازون، مناطق مستبعدة).
+      supabase.rpc('get_debt_aging'),
     ]);
     if (!isCurrent()) return; // a newer month/rep selection superseded this response
     if (entriesResult.data) setEntries(entriesResult.data);
