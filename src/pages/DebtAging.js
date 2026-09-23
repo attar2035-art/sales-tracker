@@ -49,6 +49,19 @@ export default function DebtAging() {
   const [loading, setLoading] = useState(false);
   // Which bucket box is expanded to show its per-rep breakdown.
   const [openBucket, setOpenBucket] = useState(null);
+  // Drill-down: which region's customer list is open (customer-level arrears).
+  const [openRegion, setOpenRegion] = useState(null);
+  const [regionCusts, setRegionCusts] = useState([]);
+  const [custLoading, setCustLoading] = useState(false);
+
+  const toggleRegionDrill = async (regionId) => {
+    if (openRegion === regionId) { setOpenRegion(null); setRegionCusts([]); return; }
+    setOpenRegion(regionId); setRegionCusts([]); setCustLoading(true);
+    const { data, error } = await supabase.rpc('get_region_customer_debt', { p_region_id: regionId });
+    if (error) console.error('region customer debt:', error);
+    setRegionCusts(data || []);
+    setCustLoading(false);
+  };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
@@ -82,6 +95,7 @@ export default function DebtAging() {
   const rows = useMemo(() => {
     return (regionRows || []).map(r => ({
       repId: r.rep_id,
+      regionId: r.region_id,
       name: r.rep_name || 'بدون مندوب',
       region: r.region_name || 'بدون منطقة',
       supervisor: r.supervisor_name || 'بدون مشرف',
@@ -299,6 +313,9 @@ export default function DebtAging() {
           {/* Per-rep table */}
           <div className="card">
             <div className="card-title">تفصيل المناديب (الأكثر تأخيرًا أولًا — 91+ يوم)</div>
+            <p style={{ fontSize: 12, color: 'var(--text-muted, #64748b)', marginTop: '-0.25rem', marginBottom: '0.75rem' }}>
+              👆 اضغط على أي مندوب لعرض <b>عملائه</b> اللي عليهم مديونية بالتفصيل (مين عليه كام).
+            </p>
             <div className="table-wrapper">
               <table className="responsive-cards">
                 <thead>
@@ -310,8 +327,10 @@ export default function DebtAging() {
                 </thead>
                 <tbody>
                   {[...rows].sort((a, b) => agedOf(b) - agedOf(a)).map(r => (
-                    <tr key={r.repId || r.region}>
-                      <td data-label="المندوب"><strong>{r.name}</strong></td>
+                    <tr key={r.repId || r.region}
+                      onClick={() => r.regionId && toggleRegionDrill(r.regionId)}
+                      style={{ cursor: r.regionId ? 'pointer' : 'default', background: openRegion === r.regionId ? 'rgba(14,165,233,0.08)' : undefined }}>
+                      <td data-label="المندوب"><strong>{openRegion === r.regionId ? '▾ ' : '▸ '}{r.name}</strong></td>
                       <td data-label="المنطقة">{r.region}</td>
                       <td data-label="المشرف">{r.supervisor}</td>
                       <td data-label="عملاء">{formatNumber(r.customerCount)}</td>
@@ -332,6 +351,54 @@ export default function DebtAging() {
               </table>
             </div>
           </div>
+
+          {/* Customer-level drill-down for the clicked rep/region */}
+          {openRegion && (() => {
+            const meta = rows.find(r => r.regionId === openRegion);
+            const totalDue = regionCusts.reduce((s, c) => s + dueOf(c), 0);
+            return (
+              <div className="card" style={{ borderInlineStart: '4px solid #0ea5e9' }}>
+                <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                  <span>🧾 عملاء {meta?.name || ''} ({meta?.region || ''}) عليهم مديونية{!custLoading ? ` — ${formatNumber(regionCusts.length)} عميل` : ''}</span>
+                  <button className="btn btn-ghost" style={{ padding: '2px 10px', fontSize: 13 }} onClick={() => { setOpenRegion(null); setRegionCusts([]); }}>✕ إغلاق</button>
+                </div>
+                {custLoading ? (
+                  <div className="loading"><div className="spinner" />جاري التحميل...</div>
+                ) : regionCusts.length === 0 ? (
+                  <div style={{ color: '#64748b', fontSize: 14 }}>لا يوجد عملاء عليهم مديونية في هذه المنطقة.</div>
+                ) : (
+                  <>
+                    <p style={{ fontSize: 12, color: 'var(--text-muted, #64748b)', marginTop: '-0.25rem', marginBottom: '0.6rem' }}>
+                      مرتّبون بالأكثر استحقاقًا للتحصيل (61+ يوم). إجمالي المستحق تحصيله بالقائمة: <b>{formatCurrency(totalDue)}</b>.
+                    </p>
+                    <div className="table-wrapper">
+                      <table className="responsive-cards">
+                        <thead>
+                          <tr>
+                            <th>العميل</th><th>المدينة</th><th>التليفون</th><th>إجمالي الدين</th><th>المستحق تحصيله (61+)</th>
+                            {BUCKETS.map(b => <th key={b.key}>{b.label}</th>)}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {regionCusts.map(c => (
+                            <tr key={c.customer_code}>
+                              <td data-label="العميل"><strong>{c.customer_name}</strong>
+                                <div style={{ fontSize: 11, color: '#94a3b8' }}>كود {c.customer_code}{c.debt_offbook ? ' · خارج حساب المندوب' : ''}</div></td>
+                              <td data-label="المدينة">{c.city || '—'}</td>
+                              <td data-label="التليفون">{c.phone || '—'}</td>
+                              <td data-label="إجمالي الدين"><strong>{formatCurrency(c.debt_total)}</strong></td>
+                              <td className="due-band" data-label="المستحق تحصيله (61+)"><strong className="due-amount">{formatCurrency(dueOf(c))}</strong></td>
+                              {BUCKETS.map(b => <td key={b.key} data-label={b.label}>{formatCurrency(c[b.key])}</td>)}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           {/* By region */}
           <div className="card">
