@@ -95,12 +95,17 @@ export default function RoutePlan({ user }) {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     if (!search.trim()) { setResults([]); return; }
     searchTimer.current = setTimeout(async () => {
+      // Strong search: match by name OR code OR phone, from the first character.
+      // Strip characters that would break the PostgREST or() filter.
+      const term = search.trim().replace(/[,()*]/g, ' ').trim();
+      if (!term) { setResults([]); return; }
       let q = supabase.from('customers').select(CUSTOMER_COLS)
-        .eq('is_active', true).ilike('customer_name', `%${search.trim()}%`);
+        .eq('is_active', true)
+        .or(`customer_name.ilike.%${term}%,customer_code.ilike.%${term}%,phone.ilike.%${term}%`);
       if (scopeRegionIds.length) q = q.in('region_id', scopeRegionIds);
-      const { data } = await q.limit(15);
+      const { data } = await q.limit(20);
       setResults(data || []);
-    }, 250);
+    }, 200);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, scopeRegionIds]);
 
@@ -259,7 +264,7 @@ export default function RoutePlan({ user }) {
       <div className="card">
         <div className="card-title">{editId ? '✏️ تعديل عميل في الخطة' : '➕ إضافة عميل للخطة'}</div>
         <div className="form-group" style={{ position: 'relative' }}>
-          <label className="form-label">ابحث عن العميل (من قاعدة العملاء) أو اكتب اسم جديد</label>
+          <label className="form-label">ابحث بالاسم أو الكود أو التليفون (من أول حرف) — أو اكتب اسم جديد</label>
           <input className="form-input" value={search}
             onChange={e => { setSearch(e.target.value); setSelectedCust(null); setForm(prev => ({ ...prev, customer_id: null, customer_name: e.target.value })); }}
             placeholder="اكتب اسم العميل..." />
@@ -269,7 +274,7 @@ export default function RoutePlan({ user }) {
                 <div key={c.id} onClick={() => pickCustomer(c)}
                   style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', color: '#0f172a' }}>
                   <b>{c.customer_name}</b>
-                  <span style={{ color: '#64748b', fontSize: 12 }}> — {c.customer_code ? `كود ${c.customer_code} · ` : ''}{c.regions?.name || 'بدون منطقة'}</span>
+                  <span style={{ color: '#64748b', fontSize: 12 }}> — {c.customer_code ? `كود ${c.customer_code}` : ''}{c.city ? ` · ${c.city}` : ''}{c.phone ? ` · ${c.phone}` : ''}</span>
                   {Number(c.debt_total) > 0 && (
                     <span style={{ color: '#b91c1c', fontSize: 12, fontWeight: 700 }}> · دين {formatCurrency(c.debt_total)}{debtDueOf(c) > 0 ? ` (مستحق ${formatCurrency(debtDueOf(c))})` : ''}</span>
                   )}
