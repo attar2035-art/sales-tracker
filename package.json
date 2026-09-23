@@ -10,7 +10,7 @@
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
     "recharts": "^2.10.0",
-    "xlsx": "npm:@e965/xlsx@^0.20.3"
+    "xlsx": "^0.18.5"
   },
   "scripts": {
     "start": "react-scripts start",
