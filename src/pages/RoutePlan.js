@@ -33,7 +33,10 @@ export default function RoutePlan({ user }) {
   const [custInfo, setCustInfo] = useState({}); // customer_id -> { code + debt } for plan rows
   const [selectedCust, setSelectedCust] = useState(null); // the picked customer record (for the header + first-time completion)
   const [form, setForm] = useState({ ...EMPTY });
-  const [search, setSearch] = useState('');
+  // Three separate search boxes: by name, by code, by phone.
+  const [sName, setSName] = useState('');
+  const [sCode, setSCode] = useState('');
+  const [sPhone, setSPhone] = useState('');
   const [results, setResults] = useState([]);
   const [msg, setMsg] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -93,21 +96,21 @@ export default function RoutePlan({ user }) {
   // pre-fill contact + location from an existing customer.
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (!search.trim()) { setResults([]); return; }
+    const clean = (s) => s.trim().replace(/[,()*%]/g, ' ').trim();
+    const nm = clean(sName), cd = clean(sCode), ph = clean(sPhone);
+    if (!nm && !cd && !ph) { setResults([]); return; }
     searchTimer.current = setTimeout(async () => {
-      // Strong search: match by name OR code OR phone, from the first character.
-      // Strip characters that would break the PostgREST or() filter.
-      const term = search.trim().replace(/[,()*]/g, ' ').trim();
-      if (!term) { setResults([]); return; }
-      let q = supabase.from('customers').select(CUSTOMER_COLS)
-        .eq('is_active', true)
-        .or(`customer_name.ilike.%${term}%,customer_code.ilike.%${term}%,phone.ilike.%${term}%`);
+      // Each filled box narrows the search on its own field (from the first char).
+      let q = supabase.from('customers').select(CUSTOMER_COLS).eq('is_active', true);
+      if (nm) q = q.ilike('customer_name', `%${nm}%`);
+      if (cd) q = q.ilike('customer_code', `%${cd}%`);
+      if (ph) q = q.ilike('phone', `%${ph}%`);
       if (scopeRegionIds.length) q = q.in('region_id', scopeRegionIds);
       const { data } = await q.limit(20);
       setResults(data || []);
     }, 200);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, scopeRegionIds]);
+  }, [sName, sCode, sPhone, scopeRegionIds]);
 
   const pickCustomer = (c) => {
     setSelectedCust(c);
@@ -124,10 +127,10 @@ export default function RoutePlan({ user }) {
       address: c.address || '',
       location_url: c.location_url || '',
     }));
-    setSearch(c.customer_name); setResults([]);
+    setSName(c.customer_name); setSCode(''); setSPhone(''); setResults([]);
   };
 
-  const resetForm = () => { setForm({ ...EMPTY }); setSearch(''); setResults([]); setEditId(null); setSelectedCust(null); };
+  const resetForm = () => { setForm({ ...EMPTY }); setSName(''); setSCode(''); setSPhone(''); setResults([]); setEditId(null); setSelectedCust(null); };
 
   // A picked existing customer whose contact fields are still blank → the rep
   // must complete them on this first visit (they save back onto the customer).
@@ -158,7 +161,8 @@ export default function RoutePlan({ user }) {
 
   const saveItem = async () => {
     if (!owner) { showMsg('هذه الصفحة للمندوب أو المشرف فقط', 'error'); return; }
-    if (!form.customer_name.trim()) { showMsg('اكتب اسم العميل أو اختره', 'error'); return; }
+    // A customer must be chosen from the database — no free-typed customers.
+    if (!form.customer_id) { showMsg('اختر العميل من نتائج البحث (بالاسم أو الكود أو التليفون)', 'error'); return; }
     // First visit for a picked customer: city/neighborhood/phone/street are required.
     if (needsCompletion) {
       const miss = [];
@@ -212,7 +216,7 @@ export default function RoutePlan({ user }) {
   };
 
   const editItem = (it) => {
-    setEditId(it.id); setSearch(it.customer_name);
+    setEditId(it.id); setSName(it.customer_name); setSCode(''); setSPhone('');
     setForm({
       customer_id: it.customer_id, customer_name: it.customer_name, region_id: it.region_id || '',
       neighborhood: it.neighborhood || '', city: it.city || '', phone: it.phone || '',
@@ -264,10 +268,18 @@ export default function RoutePlan({ user }) {
       <div className="card">
         <div className="card-title">{editId ? '✏️ تعديل عميل في الخطة' : '➕ إضافة عميل للخطة'}</div>
         <div className="form-group" style={{ position: 'relative' }}>
-          <label className="form-label">ابحث بالاسم أو الكود أو التليفون (من أول حرف) — أو اكتب اسم جديد</label>
-          <input className="form-input" value={search}
-            onChange={e => { setSearch(e.target.value); setSelectedCust(null); setForm(prev => ({ ...prev, customer_id: null, customer_name: e.target.value })); }}
-            placeholder="اكتب اسم العميل..." />
+          <label className="form-label">ابحث عن العميل (من قاعدة العملاء) — بالاسم أو الكود أو التليفون</label>
+          <div className="form-grid" style={{ marginBottom: 0 }}>
+            <input className="form-input" value={sName}
+              onChange={e => { setSName(e.target.value); if (!e.target.value) { setSelectedCust(null); setForm(p => ({ ...p, customer_id: null })); } }}
+              placeholder="🔎 اسم العميل" />
+            <input className="form-input" value={sCode} inputMode="numeric"
+              onChange={e => setSCode(e.target.value)}
+              placeholder="🔎 رقم العميل (الكود)" />
+            <input className="form-input" value={sPhone} type="tel" inputMode="tel"
+              onChange={e => setSPhone(e.target.value)}
+              placeholder="🔎 تليفون العميل" />
+          </div>
           {results.length > 0 && (
             <div style={{ position: 'absolute', zIndex: 20, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, width: '100%', maxHeight: 220, overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,.1)' }}>
               {results.map(c => (
