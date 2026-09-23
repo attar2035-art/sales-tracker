@@ -31,6 +31,7 @@ export default function RoutePlan({ user }) {
   const [regions, setRegions] = useState([]);
   const [scopeRegionIds, setScopeRegionIds] = useState([]); // customer search is limited to these regions
   const [custInfo, setCustInfo] = useState({}); // customer_id -> { code + debt } for plan rows
+  const [selectedCust, setSelectedCust] = useState(null); // the picked customer record (for the header + first-time completion)
   const [form, setForm] = useState({ ...EMPTY });
   const [search, setSearch] = useState('');
   const [results, setResults] = useState([]);
@@ -104,6 +105,7 @@ export default function RoutePlan({ user }) {
   }, [search, scopeRegionIds]);
 
   const pickCustomer = (c) => {
+    setSelectedCust(c);
     setForm(prev => ({
       ...prev,
       customer_id: c.id,
@@ -120,7 +122,12 @@ export default function RoutePlan({ user }) {
     setSearch(c.customer_name); setResults([]);
   };
 
-  const resetForm = () => { setForm({ ...EMPTY }); setSearch(''); setResults([]); setEditId(null); };
+  const resetForm = () => { setForm({ ...EMPTY }); setSearch(''); setResults([]); setEditId(null); setSelectedCust(null); };
+
+  // A picked existing customer whose contact fields are still blank → the rep
+  // must complete them on this first visit (they save back onto the customer).
+  const missingContact = (c) => !!c && (!c.phone || !c.city || !c.neighborhood || !c.address);
+  const needsCompletion = missingContact(selectedCust);
 
   // Weekly cycle: copy a previous day's planned customers into this plan_date.
   const generateFromDate = async () => {
@@ -147,6 +154,15 @@ export default function RoutePlan({ user }) {
   const saveItem = async () => {
     if (!owner) { showMsg('هذه الصفحة للمندوب أو المشرف فقط', 'error'); return; }
     if (!form.customer_name.trim()) { showMsg('اكتب اسم العميل أو اختره', 'error'); return; }
+    // First visit for a picked customer: city/neighborhood/phone/street are required.
+    if (needsCompletion) {
+      const miss = [];
+      if (!form.city.trim()) miss.push('المدينة');
+      if (!form.neighborhood.trim()) miss.push('الحي');
+      if (!form.phone.trim()) miss.push('التليفون');
+      if (!form.address.trim()) miss.push('الشارع/العنوان');
+      if (miss.length) { showMsg('أكمل بيانات العميل (مرة واحدة): ' + miss.join('، '), 'error'); return; }
+    }
     setLoading(true);
     const payload = {
       ...owner, plan_date: planDate,
@@ -169,8 +185,23 @@ export default function RoutePlan({ user }) {
     else ({ error } = await supabase.from('daily_route_plan').insert({ ...payload, sort_order: items.length }));
     if (error) showMsg('خطأ: ' + error.message, 'error');
     else {
+      // Persist the completed contact info back onto the customer (fills blanks
+      // only) — so it's captured once and won't be asked again.
+      let completed = false;
+      if (form.customer_id && needsCompletion) {
+        const { error: rpcErr } = await supabase.rpc('complete_customer_contact', {
+          p_customer_id: form.customer_id,
+          p_phone: form.phone.trim() || null,
+          p_city: form.city.trim() || null,
+          p_neighborhood: form.neighborhood.trim() || null,
+          p_address: form.address.trim() || null,
+          p_location_url: form.location_url.trim() || null,
+        });
+        if (!rpcErr) completed = true;
+      }
       await logAuditEvent({ eventType: editId ? 'update' : 'create', pageKey: 'routeplan', entityType: 'daily_route_plan', details: { customer: payload.customer_name, date: planDate } });
-      showMsg(editId ? 'تم التعديل ✓' : 'تمت الإضافة للخطة ✓'); resetForm(); fetchItems();
+      showMsg(completed ? '✓ تم حفظ بيانات العميل (مرة واحدة) وإضافته للخطة' : (editId ? 'تم التعديل ✓' : 'تمت الإضافة للخطة ✓'));
+      resetForm(); fetchItems();
     }
     setLoading(false);
   };
@@ -230,7 +261,7 @@ export default function RoutePlan({ user }) {
         <div className="form-group" style={{ position: 'relative' }}>
           <label className="form-label">ابحث عن العميل (من قاعدة العملاء) أو اكتب اسم جديد</label>
           <input className="form-input" value={search}
-            onChange={e => { setSearch(e.target.value); setForm(prev => ({ ...prev, customer_id: null, customer_name: e.target.value })); }}
+            onChange={e => { setSearch(e.target.value); setSelectedCust(null); setForm(prev => ({ ...prev, customer_id: null, customer_name: e.target.value })); }}
             placeholder="اكتب اسم العميل..." />
           {results.length > 0 && (
             <div style={{ position: 'absolute', zIndex: 20, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, width: '100%', maxHeight: 220, overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,.1)' }}>
@@ -247,6 +278,25 @@ export default function RoutePlan({ user }) {
             </div>
           )}
         </div>
+        {selectedCust && (
+          <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', marginBottom: '0.75rem', background: 'rgba(37,99,235,0.08)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+              <div>
+                <strong style={{ fontSize: '1.05rem' }}>{selectedCust.customer_name}</strong>
+                {selectedCust.customer_code && <span style={{ color: 'var(--text-secondary)', marginInlineStart: 8 }}>كود {selectedCust.customer_code}</span>}
+                {selectedCust.city && <span style={{ color: 'var(--text-secondary)', marginInlineStart: 8 }}>· {selectedCust.city}</span>}
+              </div>
+              {Number(selectedCust.debt_total) > 0 && (
+                <span style={{ color: '#dc2626', fontWeight: 800 }}>دين {formatCurrency(selectedCust.debt_total)}{debtDueOf(selectedCust) > 0 ? ` · مستحق ${formatCurrency(debtDueOf(selectedCust))}` : ''}</span>
+              )}
+            </div>
+            {needsCompletion && (
+              <div className="alert alert-warning" style={{ marginTop: 8, marginBottom: 0 }}>
+                ⚠️ أول زيارة لهذا العميل — أكمل <b>المدينة والحي والتليفون والشارع</b>. تُكتب <b>مرة واحدة فقط</b> وتُحفظ على العميل.
+              </div>
+            )}
+          </div>
+        )}
         <div className="form-grid">
           <div className="form-group">
             <label className="form-label">المنطقة</label>
@@ -271,8 +321,8 @@ export default function RoutePlan({ user }) {
               <option value="C">C — عادي</option>
               <option value="D">D — ضعيف</option>
             </select></div>
-          <div className="form-group"><label className="form-label">العنوان</label>
-            <input className="form-input" value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} placeholder="العنوان / وصف الموقع" /></div>
+          <div className="form-group"><label className="form-label">الشارع / العنوان</label>
+            <input className="form-input" value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} placeholder="الشارع / وصف الموقع" /></div>
           <div className="form-group"><label className="form-label">رابط الموقع (خرائط جوجل)</label>
             <input className="form-input" type="url" inputMode="url" value={form.location_url} onChange={e => setForm(p => ({ ...p, location_url: e.target.value }))} placeholder="https://maps.google.com/..." /></div>
         </div>
