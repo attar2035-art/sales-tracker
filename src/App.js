@@ -131,7 +131,9 @@ function NoAccess({ email, onLogout }) {
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState('dashboard');
+  // Start from the last saved page so the "save page" effect below doesn't
+  // overwrite it with the default before checkUser restores it on reload.
+  const [page, setPage] = useState(() => readSavedPage() || 'dashboard');
   const [menuOpen, setMenuOpen] = useState(false);
   const [recovery, setRecovery] = useState(false);
   // Bumped when a visit is logged via the floating button, so the supervisor's
