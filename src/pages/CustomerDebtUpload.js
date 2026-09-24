@@ -36,6 +36,7 @@ export default function CustomerDebtUpload() {
   const [dataRows, setDataRows] = useState([]);
   const [map, setMap] = useState({});
   const [busy, setBusy] = useState(false);
+  const [mergeMode, setMergeMode] = useState(false); // add a 2nd file without zeroing the region
   const [msg, setMsg] = useState(null);
   const [result, setResult] = useState(null);
 
@@ -89,9 +90,13 @@ export default function CustomerDebtUpload() {
   const apply = async () => {
     if (!regionId) { showMsg('اختر المنطقة أولًا', 'error'); return; }
     if (!preview.count) { showMsg('لا توجد صفوف صالحة — تأكد من عمود رقم العميل', 'error'); return; }
-    if (!window.confirm(`تحديث ديون ${preview.count} عميل لمنطقة «${regions.find(r => r.id === regionId)?.name}»؟\nالعملاء غير الموجودين في الملف سيصبح دينهم صفر (لقطة جديدة). أي كود جديد في الملف سيُضاف كعميل جديد للمنطقة.`)) return;
+    const regionName = regions.find(r => r.id === regionId)?.name;
+    const confirmText = mergeMode
+      ? `دمج ${preview.count} عميل في منطقة «${regionName}» بدون تصفير الباقي؟\nيُستخدم لرفع ملف ثانٍ لنفس المنطقة (لن يُمسح ما رُفع قبله). أي كود جديد سيُضاف.`
+      : `تحديث ديون ${preview.count} عميل لمنطقة «${regionName}»؟\nالعملاء غير الموجودين في الملف سيصبح دينهم صفر (لقطة جديدة). أي كود جديد في الملف سيُضاف كعميل جديد للمنطقة.`;
+    if (!window.confirm(confirmText)) return;
     setBusy(true); setResult(null);
-    const { data, error } = await supabase.rpc('import_customer_debt', { p_rows: preview.rows, p_region_id: regionId });
+    const { data, error } = await supabase.rpc('import_customer_debt', { p_rows: preview.rows, p_region_id: regionId, p_zero_region: !mergeMode });
     if (error) { showMsg('خطأ: ' + error.message, 'error'); setBusy(false); return; }
     setResult(data);
     await logAuditEvent({ eventType: 'import', pageKey: 'debtupload', entityType: 'customers', details: { region: regionId, updated: data?.updated, inserted: data?.inserted, rows: preview.count } });
@@ -178,9 +183,18 @@ export default function CustomerDebtUpload() {
             </table>
           </div>
           {preview.count > 8 && <p className="muted-text" style={{ fontSize: 12, marginTop: 6 }}>… و{preview.count - 8} صف آخر.</p>}
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: '0.75rem', cursor: 'pointer', fontSize: 13 }}>
+            <input type="checkbox" checked={mergeMode} onChange={e => setMergeMode(e.target.checked)} style={{ marginTop: 3 }} />
+            <span>
+              <b>دمج بدون تصفير</b> — فعّلها لرفع <b>ملف ثانٍ لنفس المنطقة</b> (مثل «الرياض ٣» بعد «الرياض ٢»).
+              يضيف/يحدّث بيانات هذا الملف <b>بدون</b> مسح ما رُفع قبله في نفس المنطقة.
+              <br />
+              <span style={{ color: '#b45309' }}>ابدأ دائمًا بملف واحد <b>بدون</b> هذا الخيار (لقطة جديدة)، ثم فعّله للملفات الإضافية.</span>
+            </span>
+          </label>
           <div className="btn-row" style={{ marginTop: '0.75rem' }}>
             <button className="btn btn-success" onClick={apply} disabled={busy || !regionId}>
-              {busy ? '⏳ جاري التحديث...' : '✅ تطبيق التحديث على المنطقة'}
+              {busy ? '⏳ جاري التحديث...' : (mergeMode ? '➕ دمج الملف في المنطقة (بدون تصفير)' : '✅ تطبيق التحديث على المنطقة (لقطة جديدة)')}
             </button>
           </div>
         </div>
