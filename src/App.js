@@ -18,6 +18,7 @@ import SupervisorFollowup from './pages/SupervisorFollowup';
 import KnowledgeCenter from './pages/KnowledgeCenter';
 import PermissionsCenter from './pages/PermissionsCenter';
 import DebtAging from './pages/DebtAging';
+import CustomerArrears from './pages/CustomerArrears';
 import SupervisorDebt from './pages/SupervisorDebt';
 import CustomerDebtUpload from './pages/CustomerDebtUpload';
 import RoutePlan from './pages/RoutePlan';
@@ -34,6 +35,7 @@ const NAV_ADMIN = [
   { key: 'repdetails', label: 'تفاصيل المندوب', icon: '👤' },
   { key: 'supervisors', label: 'متابعة المشرفين', icon: '👔' },
   { key: 'debt', label: 'تحليل المتأخرات', icon: '🏦' },
+  { key: 'arrears', label: 'متأخرات العملاء', icon: '💰' },
   { key: 'debtupload', label: 'تحديث ديون العملاء', icon: '📥' },
   { key: 'routeexec', label: 'تنفيذ خط السير', icon: '✅' },
   { key: 'routefollow', label: 'متابعة خط السير', icon: '📋' },
@@ -67,6 +69,7 @@ const NAV_DATA_ENTRY = [
   { key: 'routeexec', label: 'تنفيذ خط السير', icon: '✅' },
   { key: 'targets', label: 'الأهداف الشهرية', icon: '🎯' },
   { key: 'debt', label: 'تحليل المتأخرات', icon: '🏦' },
+  { key: 'arrears', label: 'متأخرات العملاء', icon: '💰' },
   { key: 'debtupload', label: 'تحديث ديون العملاء', icon: '📥' },
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
 ];
@@ -84,6 +87,7 @@ const NAV_MANAGER = [
   { key: 'dashboard', label: 'لوحة المتابعة', icon: '📊' },
   { key: 'supervisors', label: 'متابعة المشرفين', icon: '👔' },
   { key: 'debt', label: 'تحليل المتأخرات', icon: '🏦' },
+  { key: 'arrears', label: 'متأخرات العملاء', icon: '💰' },
   { key: 'routefollow', label: 'متابعة خط السير', icon: '📋' },
   { key: 'knowledge', label: 'مركز المعرفة', icon: '🧠' },
   { key: 'customers', label: 'العملاء', icon: '👥' },
@@ -230,6 +234,7 @@ export default function App() {
       if (page === 'password') return <ChangePassword />;
       if (page === 'targets') return <Targets />;
       if (page === 'debt') return <DebtAging />;
+      if (page === 'arrears') return <CustomerArrears />;
       if (page === 'debtupload') return <CustomerDebtUpload />;
       if (page === 'routeexec') return <RouteExecution user={user} />;
       // Company-wide, read-only view of all regions' numbers.
@@ -241,6 +246,7 @@ export default function App() {
       if (page === 'password') return <ChangePassword />;
       if (page === 'supervisors') return <SupervisorFollowup />;
       if (page === 'debt') return <DebtAging />;
+      if (page === 'arrears') return <CustomerArrears />;
       if (page === 'routefollow') return <RoutePlanFollowup />;
       if (page === 'knowledge') return <KnowledgeCenter user={user} />;
       if (page === 'customers') return <Customers user={user} />;
@@ -268,6 +274,7 @@ export default function App() {
         case 'repdetails': return <RepDetails />;
         case 'supervisors': return <SupervisorFollowup />;
         case 'debt': return <DebtAging />;
+        case 'arrears': return <CustomerArrears />;
         case 'debtupload': return <CustomerDebtUpload />;
         case 'routeexec': return <RouteExecution user={user} />;
         case 'routefollow': return <RoutePlanFollowup />;
