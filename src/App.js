@@ -91,6 +91,18 @@ const NAV_MANAGER = [
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
 ];
 
+const NAV_BY_ROLE = {
+  admin: NAV_ADMIN, supervisor: NAV_SUPERVISOR, data_entry: NAV_DATA_ENTRY,
+  rep: NAV_REP, manager: NAV_MANAGER,
+};
+const navKeysForRole = (role) => (NAV_BY_ROLE[role] || []).map(n => n.key).concat('password');
+const defaultPageForRole = (role) =>
+  role === 'data_entry' ? 'daily' : role === 'rep' ? 'repdashboard' : 'dashboard';
+
+const PAGE_KEY = 'hw_current_page';
+const readSavedPage = () => { try { return localStorage.getItem(PAGE_KEY); } catch { return null; } };
+const savePage = (p) => { try { if (p) localStorage.setItem(PAGE_KEY, p); } catch { /* ignore */ } };
+
 function NoAccess({ email, onLogout }) {
   return (
     <div style={{
@@ -127,15 +139,23 @@ export default function App() {
   const [visitRefresh, setVisitRefresh] = useState(0);
 
   useEffect(() => {
-    checkUser();
+    checkUser(true); // initial load: restore the last open page
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       // A password-reset link opens the app with a recovery session; show the
       // "set new password" screen instead of the normal dashboard.
-      if (event === 'PASSWORD_RECOVERY') setRecovery(true);
-      checkUser();
+      if (event === 'PASSWORD_RECOVERY') { setRecovery(true); return; }
+      if (event === 'SIGNED_OUT') { setUser(null); return; }
+      // TOKEN_REFRESHED / USER_UPDATED / SIGNED_IN (e.g. app resumed on mobile):
+      // just refresh the user object — DO NOT reset the current page, otherwise
+      // the user gets bounced back to the home page while working.
+      refreshUser();
     });
     return () => subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Remember the current page so it survives a reload / app resume.
+  useEffect(() => { savePage(page); }, [page]);
 
   useEffect(() => {
     if (!user || user.must_change_password) return;
@@ -143,20 +163,29 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, user?.id, user?.must_change_password]);
 
-  const checkUser = async () => {
+  // Refresh the user object without touching the current page.
+  const refreshUser = async () => {
+    const u = await getCurrentUser();
+    setUser(u);
+  };
+
+  const checkUser = async (isInitial = false) => {
     setLoading(true);
     const u = await getCurrentUser();
     setUser(u);
-    if (u) {
-      if (u.role === 'data_entry') setPage('daily');
-      else if (u.role === 'rep') setPage('repdashboard');
-      else setPage('dashboard');
+    if (u && isInitial) {
+      // Restore the last page the user had open, if it's valid for their role;
+      // otherwise fall back to their role's home page.
+      const saved = readSavedPage();
+      const allowed = navKeysForRole(u.role);
+      setPage(saved && allowed.includes(saved) ? saved : defaultPageForRole(u.role));
     }
     setLoading(false);
   };
 
   const handleLogout = async () => {
     await logAuditEvent({ eventType: 'logout', pageKey: page });
+    try { localStorage.removeItem(PAGE_KEY); } catch { /* ignore */ }
     await signOut();
     setUser(null);
   };
@@ -169,10 +198,10 @@ export default function App() {
 
   // Recovery flow (from a password-reset email): let the user set a new password.
   if (recovery) return (
-    <ChangePassword recovery onChanged={() => { setRecovery(false); checkUser(); }} />
+    <ChangePassword recovery onChanged={() => { setRecovery(false); checkUser(true); }} />
   );
 
-  if (!user) return <Login onLogin={checkUser} />;
+  if (!user) return <Login onLogin={() => checkUser(true)} />;
 
   const getNav = () => {
     if (user.role === 'admin') return NAV_ADMIN;
@@ -186,7 +215,7 @@ export default function App() {
 
   const renderPage = () => {
     if (user.must_change_password) {
-      return <ChangePassword forceChange onChanged={checkUser} />;
+      return <ChangePassword forceChange onChanged={() => checkUser(true)} />;
     }
     if (user.role === 'rep') {
       if (page === 'password') return <ChangePassword />;
