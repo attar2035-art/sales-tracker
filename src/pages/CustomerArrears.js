@@ -3,15 +3,21 @@ import { supabase } from '../lib/supabase';
 import { formatCurrency, formatNumber } from '../lib/helpers';
 import { DEBT_BUCKETS, debtDueOf } from '../lib/debtAging';
 
+// Aging weight — the older the bucket, the heavier — used for the "oldest" sort
+// so customers whose debt is the most aged (فوق 150 → 61-90) rise to the top.
+const agingScore = (r) => (Number(r.debt_over_150) || 0) * 4 + (Number(r.debt_over_120) || 0) * 3
+  + (Number(r.debt_over_90) || 0) * 2 + (Number(r.debt_over_60) || 0) * 1;
+
 // متأخرات العملاء — a standalone, always-visible list of every customer that
-// owes money (across all regions), most overdue (61+) first, with region /
-// rep / city filters and search. Management view (admin / manager / data_entry).
+// owes money, sortable by Pareto (highest debt, 80/20) or by oldest aging,
+// with region / rep filters and search. Management + rep-scoped views.
 export default function CustomerArrears({ rpc = 'get_all_customer_debt', title = 'متأخرات العملاء' }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [regionFilter, setRegionFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [dueOnly, setDueOnly] = useState(false); // only customers with 61+ arrears
+  const [sortBy, setSortBy] = useState('pareto'); // pareto | oldest | due
   const [limit, setLimit] = useState(50);
 
   useEffect(() => {
@@ -47,7 +53,32 @@ export default function CustomerArrears({ rpc = 'get_all_customer_debt', title =
     a.count += 1; a.total += Number(r.debt_total) || 0; a.due += debtDueOf(r); return a;
   }, { count: 0, total: 0, due: 0 }), [filtered]);
 
-  const shown = filtered.slice(0, limit);
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    if (sortBy === 'oldest') {
+      arr.sort((a, b) => agingScore(b) - agingScore(a) || (Number(b.debt_total) || 0) - (Number(a.debt_total) || 0));
+    } else if (sortBy === 'due') {
+      arr.sort((a, b) => debtDueOf(b) - debtDueOf(a) || (Number(b.debt_total) || 0) - (Number(a.debt_total) || 0));
+    } else { // pareto — highest total debt first
+      arr.sort((a, b) => (Number(b.debt_total) || 0) - (Number(a.debt_total) || 0));
+    }
+    return arr;
+  }, [filtered, sortBy]);
+
+  // Pareto 80/20: cumulative debt share down the (debt-sorted) list, and the
+  // index of the "vital few" that together make up 80% of the debt.
+  const pareto = useMemo(() => {
+    const total = sorted.reduce((s, r) => s + (Number(r.debt_total) || 0), 0);
+    let run = 0;
+    const cum = sorted.map((r) => {
+      run += Number(r.debt_total) || 0;
+      return total > 0 ? (run / total) * 100 : 0;
+    });
+    const cutoff = cum.findIndex(p => p >= 80); // index of first row reaching 80%
+    return { cum, cutoff, total };
+  }, [sorted]);
+
+  const shown = sorted.slice(0, limit);
 
   return (
     <div>
@@ -82,6 +113,14 @@ export default function CustomerArrears({ rpc = 'get_all_customer_debt', title =
             </div>
           )}
           <div className="form-group">
+            <label className="form-label">الترتيب</label>
+            <select className="form-select" value={sortBy} onChange={e => { setSortBy(e.target.value); setLimit(50); }}>
+              <option value="pareto">الأعلى مديونية — قاعدة باريتو (80/20)</option>
+              <option value="oldest">الأقدم — حسب أعمار الدين</option>
+              <option value="due">الأكثر استحقاقًا للتحصيل (61+)</option>
+            </select>
+          </div>
+          <div className="form-group">
             <label className="form-label">بحث (اسم / كود / تليفون)</label>
             <input className="form-input" value={search} onChange={e => { setSearch(e.target.value); setLimit(50); }} placeholder="🔎 اكتب اسم العميل أو كوده أو تليفونه" />
           </div>
@@ -95,8 +134,18 @@ export default function CustomerArrears({ rpc = 'get_all_customer_debt', title =
       {/* List */}
       <div className="card">
         <div className="card-title">
-          القائمة — {formatNumber(filtered.length)} عميل (الأكثر استحقاقًا أولًا)
+          القائمة — {formatNumber(filtered.length)} عميل
+          {sortBy === 'pareto' ? ' (الأعلى مديونية أولًا)' : sortBy === 'oldest' ? ' (الأقدم حسب أعمار الدين)' : ' (الأكثر استحقاقًا أولًا)'}
         </div>
+
+        {!loading && sortBy === 'pareto' && pareto.cutoff >= 0 && (
+          <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: '10px 14px', marginBottom: '0.75rem', fontSize: 13, color: '#1e3a8a' }}>
+            📊 <b>قاعدة باريتو:</b> أعلى <b>{formatNumber(pareto.cutoff + 1)}</b> عميل
+            ({Math.round(((pareto.cutoff + 1) / filtered.length) * 100)}% من العملاء) عليهم <b>~80%</b> من إجمالي الدين.
+            ابدأ التحصيل بهم — الصفوف المميّزة بـ ⭐.
+          </div>
+        )}
+
         {loading ? (
           <div className="loading"><div className="spinner" />جاري التحميل...</div>
         ) : filtered.length === 0 ? (
@@ -107,14 +156,19 @@ export default function CustomerArrears({ rpc = 'get_all_customer_debt', title =
               <table className="responsive-cards">
                 <thead>
                   <tr>
-                    <th>العميل</th><th>المنطقة</th><th>المندوب</th><th>المدينة</th><th>التليفون</th>
-                    <th>إجمالي الدين</th><th>المستحق (61+)</th>
+                    <th>#</th><th>العميل</th><th>المنطقة</th><th>المندوب</th><th>المدينة</th><th>التليفون</th>
+                    <th>إجمالي الدين</th>
+                    {sortBy === 'pareto' && <th>نسبة تراكمية</th>}
+                    <th>المستحق (61+)</th>
                     {DEBT_BUCKETS.map(b => <th key={b.key}>{b.label}</th>)}
                   </tr>
                 </thead>
                 <tbody>
-                  {shown.map(c => (
-                    <tr key={c.customer_code}>
+                  {shown.map((c, i) => {
+                    const vital = sortBy === 'pareto' && pareto.cutoff >= 0 && i <= pareto.cutoff;
+                    return (
+                    <tr key={c.customer_code} style={{ background: vital ? 'rgba(37,99,235,0.06)' : undefined }}>
+                      <td data-label="#">{vital ? '⭐ ' : ''}{formatNumber(i + 1)}</td>
                       <td data-label="العميل"><strong>{c.customer_name}</strong>
                         <div style={{ fontSize: 11, color: '#94a3b8' }}>
                           كود {c.customer_code}
@@ -127,10 +181,12 @@ export default function CustomerArrears({ rpc = 'get_all_customer_debt', title =
                       <td data-label="المدينة">{c.city || '—'}</td>
                       <td data-label="التليفون">{c.phone || '—'}</td>
                       <td data-label="إجمالي الدين"><strong>{formatCurrency(c.debt_total)}</strong></td>
+                      {sortBy === 'pareto' && <td data-label="نسبة تراكمية">{Math.round(pareto.cum[i] || 0)}%</td>}
                       <td className="due-band" data-label="المستحق (61+)"><strong className="due-amount">{formatCurrency(debtDueOf(c))}</strong></td>
                       {DEBT_BUCKETS.map(b => <td key={b.key} data-label={b.label}>{formatCurrency(c[b.key])}</td>)}
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
