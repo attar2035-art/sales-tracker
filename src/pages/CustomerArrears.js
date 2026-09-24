@@ -6,7 +6,7 @@ import { DEBT_BUCKETS, debtDueOf } from '../lib/debtAging';
 // متأخرات العملاء — a standalone, always-visible list of every customer that
 // owes money (across all regions), most overdue (61+) first, with region /
 // rep / city filters and search. Management view (admin / manager / data_entry).
-export default function CustomerArrears() {
+export default function CustomerArrears({ rpc = 'get_all_customer_debt', title = 'متأخرات العملاء' }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [regionFilter, setRegionFilter] = useState('all');
@@ -17,12 +17,12 @@ export default function CustomerArrears() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const { data, error } = await supabase.rpc('get_all_customer_debt');
+      const { data, error } = await supabase.rpc(rpc);
       if (error) console.error('customer arrears:', error);
       setRows(data || []);
       setLoading(false);
     })();
-  }, []);
+  }, [rpc]);
 
   const regions = useMemo(() => {
     const m = new Map();
@@ -51,7 +51,7 @@ export default function CustomerArrears() {
 
   return (
     <div>
-      <div className="page-header"><h1 className="page-title">💰 متأخرات العملاء</h1></div>
+      <div className="page-header"><h1 className="page-title">💰 {title}</h1></div>
 
       {/* Summary tiles */}
       <div className="form-grid" style={{ marginBottom: '1rem' }}>
@@ -72,13 +72,15 @@ export default function CustomerArrears() {
       {/* Filters */}
       <div className="card">
         <div className="form-grid">
-          <div className="form-group">
-            <label className="form-label">المنطقة / المندوب</label>
-            <select className="form-select" value={regionFilter} onChange={e => { setRegionFilter(e.target.value); setLimit(50); }}>
-              <option value="all">كل المناطق</option>
-              {regions.map(rn => <option key={rn} value={rn}>{rn}</option>)}
-            </select>
-          </div>
+          {regions.length > 1 && (
+            <div className="form-group">
+              <label className="form-label">المنطقة / المندوب</label>
+              <select className="form-select" value={regionFilter} onChange={e => { setRegionFilter(e.target.value); setLimit(50); }}>
+                <option value="all">كل المناطق</option>
+                {regions.map(rn => <option key={rn} value={rn}>{rn}</option>)}
+              </select>
+            </div>
+          )}
           <div className="form-group">
             <label className="form-label">بحث (اسم / كود / تليفون)</label>
             <input className="form-input" value={search} onChange={e => { setSearch(e.target.value); setLimit(50); }} placeholder="🔎 اكتب اسم العميل أو كوده أو تليفونه" />

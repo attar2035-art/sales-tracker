@@ -76,6 +76,7 @@ const NAV_DATA_ENTRY = [
 
 const NAV_REP = [
   { key: 'repdashboard', label: 'تقريري', icon: '📊' },
+  { key: 'arrears', label: 'متأخرات عملائي', icon: '💰' },
   { key: 'routeplan', label: 'خطة خط السير', icon: '🗺️' },
   { key: 'customers', label: 'العملاء', icon: '👥' },
   { key: 'analytics', label: 'تحليل العملاء', icon: '📈' },
@@ -225,6 +226,7 @@ export default function App() {
     }
     if (user.role === 'rep') {
       if (page === 'password') return <ChangePassword />;
+      if (page === 'arrears') return <CustomerArrears rpc="get_my_customer_arrears" title="متأخرات عملائي" />;
       if (page === 'customers') return <Customers user={user} />;
       if (page === 'analytics') return <CustomerAnalytics />;
       if (page === 'routeplan') return <RoutePlan user={user} />;
