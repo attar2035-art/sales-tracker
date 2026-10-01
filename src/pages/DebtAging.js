@@ -44,6 +44,8 @@ export default function DebtAging() {
   const [regionRows, setRegionRows] = useState([]);
   // Off-book customers (نون/أمازون …): in the company total but not on any rep.
   const [offbook, setOffbook] = useState([]);
+  // Bad (written-off) debt — excluded from every total, shown on its own.
+  const [badDebt, setBadDebt] = useState([]);
   const [targets, setTargets] = useState([]);
   const [collections, setCollections] = useState([]); // {rep_id, daily_collection} this month
   const [loading, setLoading] = useState(false);
@@ -69,15 +71,17 @@ export default function DebtAging() {
   const load = async () => {
     setLoading(true);
     const [y, m] = todayStr.split('-').map(Number);
-    const [debtRes, offRes, targetsRes, collRes] = await Promise.all([
+    const [debtRes, offRes, badRes, targetsRes, collRes] = await Promise.all([
       // Company debt aging from the per-customer snapshot (SECURITY DEFINER RPC
       // → consistent company totals for every authorized viewer; excludes
       // regions flagged out of the company total, e.g. مركز مبيعات، وعملاء
-      // «خارج حساب المناديب»).
+      // «خارج حساب المناديب»، والديون المعدومة).
       supabase.rpc('get_company_debt_aging'),
       // Off-book customers (نون/أمازون …) — counted in the company total but
       // shown separately, not on any rep.
       supabase.rpc('get_offbook_debt'),
+      // Bad (written-off) debt — excluded from everything, shown on its own.
+      supabase.rpc('get_bad_debt'),
       supabase.from('monthly_targets').select('*').limit(10000),
       // Collection booked so far this month (to date), per rep.
       supabase.from('daily_entries').select('rep_id, daily_collection')
@@ -86,6 +90,7 @@ export default function DebtAging() {
     if (debtRes.error) console.error('debt aging:', debtRes.error);
     setRegionRows(debtRes.data || []);
     setOffbook(offRes.data || []);
+    setBadDebt(badRes.data || []);
     setTargets(targetsRes.data || []);
     setCollections(collRes.data || []);
     setLoading(false);
@@ -112,6 +117,7 @@ export default function DebtAging() {
 
   // Off-book aggregate (نون/أمازون …) — added into the company total below.
   const offbookAgg = useMemo(() => (offbook || []).reduce((acc, r) => addInto(acc, r), emptyBuckets()), [offbook]);
+  const badDebtTotal = useMemo(() => (badDebt || []).reduce((s, r) => s + (Number(r.debt_total) || 0), 0), [badDebt]);
   const offbookCount = useMemo(() => (offbook || []).filter(r => Number(r.debt_total) > 0).length, [offbook]);
   // Company total = all region (rep) rows + the off-book customers.
   const company = useMemo(() => {
@@ -480,9 +486,37 @@ export default function DebtAging() {
             </div>
           )}
 
+          {/* Bad (written-off) debt — excluded from EVERYTHING, shown on its own */}
+          {badDebt.length > 0 && (
+            <div className="card" style={{ borderInlineStart: '4px solid #dc2626', background: '#fef2f2' }}>
+              <div className="card-title" style={{ color: '#991b1b' }}>❌ ديون معدومة — {formatCurrency(badDebtTotal)}</div>
+              <p style={{ fontSize: 12, color: '#b91c1c', marginTop: '-0.25rem', marginBottom: '0.75rem' }}>
+                ديون مشطوبة/متعثّرة — <b>مستبعدة تمامًا من كل حسابات الديون</b> (لا في إجمالي الشركة ولا على أي مندوب). معروضة هنا للمتابعة فقط.
+              </p>
+              <div className="table-wrapper">
+                <table className="responsive-cards">
+                  <thead>
+                    <tr><th>العميل</th><th>المنطقة</th><th>قيمة الدين المعدوم</th></tr>
+                  </thead>
+                  <tbody>
+                    {badDebt.map(c => (
+                      <tr key={c.customer_code}>
+                        <td data-label="العميل"><strong>{c.customer_name}</strong>
+                          <div style={{ fontSize: 11, color: '#94a3b8' }}>كود {c.customer_code}</div></td>
+                        <td data-label="المنطقة">{c.region_name}</td>
+                        <td data-label="قيمة الدين المعدوم"><strong style={{ color: '#b91c1c' }}>{formatCurrency(c.debt_total)}</strong></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           <p className="muted-text" style={{ fontSize: 12, marginTop: 8 }}>
             الأرقام من مديونية العملاء لكل منطقة (تُحدَّث يوميًا برفع إكسل من «تحديث ديون العملاء»).
             «مركز مبيعات» مستبعد تمامًا من الإجمالي. «عملاء خارج حساب المناديب» (نون/أمازون/كنوز الحكمة …) داخلون في الإجمالي لكن غير محسوبين على مندوب ومعروضون لوحدهم بالأسفل.
+            «ديون معدومة» (اي براند/ديوان الخليج) مستبعدة تمامًا من كل الحسابات.
           </p>
         </>
       )}
