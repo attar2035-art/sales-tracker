@@ -203,28 +203,44 @@ async function listAuthUsers() {
   return users;
 }
 
-async function main() {
-  const REPORT_DATE = process.env.REPORT_DATE || todayInRiyadh();
-
-  const [repsRes, rolesRes, mgrsRes, users, custRes] = await Promise.all([
-    supabase.from('representatives').select('id,name,is_active,supervisor_id,region_id,supervisors(name),regions(name)').eq('is_active', true),
-    supabase.from('user_roles').select('user_id,rep_id,supervisor_id,role'),
-    supabase.from('managers').select('email').eq('is_active', true),
-    listAuthUsers(),
-    // Live, on-book debt straight from the customers table (what may@ imports daily).
-    // On-book filter mirrors the rest of the system: skip bad / off-book / excluded
-    // customers and excluded regions.
-    supabase.from('customers')
+// Fetch every on-book customer, paging around PostgREST's 1000-row response cap.
+// Ordered by id so pages don't overlap or skip rows between requests.
+async function fetchOnBookCustomers() {
+  const PAGE = 1000;
+  const all = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase.from('customers')
       .select('region_id, debt_total, debt_1_45, debt_over_60, debt_over_90, debt_over_120, debt_over_150, regions!inner(name,exclude_from_debt)')
       .eq('debt_bad', false)
       .eq('debt_offbook', false)
       .eq('exclude_from_debt', false)
       .eq('regions.exclude_from_debt', false)
-      .limit(50000),
+      .order('id', { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    const batch = data || [];
+    all.push(...batch);
+    if (batch.length < PAGE) break;
+  }
+  return all;
+}
+
+async function main() {
+  const REPORT_DATE = process.env.REPORT_DATE || todayInRiyadh();
+
+  const [repsRes, rolesRes, mgrsRes, users] = await Promise.all([
+    supabase.from('representatives').select('id,name,is_active,supervisor_id,region_id,supervisors(name),regions(name)').eq('is_active', true),
+    supabase.from('user_roles').select('user_id,rep_id,supervisor_id,role'),
+    supabase.from('managers').select('email').eq('is_active', true),
+    listAuthUsers(),
   ]);
   if (repsRes.error) throw repsRes.error;
   if (rolesRes.error) throw rolesRes.error;
-  if (custRes.error) throw custRes.error;
+
+  // Live, on-book debt straight from the customers table (what may@ imports daily).
+  // Paged because PostgREST caps a single response at 1000 rows and there are more
+  // on-book customers than that — a single request would silently truncate the totals.
+  const customers = await fetchOnBookCustomers();
 
   const reps = repsRes.data || [];
   const roles = rolesRes.data || [];
@@ -234,7 +250,7 @@ async function main() {
 
   // Aggregate the live debt per region.
   const debtByRegion = new Map();
-  for (const c of (custRes.data || [])) {
+  for (const c of customers) {
     if (!c.region_id) continue;
     const g = debtByRegion.get(c.region_id) || { regionName: c.regions?.name || 'بدون منطقة', ...emptyDebt() };
     addDebt(g, c);
