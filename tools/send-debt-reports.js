@@ -4,8 +4,11 @@
 //   • supervisor -> their team (all their reps/regions)
 //   • manager/admin & configured report recipients -> the whole company
 //
-// Debt figures are a running balance, so each rep's latest snapshot (on/before
-// the report date) is the current one; the previous snapshot gives the change.
+// Debt figures are read LIVE from the `customers` table (the running balance that
+// may@ imports daily), aggregated per region and mapped to each region's active rep.
+// We no longer read the per-day `daily_entries` debt snapshot: it stopped being
+// populated on 2026-09-23 (imports now land in `customers` directly), which froze
+// this report on stale data while the live balances kept moving.
 // Meant to run daily from GitHub Actions (cron '0 5 * * *' = 08:00 Asia/Riyadh).
 const { createClient } = require('@supabase/supabase-js');
 const { escapeHtml, formatCurrency, formatNumber } = require('../src/lib/reportMetrics');
@@ -203,50 +206,71 @@ async function listAuthUsers() {
 async function main() {
   const REPORT_DATE = process.env.REPORT_DATE || todayInRiyadh();
 
-  const [repsRes, rolesRes, mgrsRes, users, debtRes] = await Promise.all([
-    supabase.from('representatives').select('id,name,is_active,supervisor_id,supervisors(name),regions(name)').eq('is_active', true),
+  const [repsRes, rolesRes, mgrsRes, users, custRes] = await Promise.all([
+    supabase.from('representatives').select('id,name,is_active,supervisor_id,region_id,supervisors(name),regions(name)').eq('is_active', true),
     supabase.from('user_roles').select('user_id,rep_id,supervisor_id,role'),
     supabase.from('managers').select('email').eq('is_active', true),
     listAuthUsers(),
-    supabase.from('daily_entries')
-      .select('rep_id, entry_date, debt_total, debt_1_45, debt_over_60, debt_over_90, debt_over_120, debt_over_150')
-      .lte('entry_date', REPORT_DATE)
-      .not('field_owners->>debt_total', 'is', null)
-      .order('entry_date', { ascending: false })
-      .limit(20000),
+    // Live, on-book debt straight from the customers table (what may@ imports daily).
+    // On-book filter mirrors the rest of the system: skip bad / off-book / excluded
+    // customers and excluded regions.
+    supabase.from('customers')
+      .select('region_id, debt_total, debt_1_45, debt_over_60, debt_over_90, debt_over_120, debt_over_150, regions!inner(name,exclude_from_debt)')
+      .eq('debt_bad', false)
+      .eq('debt_offbook', false)
+      .eq('exclude_from_debt', false)
+      .eq('regions.exclude_from_debt', false)
+      .limit(50000),
   ]);
   if (repsRes.error) throw repsRes.error;
   if (rolesRes.error) throw rolesRes.error;
+  if (custRes.error) throw custRes.error;
 
   const reps = repsRes.data || [];
   const roles = rolesRes.data || [];
-  const repById = new Map(reps.map(r => [r.id, r]));
   const emailByUserId = Object.fromEntries(users.map(u => [u.id, u.email]));
   const emailByRepId = {};
   roles.filter(r => r.role === 'rep').forEach(r => { if (r.rep_id && emailByUserId[r.user_id]) emailByRepId[r.rep_id] = emailByUserId[r.user_id]; });
 
-  // Latest debt snapshot per rep (+ previous for the change).
-  const byRep = new Map();
-  for (const d of (debtRes.data || [])) {
-    const list = byRep.get(d.rep_id) || [];
-    list.push(d); byRep.set(d.rep_id, list);
+  // Aggregate the live debt per region.
+  const debtByRegion = new Map();
+  for (const c of (custRes.data || [])) {
+    if (!c.region_id) continue;
+    const g = debtByRegion.get(c.region_id) || { regionName: c.regions?.name || 'بدون منطقة', ...emptyDebt() };
+    addDebt(g, c);
+    debtByRegion.set(c.region_id, g);
   }
-  // Build enriched rows (only reps that have debt data and are still active).
+
+  // One active rep per region, so company totals never double-count a region.
+  const repByRegion = new Map();
+  for (const rep of reps) {
+    if (rep.region_id && !repByRegion.has(rep.region_id)) repByRegion.set(rep.region_id, rep);
+  }
+
+  // One enriched row per region that carries debt, attributed to its rep.
+  // No day-over-day change is available from the live table (no dated history),
+  // so `change` is null and the UI shows "—".
   const rows = [];
-  for (const [repId, list] of byRep.entries()) {
-    const rep = repById.get(repId);
-    if (!rep) continue;
+  for (const [regionId, g] of debtByRegion.entries()) {
+    if (n(g.debt_total) === 0) continue;
+    const rep = repByRegion.get(regionId);
     rows.push({
-      repId,
-      name: rep.name,
-      region: rep.regions?.name || 'بدون منطقة',
-      supervisor: rep.supervisors?.name || 'بدون مشرف',
-      supervisorId: rep.supervisor_id,
-      d: list[0],
-      change: list[1] != null ? n(list[0].debt_total) - n(list[1].debt_total) : null,
+      repId: rep?.id || `region:${regionId}`,
+      name: rep?.name || g.regionName,
+      region: g.regionName,
+      supervisor: rep?.supervisors?.name || 'بدون مشرف',
+      supervisorId: rep?.supervisor_id || null,
+      d: {
+        debt_total: g.debt_total,
+        debt_1_45: g.debt_1_45,
+        debt_over_60: g.debt_over_60,
+        debt_over_90: g.debt_over_90,
+        debt_over_120: g.debt_over_120,
+        debt_over_150: g.debt_over_150,
+      },
+      change: null,
     });
   }
-  const rowByRepId = new Map(rows.map(r => [r.repId, r]));
 
   const outbox = [];
 
@@ -292,7 +316,7 @@ async function main() {
     catch (e) { failed += 1; console.error(`::error title=Debt email failed::${(e?.message || String(e)).replace(/\r?\n/g, ' ')}`); }
   }
   console.log(`Debt reports complete. date=${REPORT_DATE} reps=${rows.length} supervisors=${supervisors.length} company=${companyRecipients.length} queued=${toSend.length} sent=${sent} failed=${failed}`);
-  if (rowByRepId.size === 0) console.log('No debt data found — nothing meaningful to report.');
+  if (rows.length === 0) console.log('No debt data found — nothing meaningful to report.');
   if (failed > 0) process.exit(1);
 }
 
