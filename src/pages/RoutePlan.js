@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { sendRoutePlan } from '../lib/visits';
 import { logAuditEvent } from '../lib/audit';
 import { formatCurrency } from '../lib/helpers';
 import { debtDueOf } from '../lib/debtAging';
@@ -41,9 +42,31 @@ export default function RoutePlan({ user }) {
   const [msg, setMsg] = useState(null);
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [sending, setSending] = useState(false);
   const searchTimer = useRef(null);
 
   const showMsg = (text, type = 'success') => { setMsg({ text, type }); setTimeout(() => setMsg(null), 3000); };
+
+  // Send the day's finished plan to the rep's supervisor + managers (one email).
+  const sendToManager = async () => {
+    if (!items.length) { showMsg('لا توجد خطة لإرسالها', 'error'); return; }
+    if (!window.confirm(`إرسال خطة يوم ${planDate} (${items.length} عميل) إلى المدير والمشرف؟`)) return;
+    setSending(true);
+    try {
+      const { data, error } = await sendRoutePlan({ planDate });
+      if (error) throw error;
+      if (data?.sent > 0) {
+        await logAuditEvent({ eventType: 'send', pageKey: 'routeplan', entityType: 'daily_route_plan', details: { date: planDate, count: items.length, recipients: data.sent } });
+        showMsg(`تم إرسال الخطة للمدير والمشرف ✓ (${data.sent} مستلم)`);
+      } else {
+        showMsg('تعذّر الإرسال: لا يوجد مستلمون مُعرّفون', 'error');
+      }
+    } catch (e) {
+      showMsg('خطأ في الإرسال: ' + (e?.message || e), 'error');
+    } finally {
+      setSending(false);
+    }
+  };
 
   const ownerMatch = (q) => (isRep ? q.eq('rep_id', user.rep_id) : q.eq('supervisor_id', user.supervisor_id));
 
@@ -352,7 +375,14 @@ export default function RoutePlan({ user }) {
       </div>
 
       <div className="card">
-        <div className="card-title">خطة يوم {planDate} — {items.length} عميل</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          <div className="card-title" style={{ margin: 0 }}>خطة يوم {planDate} — {items.length} عميل</div>
+          {isRep && items.length > 0 && (
+            <button className="btn btn-primary btn-sm" onClick={sendToManager} disabled={sending}>
+              {sending ? '⏳ جارٍ الإرسال...' : '📤 إرسال الخطة للمدير'}
+            </button>
+          )}
+        </div>
         {items.length === 0 ? (
           <div className="empty-state"><div className="empty-state-icon">🗺️</div>
             <div className="empty-state-text">لا يوجد عملاء في خطة هذا اليوم بعد. أضِفهم من الأعلى.</div></div>
