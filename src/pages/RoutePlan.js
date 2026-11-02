@@ -50,14 +50,14 @@ export default function RoutePlan({ user }) {
   // Send the day's finished plan to the rep's supervisor + managers (one email).
   const sendToManager = async () => {
     if (!items.length) { showMsg('لا توجد خطة لإرسالها', 'error'); return; }
-    if (!window.confirm(`إرسال خطة يوم ${planDate} (${items.length} عميل) إلى المدير والمشرف؟`)) return;
+    if (!window.confirm(`حفظ وإرسال خطة يوم ${planDate} (${items.length} عميل) إلى المشرف/المدير؟`)) return;
     setSending(true);
     try {
       const { data, error } = await sendRoutePlan({ planDate });
       if (error) throw error;
       if (data?.sent > 0) {
         await logAuditEvent({ eventType: 'send', pageKey: 'routeplan', entityType: 'daily_route_plan', details: { date: planDate, count: items.length, recipients: data.sent } });
-        showMsg(`تم إرسال الخطة للمدير والمشرف ✓ (${data.sent} مستلم)`);
+        showMsg(`تم حفظ وإرسال الخطة للمشرف/المدير ✓ (${data.sent} مستلم)`);
       } else {
         showMsg('تعذّر الإرسال: لا يوجد مستلمون مُعرّفون', 'error');
       }
@@ -379,7 +379,7 @@ export default function RoutePlan({ user }) {
           <div className="card-title" style={{ margin: 0 }}>خطة يوم {planDate} — {items.length} عميل</div>
           {isRep && items.length > 0 && (
             <button className="btn btn-primary btn-sm" onClick={sendToManager} disabled={sending}>
-              {sending ? '⏳ جارٍ الإرسال...' : '📤 إرسال الخطة للمدير'}
+              {sending ? '⏳ جارٍ الإرسال...' : '📤 حفظ وإرسال الخطة'}
             </button>
           )}
         </div>

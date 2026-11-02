@@ -105,17 +105,30 @@ serve(async (req) => {
   const rows = planRows || [];
   if (rows.length === 0) return json({ sent: 0, reason: 'no plan' });
 
-  // Recipients = region-scoped Permissions-Center recipients + all active
-  // managers (company-wide) + the rep's own region supervisor.
-  const { data: recs } = await admin.from('report_recipients')
+  // Recipients: the rep's region supervisor if there is one; otherwise the
+  // fixed company managers. A region supervisor is either the rep's own
+  // supervisor (representatives.supervisor_id) OR a region-scoped recipient
+  // who is NOT one of the company managers (this is how وليد supervises
+  // خميس/جيزان). A manager scoped to a region (e.g. أحمد عطار on جدة) is a
+  // manager, not the supervisor, so it is excluded from supervisor detection.
+  const FIXED_MANAGERS = [
+    'salm77437@gmail.com', 'ahmedattar88@gmail.com', 'attar4334@gmail.com',
+    'sayedattar300@gmail.com', 'ceo@hawafel.com',
+  ];
+
+  const { data: allRecs } = await admin.from('report_recipients')
     .select('email, region_id, is_active').eq('is_active', true);
-  const fromCenter = (recs || [])
-    .filter((r) => !r.region_id || r.region_id === rep.region_id)
-    .map((r) => String(r.email).toLowerCase());
   const { data: mgrs } = await admin.from('managers')
     .select('email').eq('is_active', true);
-  const fromManagers = (mgrs || []).map((m) => String(m.email).toLowerCase());
+  // The company-manager set: used to tell a region supervisor apart from a
+  // region-scoped manager.
+  const managerSet = new Set<string>([
+    ...FIXED_MANAGERS.map((e) => e.toLowerCase()),
+    ...(mgrs || []).map((m) => String(m.email).toLowerCase()),
+    ...(allRecs || []).filter((r) => !r.region_id).map((r) => String(r.email).toLowerCase()),
+  ]);
 
+  // (1) the rep's own supervisor (رامي / يحي)
   let supEmail: string | null = null;
   if (rep.supervisor_id) {
     const { data: supRole } = await admin.from('user_roles')
@@ -125,8 +138,17 @@ serve(async (req) => {
       supEmail = supUser?.user?.email ? supUser.user.email.toLowerCase() : null;
     }
   }
+  // (2) a region-scoped recipient who is not a company manager = the supervisor (وليد)
+  const regionSups = (allRecs || [])
+    .filter((r) => r.region_id === rep.region_id)
+    .map((r) => String(r.email).toLowerCase())
+    .filter((e) => !managerSet.has(e));
 
-  const recipients = [...new Set([...fromCenter, ...fromManagers, ...(supEmail ? [supEmail] : [])])];
+  const supervisors = [...new Set([...(supEmail ? [supEmail] : []), ...regionSups])];
+  // Supervisor if any; otherwise fall back to the fixed company managers.
+  const recipients = supervisors.length > 0
+    ? supervisors
+    : [...new Set(FIXED_MANAGERS.map((e) => e.toLowerCase()))];
   if (recipients.length === 0) return json({ sent: 0, reason: 'no recipients' });
 
   // Region names for the table.
