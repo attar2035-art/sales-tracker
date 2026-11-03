@@ -24,6 +24,7 @@ import CustomerDebtUpload from './pages/CustomerDebtUpload';
 import RoutePlan from './pages/RoutePlan';
 import RouteExecution from './pages/RouteExecution';
 import RoutePlanFollowup from './pages/RoutePlanFollowup';
+import CashInvoices from './pages/CashInvoices';
 import FloatingVisitButton from './components/FloatingVisitButton';
 import InstallPrompt from './components/InstallPrompt';
 import { logAuditEvent } from './lib/audit';
@@ -39,6 +40,7 @@ const NAV_ADMIN = [
   { key: 'debtupload', label: 'تحديث ديون العملاء', icon: '📥' },
   { key: 'routeexec', label: 'تنفيذ خط السير', icon: '✅' },
   { key: 'routefollow', label: 'متابعة خط السير', icon: '📋' },
+  { key: 'cashinv', label: 'الفواتير النقدية', icon: '🧾' },
   { key: 'customers', label: 'العملاء', icon: '👥' },
   { key: 'analytics', label: 'تحليل العملاء', icon: '📈' },
   { key: 'segmentation', label: 'تقسيم العملاء', icon: '📊' },
@@ -67,6 +69,7 @@ const NAV_DATA_ENTRY = [
   { key: 'dashboard', label: 'لوحة المتابعة', icon: '📊' },
   { key: 'daily', label: 'الإدخال اليومي', icon: '📝' },
   { key: 'routeexec', label: 'تنفيذ خط السير', icon: '✅' },
+  { key: 'cashinv', label: 'الفواتير النقدية', icon: '🧾' },
   { key: 'targets', label: 'الأهداف الشهرية', icon: '🎯' },
   { key: 'debt', label: 'تحليل المتأخرات', icon: '🏦' },
   { key: 'arrears', label: 'متأخرات العملاء', icon: '💰' },
@@ -90,6 +93,7 @@ const NAV_MANAGER = [
   { key: 'debt', label: 'تحليل المتأخرات', icon: '🏦' },
   { key: 'arrears', label: 'متأخرات العملاء', icon: '💰' },
   { key: 'routefollow', label: 'متابعة خط السير', icon: '📋' },
+  { key: 'cashinv', label: 'الفواتير النقدية', icon: '🧾' },
   { key: 'knowledge', label: 'مركز المعرفة', icon: '🧠' },
   { key: 'customers', label: 'العملاء', icon: '👥' },
   { key: 'analytics', label: 'تحليل العملاء', icon: '📈' },
@@ -239,6 +243,7 @@ export default function App() {
       if (page === 'arrears') return <CustomerArrears />;
       if (page === 'debtupload') return <CustomerDebtUpload />;
       if (page === 'routeexec') return <RouteExecution user={user} />;
+      if (page === 'cashinv') return <CashInvoices user={user} />;
       // Company-wide, read-only view of all regions' numbers.
       if (page === 'dashboard') return <Dashboard />;
       return <DailyEntry user={user} />;
@@ -250,6 +255,7 @@ export default function App() {
       if (page === 'debt') return <DebtAging />;
       if (page === 'arrears') return <CustomerArrears />;
       if (page === 'routefollow') return <RoutePlanFollowup />;
+      if (page === 'cashinv') return <CashInvoices user={user} />;
       if (page === 'knowledge') return <KnowledgeCenter user={user} />;
       if (page === 'customers') return <Customers user={user} />;
       if (page === 'analytics') return <CustomerAnalytics />;
@@ -280,6 +286,7 @@ export default function App() {
         case 'debtupload': return <CustomerDebtUpload />;
         case 'routeexec': return <RouteExecution user={user} />;
         case 'routefollow': return <RoutePlanFollowup />;
+        case 'cashinv': return <CashInvoices user={user} />;
         case 'customers': return <Customers user={user} />;
         case 'analytics': return <CustomerAnalytics />;
         case 'segmentation': return <CustomerSegmentation />;

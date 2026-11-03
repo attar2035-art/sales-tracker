@@ -259,6 +259,14 @@ export const sendVisitReport = async (payload) => {
   return supabase.functions.invoke('send-visit-report', { body: payload });
 };
 
+// Email a rep's daily route plan to their region supervisor + the managers.
+// Runs server-side in the send-route-plan edge function (Resend); the user's JWT
+// is attached automatically by supabase.functions.invoke. One email per call.
+//   payload: { planDate }  (a supervisor/admin may also pass { planDate, repId })
+export const sendRoutePlan = async (payload) => {
+  return supabase.functions.invoke('send-route-plan', { body: payload });
+};
+
 // Mark today's route as completed (used by the end-of-day "send report" action).
 export const completeRoute = async (routeId) => {
   return supabase.from('supervisor_routes').update({ status: 'completed' }).eq('id', routeId);
