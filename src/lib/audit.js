@@ -15,6 +15,7 @@ export const AUDIT_EVENT_LABELS = {
 export const PAGE_LABELS = {
   dashboard: 'لوحة المتابعة',
   daily: 'الإدخال اليومي',
+  cashinv: 'الفواتير النقدية',
   targets: 'الأهداف الشهرية',
   repdetails: 'تفاصيل المندوب',
   repdashboard: 'تقريري',
