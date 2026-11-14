@@ -46,6 +46,11 @@ const LOCKABLE_KEYS = [
   'notes',
 ];
 
+// Visit counts come from the "رفع الزيارات اليومية" upload page (parsed from the
+// program's visits report), not hand-typed — so these boxes are read-only here.
+const VISIT_UPLOAD_KEYS = ['total_visits', 'successful_visits'];
+const isVisitUpload = (key) => VISIT_UPLOAD_KEYS.includes(key);
+
 export default function DailyEntry({ user }) {
   const isAdmin = user?.role === 'admin';
   const myId = user?.id || null;
@@ -86,7 +91,7 @@ export default function DailyEntry({ user }) {
 
   // Update a field and clear its inline error as the user corrects it.
   const changeField = (key, value) => {
-    if (isLocked(key)) return; // guard: locked fields are read-only for others
+    if (isLocked(key) || isVisitUpload(key)) return; // guard: locked / upload-managed fields are read-only
     setForm(prev => ({ ...prev, [key]: value }));
     setErrors(prev => {
       if (!prev[key]) return prev;
@@ -452,12 +457,10 @@ export default function DailyEntry({ user }) {
               <div className="form-group">
                 <label className="form-label">زيارات إجمالي</label>
                 <input className={errCls('total_visits')} type="text" inputMode="numeric"
-                  enterKeyHint="next" data-field="total_visits" disabled={isLocked('total_visits')}
+                  data-field="total_visits" disabled readOnly
                   value={form.total_visits}
-                  onChange={e => changeField('total_visits', e.target.value.replace(/[^0-9.+ ]/g, ''))}
-                  placeholder="عدد" />
-                {String(form.total_visits || '').includes('+') && <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '0.25rem', fontWeight: 700 }}>= {sumExpr(form.total_visits).toLocaleString('en')}</div>}
-                {lockNote('total_visits')}
+                  placeholder="—" />
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>📍 من «رفع الزيارات اليومية» — للقراءة فقط</div>
                 {errors.total_visits && <div className="form-error">{errors.total_visits}</div>}
               </div>
               <div className="form-group">
@@ -483,12 +486,10 @@ export default function DailyEntry({ user }) {
               <div className="form-group">
                 <label className="form-label">زيارات ناجحة</label>
                 <input className={errCls('successful_visits')} type="text" inputMode="numeric"
-                  enterKeyHint="next" data-field="successful_visits" disabled={isLocked('successful_visits')}
+                  data-field="successful_visits" disabled readOnly
                   value={form.successful_visits}
-                  onChange={e => changeField('successful_visits', e.target.value.replace(/[^0-9.+ ]/g, ''))}
-                  placeholder="عدد" />
-                {String(form.successful_visits || '').includes('+') && <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '0.25rem', fontWeight: 700 }}>= {sumExpr(form.successful_visits).toLocaleString('en')}</div>}
-                {lockNote('successful_visits')}
+                  placeholder="—" />
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>📍 من «رفع الزيارات اليومية» — للقراءة فقط</div>
                 {errors.successful_visits && <div className="form-error">{errors.successful_visits}</div>}
               </div>
             </div>

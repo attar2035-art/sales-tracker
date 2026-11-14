@@ -36,17 +36,37 @@ const shell = (title: string, inner: string) => `<!doctype html>
 </div></body></html>`;
 
 async function sendEmail(resendKey: string, from: string, to: string[], subject: string, html: string, replyTo?: string | null) {
-  const body: Record<string, unknown> = { from, to, subject, html };
-  // Let managers reply straight to the supervisor from their inbox.
-  if (replyTo) body.reply_to = replyTo;
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(payload?.message || `Resend error ${res.status}`);
-  return payload;
+  // Send ONE email per recipient instead of a single multi-recipient send.
+  // Resend rejects an entire message if any address on it is suppressed
+  // (a past hard bounce/complaint), which previously blocked the whole
+  // notification for every manager. Per-recipient sending isolates failures:
+  // a suppressed/bounced address is skipped and everyone else still gets it.
+  const recipients = [...new Set(to.filter(Boolean))];
+  let sent = 0;
+  const errors: string[] = [];
+  for (const addr of recipients) {
+    const body: Record<string, unknown> = { from, to: [addr], subject, html };
+    // Let managers reply straight to the supervisor from their inbox.
+    if (replyTo) body.reply_to = replyTo;
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) { errors.push(`${addr}: ${payload?.message || res.status}`); continue; }
+      sent++;
+    } catch (e) {
+      errors.push(`${addr}: ${String((e as Error)?.message || e)}`);
+    }
+  }
+  // Only error out if NOBODY could be reached; otherwise a single bad
+  // address must never fail the request for the rest.
+  if (sent === 0 && recipients.length > 0) {
+    throw new Error(`All recipients failed — ${errors.join('; ')}`);
+  }
+  return { sent, failed: errors.length, errors };
 }
 
 serve(async (req) => {
