@@ -21,6 +21,7 @@ import DebtAging from './pages/DebtAging';
 import CustomerArrears from './pages/CustomerArrears';
 import SupervisorDebt from './pages/SupervisorDebt';
 import CustomerDebtUpload from './pages/CustomerDebtUpload';
+import VisitsUpload from './pages/VisitsUpload';
 import RoutePlan from './pages/RoutePlan';
 import RouteExecution from './pages/RouteExecution';
 import RoutePlanFollowup from './pages/RoutePlanFollowup';
@@ -38,6 +39,7 @@ const NAV_ADMIN = [
   { key: 'debt', label: 'تحليل المتأخرات', icon: '🏦' },
   { key: 'arrears', label: 'متأخرات العملاء', icon: '💰' },
   { key: 'debtupload', label: 'تحديث ديون العملاء', icon: '📥' },
+  { key: 'visitsupload', label: 'رفع الزيارات اليومية', icon: '📍' },
   { key: 'routeexec', label: 'تنفيذ خط السير', icon: '✅' },
   { key: 'routefollow', label: 'متابعة خط السير', icon: '📋' },
   { key: 'cashinv', label: 'الفواتير النقدية', icon: '🧾' },
@@ -74,6 +76,7 @@ const NAV_DATA_ENTRY = [
   { key: 'debt', label: 'تحليل المتأخرات', icon: '🏦' },
   { key: 'arrears', label: 'متأخرات العملاء', icon: '💰' },
   { key: 'debtupload', label: 'تحديث ديون العملاء', icon: '📥' },
+  { key: 'visitsupload', label: 'رفع الزيارات اليومية', icon: '📍' },
   { key: 'password', label: 'تغيير كلمة السر', icon: '🔑' },
 ];
 
@@ -242,6 +245,7 @@ export default function App() {
       if (page === 'debt') return <DebtAging />;
       if (page === 'arrears') return <CustomerArrears />;
       if (page === 'debtupload') return <CustomerDebtUpload />;
+      if (page === 'visitsupload') return <VisitsUpload />;
       if (page === 'routeexec') return <RouteExecution user={user} />;
       if (page === 'cashinv') return <CashInvoices user={user} />;
       // Company-wide, read-only view of all regions' numbers.
@@ -284,6 +288,7 @@ export default function App() {
         case 'debt': return <DebtAging />;
         case 'arrears': return <CustomerArrears />;
         case 'debtupload': return <CustomerDebtUpload />;
+        case 'visitsupload': return <VisitsUpload />;
         case 'routeexec': return <RouteExecution user={user} />;
         case 'routefollow': return <RoutePlanFollowup />;
         case 'cashinv': return <CashInvoices user={user} />;
