@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
 import { logAuditEvent } from '../lib/audit';
@@ -8,9 +8,6 @@ const arDigits = '٠١٢٣٤٥٦٧٨٩';
 const toLatin = (s) => String(s ?? '').replace(/[٠-٩]/g, d => String(arDigits.indexOf(d)));
 const norm = (s) => toLatin(s).replace(/\s+/g, ' ').trim();
 
-// Guess a column index from header keywords.
-const findCol = (headers, test) => headers.findIndex(h => test(norm(h)));
-
 // Convert a cell (Excel Date, serial, or text) to YYYY-MM-DD. Assumes DD/MM/YYYY for text.
 const toISO = (v) => {
   if (v == null || v === '') return '';
@@ -19,9 +16,9 @@ const toISO = (v) => {
     return `${y}-${m}-${d}`;
   }
   const s = toLatin(String(v)).trim();
-  let m = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/); // DD/MM/YYYY
+  let m = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})/); // DD/MM/YYYY [time]
   if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
-  m = s.match(/^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})$/); // YYYY-MM-DD
+  m = s.match(/^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})/); // YYYY-MM-DD [time]
   if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
   const d = new Date(s);
   if (!isNaN(d)) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
@@ -36,57 +33,93 @@ const normResult = (v) => {
   return '';
 };
 
+// Content tests used for automatic column detection (header-independent).
+const isCodeCell = (v) => /^\d{8,12}$/.test(toLatin(String(v ?? '')).trim());
+const isDateCell = (v) => { const iso = toISO(v); return !!iso && Number(iso.slice(0, 4)) >= 2000; };
+const isResultCell = (v) => normResult(v) !== '';
+
 const TARGETS = [
-  { key: 'code', label: 'رقم العميل (الكود)', guess: (h) => h.includes('رقم العميل') || h === 'كود' || h.includes('كود العميل') },
-  { key: 'date', label: 'تاريخ الزيارة', guess: (h) => (h.includes('تاريخ') && h.includes('زيار')) || h === 'التاريخ' || h === 'تاريخ' },
-  { key: 'result', label: 'نتيجة الزيارة', guess: (h) => (h.includes('نتيج') && h.includes('زيار')) || h === 'النتيجة' || h === 'نتيجة' },
+  { key: 'code', label: 'رقم العميل (الكود)' },
+  { key: 'date', label: 'تاريخ الزيارة' },
+  { key: 'result', label: 'نتيجة الزيارة' },
 ];
+
+// Pick the column (index) whose cells most often satisfy `pred`, excluding already-used columns.
+const detectCol = (rows, ncols, pred, exclude) => {
+  let best = -1, bestCount = 0;
+  for (let i = 0; i < ncols; i++) {
+    if (exclude.includes(i)) continue;
+    let c = 0;
+    for (const r of rows) if (pred(r[i])) c++;
+    if (c > bestCount) { bestCount = c; best = i; }
+  }
+  return bestCount > 0 ? best : undefined;
+};
 
 export default function VisitsUpload() {
   const [fileName, setFileName] = useState('');
   const [headers, setHeaders] = useState([]);
   const [dataRows, setDataRows] = useState([]);
   const [map, setMap] = useState({});
+  const [autoOk, setAutoOk] = useState(false);
+  const [showMap, setShowMap] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const [result, setResult] = useState(null);
-
-  useEffect(() => { /* no lookups needed: rep is resolved by customer code server-side */ }, []);
 
   const showMsg = (text, type = 'success') => { setMsg({ text, type }); };
 
   const onFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setFileName(file.name); setResult(null); setMsg(null);
+    setFileName(file.name); setResult(null); setMsg(null); setAutoOk(false); setShowMap(false);
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: 'array', cellDates: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' });
-      // Header row: first row containing a "رقم العميل" cell.
-      let hIdx = rows.findIndex(r => r.some(c => norm(c).includes('رقم العميل')));
-      if (hIdx < 0) hIdx = 0;
-      const hdr = rows[hIdx].map(c => norm(c));
-      const body = rows.slice(hIdx + 1).filter(r => r.some(c => String(c ?? '').trim() !== ''));
-      setHeaders(hdr);
-      setDataRows(body);
+      const ncols = rows.reduce((mx, r) => Math.max(mx, r.length), 0);
+
+      // Column names for the (optional) manual mapping dropdowns: use the first row
+      // that looks like a header, else generic labels.
+      let hIdx = rows.findIndex(r => r.some(c => { const s = norm(c); return s.includes('نتيج') || s.includes('العميل'); }));
+      const hdr = hIdx >= 0
+        ? Array.from({ length: ncols }, (_, i) => norm(rows[hIdx][i]) || `عمود ${i + 1}`)
+        : Array.from({ length: ncols }, (_, i) => `عمود ${i + 1}`);
+
+      // Auto-detect columns BY CONTENT (works even with the "رق العميل" typo,
+      // per-rep section headers, repeated header rows and blank rows).
+      const cCode = detectCol(rows, ncols, isCodeCell, []);
+      const cResult = detectCol(rows, ncols, isResultCell, [cCode].filter(x => x != null));
+      const cDate = detectCol(rows, ncols, isDateCell, [cCode, cResult].filter(x => x != null));
+
       const m = {};
-      TARGETS.forEach(t => { const i = findCol(hdr, t.guess); if (i >= 0) m[t.key] = i; });
+      if (cCode != null) m.code = cCode;
+      if (cDate != null) m.date = cDate;
+      if (cResult != null) m.result = cResult;
+
+      const ok = m.code != null && m.date != null && m.result != null;
+      setHeaders(hdr);
+      setDataRows(rows);
       setMap(m);
+      setAutoOk(ok);
+      setShowMap(!ok); // only reveal the mapping UI if auto-detection was incomplete
+      if (!ok) showMsg('تعذّر اكتشاف بعض الأعمدة تلقائيًا — راجعي المطابقة بالأسفل', 'error');
     } catch (err) {
       showMsg('تعذّر قراءة الملف: ' + err.message, 'error');
     }
   };
 
   // Per-line rows (one per operation) sent to the server; it dedups + attributes.
+  // Rows that aren't real visits (section headers, repeated header rows, blanks)
+  // are dropped here because their code isn't a customer code / result isn't valid.
   const lines = useMemo(() => {
     if (!dataRows.length || map.code == null || map.date == null || map.result == null) return [];
     return dataRows.map(r => ({
-      code: norm(r[map.code]),
+      code: toLatin(String(r[map.code] ?? '')).trim(),
       date: toISO(r[map.date]),
       result: normResult(r[map.result]),
-    })).filter(x => x.code && x.date && x.result);
+    })).filter(x => /^\d{8,12}$/.test(x.code) && x.date && x.result);
   }, [dataRows, map]);
 
   // Client-side preview: dedup a customer's multiple same-day operations into one visit.
@@ -104,7 +137,7 @@ export default function VisitsUpload() {
   }, [lines]);
 
   const apply = async () => {
-    if (!preview.visits) { showMsg('لا توجد زيارات صالحة — تأكد من أعمدة رقم العميل والتاريخ والنتيجة', 'error'); return; }
+    if (!preview.visits) { showMsg('لا توجد زيارات صالحة في الملف — تأكدي من أعمدة رقم العميل والتاريخ والنتيجة', 'error'); return; }
     const confirmText = `رفع زيارات ${preview.dates.length > 1 ? preview.dates.length + ' أيام' : 'يوم ' + preview.dates[0]}؟\n`
       + `${preview.visits} زيارة فعلية (بعد دمج العميل المكرر في نفس اليوم)، منها ${preview.successful} ناجحة.\n`
       + `التوزيع على المناديب بالكود. أرقام الزيارات في الإدخال اليومي هتتحدّث لهذه الأيام.`;
@@ -135,11 +168,11 @@ export default function VisitsUpload() {
       {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
 
       <div className="card">
-        <div className="card-title">1) ارفع ملف الزيارات</div>
+        <div className="card-title">1) ارفعي ملف الزيارات</div>
         <p className="muted-text" style={{ fontSize: 12, marginBottom: '0.75rem' }}>
           صدّري «تقرير الزيارات – تحليلي» من البرنامج كـ Excel وارفعيه هنا — بدل إدخال الزيارات الناجحة والفاشلة يدويًا.
-          العميل اللي عليه أكتر من عملية في نفس اليوم (فاتورة + سند + مرتجع) يُحتسب <b>زيارة واحدة</b>،
-          والزيارة تُوزَّع على مندوبها بـ«رقم العميل». ما تحتاجش تختاري منطقة.
+          التطبيق يكتشف الأعمدة تلقائيًا ويتجاهل صفوف عناوين المناديب. العميل اللي عليه أكتر من عملية في نفس اليوم
+          (فاتورة + سند + مرتجع) يُحتسب <b>زيارة واحدة</b>، والزيارة تُوزَّع على مندوبها بـ«رقم العميل». ما تحتاجيش تختاري منطقة.
         </p>
         <div className="form-group">
           <label className="form-label">ملف الزيارات (Excel / CSV)</label>
@@ -148,11 +181,21 @@ export default function VisitsUpload() {
         </div>
       </div>
 
-      {headers.length > 0 && (
+      {autoOk && !showMap && (
+        <div className="card" style={{ borderInlineStart: '4px solid #16a34a' }}>
+          <div style={{ fontSize: 14, color: '#15803d', fontWeight: 700 }}>✅ تم اكتشاف الأعمدة تلقائيًا</div>
+          <div className="muted-text" style={{ fontSize: 12, marginTop: 4 }}>
+            رقم العميل: «{headers[map.code]}» · التاريخ: «{headers[map.date]}» · النتيجة: «{headers[map.result]}».
+          </div>
+          <button className="btn btn-secondary" style={{ marginTop: 8 }} onClick={() => setShowMap(true)}>تعديل الأعمدة يدويًا</button>
+        </div>
+      )}
+
+      {headers.length > 0 && showMap && (
         <div className="card">
-          <div className="card-title">2) مطابقة الأعمدة</div>
+          <div className="card-title">مطابقة الأعمدة</div>
           <p className="muted-text" style={{ fontSize: 12, marginBottom: '0.75rem' }}>
-            راجعي الأعمدة المكتشفة تلقائيًا وعدّليها لو لزم.
+            اختاري العمود المطابق لكل حقل من ملفك.
           </p>
           <div className="form-grid">
             {TARGETS.map(t => (
@@ -171,7 +214,7 @@ export default function VisitsUpload() {
       {preview.visits > 0 && (
         <div className="card">
           <div className="card-title">
-            3) معاينة — {preview.visits} زيارة فعلية · {preview.successful} ناجحة · {preview.failed} غير ناجحة
+            2) معاينة — {preview.visits} زيارة فعلية · {preview.successful} ناجحة · {preview.failed} غير ناجحة
           </div>
           <p className="muted-text" style={{ fontSize: 13, marginBottom: '0.5rem' }}>
             عدد السطور في الملف: {preview.lineCount} · بعد دمج العميل المكرر في نفس اليوم: <b>{preview.visits}</b> زيارة.
