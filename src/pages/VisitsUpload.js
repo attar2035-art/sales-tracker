@@ -20,6 +20,9 @@ const toISO = (v) => {
   if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
   m = s.match(/^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})/); // YYYY-MM-DD [time]
   if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  // A bare number (e.g. a visit id like 36194) is NOT a date — require a real
+  // date separator before falling back to Date parsing.
+  if (!/[-/.]/.test(s)) return '';
   const d = new Date(s);
   if (!isNaN(d)) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
   return '';
@@ -35,7 +38,7 @@ const normResult = (v) => {
 
 // Content tests used for automatic column detection (header-independent).
 const isCodeCell = (v) => /^\d{8,12}$/.test(toLatin(String(v ?? '')).trim());
-const isDateCell = (v) => { const iso = toISO(v); return !!iso && Number(iso.slice(0, 4)) >= 2000; };
+const isDateCell = (v) => { const iso = toISO(v); if (!iso) return false; const y = Number(iso.slice(0, 4)); return y >= 2000 && y <= 2100; };
 const isResultCell = (v) => normResult(v) !== '';
 
 const TARGETS = [
