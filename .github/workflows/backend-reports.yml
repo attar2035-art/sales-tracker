@@ -1,0 +1,83 @@
+name: Backend operational reports
+
+# Backend equivalents of the Claude-session report triggers, run with no human
+# in the loop. Times mirror the triggers, converted Asia/Riyadh -> UTC (-3h).
+# GitHub cron is UTC-only. Each job runs only for its own schedule, or for a
+# matching workflow_dispatch input. DRY_RUN=true sends nothing.
+#
+# IMPORTANT: scheduled runs only fire from the default branch. Enabling this in
+# production also requires disabling the matching session trigger at cutover to
+# avoid duplicate sends (the triggers do not share report_send_log).
+
+on:
+  schedule:
+    - cron: '55 4 * * 6,0,1,2,3,4'   # route-plan          07:55 Riyadh
+    - cron: '7 5 * * 6,0,1,2,3,4'    # targets             08:07 Riyadh
+    - cron: '48 5 * * 0'             # weekly-collection   08:48 Riyadh (Sun)
+    - cron: '5 6 * * *'              # manager-debt-walid  09:05 Riyadh
+    - cron: '10 6 * * *'             # manager-debt-ahmed  09:10 Riyadh
+    - cron: '15 6 * * *'             # manager-debt-ramy   09:15 Riyadh
+    - cron: '20 6 * * 6,0,1,2,3,4'   # credit-control      09:20 Riyadh
+    - cron: '12 7 * * *'             # aya-visit-confirm   10:12 Riyadh
+    - cron: '18 13 * * 0,1,2,3,4,5'  # route-adherence     16:18 Riyadh
+  workflow_dispatch:
+    inputs:
+      report:
+        description: 'Report to run or "all". One of: manager-debt-walid, manager-debt-ahmed, manager-debt-ramy, credit-control, targets, route-plan, route-adherence, aya-visit-confirm, weekly-collection, all'
+        required: true
+        default: all
+      dry_run:
+        description: 'true = build + log only, send nothing'
+        required: false
+        default: 'true'
+      report_date:
+        description: 'Optional YYYY-MM-DD (defaults to today, Riyadh)'
+        required: false
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+  RESEND_RATE_BUDGET: '8'
+  DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run || 'false' }}
+  REPORT_DATE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.report_date || '' }}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: route-plan,          cron: '55 4 * * 6,0,1,2,3,4' }
+          - { name: targets,             cron: '7 5 * * 6,0,1,2,3,4' }
+          - { name: weekly-collection,   cron: '48 5 * * 0' }
+          - { name: manager-debt-walid,  cron: '5 6 * * *' }
+          - { name: manager-debt-ahmed,  cron: '10 6 * * *' }
+          - { name: manager-debt-ramy,   cron: '15 6 * * *' }
+          - { name: credit-control,      cron: '20 6 * * 6,0,1,2,3,4' }
+          - { name: aya-visit-confirm,   cron: '12 7 * * *' }
+          - { name: route-adherence,     cron: '18 13 * * 0,1,2,3,4,5' }
+    steps:
+      - name: Should this report run?
+        id: gate
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            [ "${{ github.event.schedule }}" = "${{ matrix.cron }}" ] && echo "go=yes" >> "$GITHUB_OUTPUT" || echo "go=no" >> "$GITHUB_OUTPUT"
+          else
+            case "${{ github.event.inputs.report }}" in
+              all|${{ matrix.name }}) echo "go=yes" >> "$GITHUB_OUTPUT" ;;
+              *) echo "go=no" >> "$GITHUB_OUTPUT" ;;
+            esac
+          fi
+      - if: steps.gate.outputs.go == 'yes'
+        uses: actions/checkout@v4
+      - if: steps.gate.outputs.go == 'yes'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - if: steps.gate.outputs.go == 'yes'
+        run: npm ci
+      - name: Send ${{ matrix.name }}
+        if: steps.gate.outputs.go == 'yes'
+        run: node tools/send-report.js ${{ matrix.name }}

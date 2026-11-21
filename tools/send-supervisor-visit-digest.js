@@ -228,19 +228,19 @@ async function main() {
   const sections = targets.map(sup =>
     buildSupervisorSection(sup.name, visits.filter(v => v.supervisor_id === sup.id), photoLinksByVisit));
 
-  let sent = 0, failed = 0;
-  for (const to of recipients) {
-    try {
-      await sendEmail(buildDigestEmail(to, REPORT_DATE, sections));
-      sent += 1;
-    } catch (error) {
-      failed += 1;
-      console.error(`::error title=Digest email failed::${(error?.message || String(error)).replace(/\r?\n/g, ' ')}`);
-    }
-  }
+  const { deliverReports } = require('./lib/deliver');
+  const units = recipients.map((to) => {
+    const e = buildDigestEmail(to, REPORT_DATE, sections);
+    return { reportId: 'digest', recipient: to, subject: e.subject, html: e.html, text: e.text || '' };
+  });
+  const s = await deliverReports(units, {
+    reportType: 'supervisor_visit_digest', period: REPORT_DATE, version: 'v1',
+    fromName: FROM_NAME, fromEmail: FROM_EMAIL, dryRun: DRY_RUN,
+  });
 
-  console.log(`Supervisor visit digest complete. date=${REPORT_DATE} supervisors=${targets.map(s => s.name).join('/')} visits=${visits.length} recipients=${recipients.length} sent=${sent} failed=${failed}`);
-  if (failed > 0) process.exit(1);
+  console.log(`Supervisor visit digest complete. date=${REPORT_DATE} supervisors=${targets.map(s2 => s2.name).join('/')} visits=${visits.length} recipients=${recipients.length} ${JSON.stringify(s)}`);
+  const needsAttention = (s.failed_permanent || 0) + (s.in_doubt || 0);
+  if (needsAttention > 0) { console.error(`::error title=Digest needs attention::failed_permanent=${s.failed_permanent} in_doubt=${s.in_doubt}`); process.exitCode = 1; }
 }
 
 if (require.main === module) {
