@@ -33,8 +33,15 @@ async function main() {
 
   const data = await report.fetch(ctx);
   const deliverPeriod = data.period || period;
-  const units = report.buildUnits(data, deliverPeriod);
+  let units = report.buildUnits(data, deliverPeriod);
   if (!units.length) { console.log(`${name}: nothing to send (no qualifying rows for ${deliverPeriod}).`); return; }
+
+  // Test mode: redirect every unit to one approved address (never the team).
+  const TEST_RECIPIENT = (process.env.TEST_RECIPIENT || '').trim();
+  if (TEST_RECIPIENT) {
+    units = units.map((u, i) => ({ ...u, recipient: TEST_RECIPIENT, reportId: `test:${u.reportId}:${i}`, subject: `[تجربة] ${u.subject}` }));
+    console.log(`TEST mode: ${units.length} unit(s) redirected to ${TEST_RECIPIENT}`);
+  }
 
   const s = await deliverReports(units, {
     reportType: report.reportType, period: deliverPeriod, version: report.version,

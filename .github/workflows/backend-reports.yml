@@ -30,6 +30,9 @@ on:
         description: 'true = build + log only, send nothing'
         required: false
         default: 'true'
+      test_recipient:
+        description: 'Optional: redirect ALL emails to this one address (provider test; never the team)'
+        required: false
       report_date:
         description: 'Optional YYYY-MM-DD (defaults to today, Riyadh)'
         required: false
@@ -40,6 +43,7 @@ env:
   RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
   RESEND_RATE_BUDGET: '8'
   DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run || 'false' }}
+  TEST_RECIPIENT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_recipient || '' }}
   REPORT_DATE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.report_date || '' }}
 
 jobs:
