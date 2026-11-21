@@ -27,8 +27,11 @@ async function deliverReports(units, meta) {
 
   const transport = createResendTransport({ apiKey: RESEND_API_KEY, dryRun });
 
-  if (dryRun && (!SUPABASE_URL || !SERVICE_KEY)) {
-    // Pure local dry-run (no DB): prove unit building + batching without creds.
+  if (dryRun) {
+    // Dry-run NEVER touches the production send log or rate budget: it uses an
+    // in-memory store so it cannot pollute de-dup (a real store + dry transport
+    // would record fake "accepted" rows that make a later real run skip those
+    // recipients). Proves unit building + batching with no side effects.
     const mem = makeMemoryStore();
     const limiter = createLocalRateLimiter({ budget, windowMs });
     const mailer = createMailer({ transport, store: mem, rateLimiter: limiter });
