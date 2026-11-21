@@ -233,13 +233,19 @@ async function main() {
   }
   const toSend = outbox;
 
-  let sent = 0, failed = 0;
-  for (const email of toSend) {
-    try { await sendEmail(email); sent += 1; }
-    catch (e) { failed += 1; console.error(`::error title=Demand email failed::${(e?.message || String(e)).replace(/\r?\n/g, ' ')}`); }
-  }
-  console.log(`Arrears notice complete. date=${DATE} mode=${MANAGER_NOTICE_TO.length ? 'managers' : 'reps'} candidates=${candidates.length} queued=${toSend.length} sent=${sent} failed=${failed}`);
-  if (failed > 0) process.exit(1);
+  // Route through the shared mailer (rate budget + atomic de-dup + retry).
+  // Note: these notices are HTML-only (no attachments). Manual/on-demand, so a
+  // deliberate same-day resend needs a version bump (dedup is per period/day).
+  const { deliverReports } = require('./lib/deliver');
+  const mode = MANAGER_NOTICE_TO.length ? 'managers' : 'reps';
+  const units = toSend.map((e, i) => ({ reportId: `${mode}:${i}`, recipient: e.to, subject: e.subject, html: e.html, text: e.text || '' }));
+  const s = await deliverReports(units, {
+    reportType: 'arrears_demand', period: DATE, version: 'v1',
+    fromName: FROM_NAME, fromEmail: FROM_EMAIL, dryRun: DRY_RUN,
+  });
+  console.log(`Arrears notice complete. date=${DATE} mode=${mode} candidates=${candidates.length} units=${units.length} ${JSON.stringify(s)}`);
+  const needsAttention = (s.failed_permanent || 0) + (s.in_doubt || 0);
+  if (needsAttention > 0) { console.error(`::error title=Arrears needs attention::failed_permanent=${s.failed_permanent} in_doubt=${s.in_doubt}`); process.exitCode = 1; }
 }
 
 if (require.main === module) {

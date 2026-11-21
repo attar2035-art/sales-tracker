@@ -601,21 +601,18 @@ async function main() {
     console.log(`TEST mode: redirecting ${toSend.length} sample email(s) to ${TEST_RECIPIENT} (kinds: ${[...seenKinds].join(', ') || 'none'})`);
   }
 
-  // Send everything; one failure must not block the rest.
-  let sent = 0;
-  let failed = 0;
-  for (const email of toSend) {
-    try {
-      await sendEmail(email);
-      sent += 1;
-    } catch (error) {
-      failed += 1;
-      console.error(`::error title=Email failed::${(error?.message || String(error)).replace(/\r?\n/g, ' ')}`);
-    }
-  }
+  // Deliver through the shared mailer: batch-first, shared rate budget, atomic
+  // de-dup, retry temporary failures only, one failure never blocks the rest.
+  const { deliverReports } = require('./lib/deliver');
+  const units = toSend.map((e) => ({ reportId: e.kind || 'rep', recipient: e.to, subject: e.subject, html: e.html, text: e.text || '' }));
+  const s = await deliverReports(units, {
+    reportType: 'rep_daily', period: REPORT_DATE, version: 'v1',
+    fromName: FROM_NAME, fromEmail: FROM_EMAIL, dryRun: DRY_RUN,
+  });
 
-  console.log(`Daily reports complete. date=${REPORT_DATE} mode=${TEST_RECIPIENT ? 'test' : 'live'} reps=${repMetrics.length} fullReports=${fullReportEmails.length} supervisors=${supervisors.length} queued=${toSend.length} sent=${sent} failed=${failed}`);
-  if (failed > 0) process.exit(1);
+  console.log(`Daily reports complete. date=${REPORT_DATE} mode=${TEST_RECIPIENT ? 'test' : 'live'} reps=${repMetrics.length} fullReports=${fullReportEmails.length} supervisors=${supervisors.length} ${JSON.stringify(s)}`);
+  const needsAttention = (s.failed_permanent || 0) + (s.in_doubt || 0);
+  if (needsAttention > 0) { console.error(`::error title=Daily reports need attention::failed_permanent=${s.failed_permanent} in_doubt=${s.in_doubt}`); process.exitCode = 1; }
 }
 
 if (require.main === module) {

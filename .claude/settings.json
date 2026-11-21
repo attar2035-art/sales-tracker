@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "mcp__Resend__send-email"
+      "mcp__Resend__send-email",
+      "mcp__Supabase__execute_sql",
+      "Bash"
     ]
   }
 }

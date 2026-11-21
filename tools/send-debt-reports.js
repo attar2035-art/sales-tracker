@@ -326,14 +326,18 @@ async function main() {
     console.log(`TEST mode: ${toSend.length} sample(s) -> ${TEST_RECIPIENT} (kinds: ${[...seen].join(', ') || 'none'})`);
   }
 
-  let sent = 0, failed = 0;
-  for (const email of toSend) {
-    try { await sendEmail(email); sent += 1; }
-    catch (e) { failed += 1; console.error(`::error title=Debt email failed::${(e?.message || String(e)).replace(/\r?\n/g, ' ')}`); }
-  }
-  console.log(`Debt reports complete. date=${REPORT_DATE} reps=${rows.length} supervisors=${supervisors.length} company=${companyRecipients.length} queued=${toSend.length} sent=${sent} failed=${failed}`);
+  const { deliverReports } = require('./lib/deliver');
+  const units = toSend.map((e) => ({ reportId: e.kind || 'debt', recipient: e.to, subject: e.subject, html: e.html, text: e.text || '' }));
+  const s = await deliverReports(units, {
+    reportType: 'debt_daily', period: REPORT_DATE, version: 'v1',
+    fromName: FROM_NAME, fromEmail: FROM_EMAIL, dryRun: DRY_RUN,
+  });
+  console.log(`Debt reports complete. date=${REPORT_DATE} reps=${rows.length} supervisors=${supervisors.length} company=${companyRecipients.length} ${JSON.stringify(s)}`);
   if (rows.length === 0) console.log('No debt data found — nothing meaningful to report.');
-  if (failed > 0) process.exit(1);
+  // Temporary failures retry on the next scheduled run; only outcomes that need
+  // a human (permanent failure / unresolved in_doubt) mark the job failed.
+  const needsAttention = (s.failed_permanent || 0) + (s.in_doubt || 0);
+  if (needsAttention > 0) { console.error(`::error title=Debt reports need attention::failed_permanent=${s.failed_permanent} in_doubt=${s.in_doubt}`); process.exitCode = 1; }
 }
 
 if (require.main === module) {
