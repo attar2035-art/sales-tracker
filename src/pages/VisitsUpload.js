@@ -157,8 +157,8 @@ export default function VisitsUpload() {
       eventType: 'import', pageKey: 'visitsupload', entityType: 'daily_visits',
       details: { reps: data?.reps, visits: data?.visits, successful: data?.successful, dates: data?.dates, lines: lines.length },
     });
-    const unmatched = Array.isArray(data?.unmatched) ? data.unmatched.length : 0;
-    showMsg(`✓ تم رفع ${data?.visits || 0} زيارة لـ ${data?.reps || 0} مندوب${unmatched ? ` · ${unmatched} كود غير معروف` : ''}`, 'success');
+    const held = Number(data?.held || 0);
+    showMsg(`✓ تم رفع ${data?.visits || 0} زيارة لـ ${data?.reps || 0} مندوب${held ? ` · ${held} زيارة محفوظة بأكواد غير مسجّلة (هتتضاف تلقائيًا بعد تسجيل العميل)` : ''}`, 'success');
     setBusy(false);
   };
 
@@ -249,7 +249,8 @@ export default function VisitsUpload() {
           )}
           {Array.isArray(result.unmatched) && result.unmatched.length > 0 && (
             <div style={{ marginTop: 8, color: '#b45309' }}>
-              ⚠️ {result.unmatched.length} رقم عميل غير معروف (لم يُحتسب — عميل جديد أو كود غير مسجّل):
+              ⚠️ <strong>{Number(result.held) || result.unmatched.length}</strong> زيارة بأكواد غير مسجّلة <strong>تم حفظها ولم تُفقَد</strong> — وستُضاف تلقائيًا بمجرد تسجيل هؤلاء العملاء، من غير إعادة رفع الملف.
+              <div style={{ fontSize: 12, marginTop: 6 }}>عدد الأكواد غير المسجّلة: {result.unmatched.length}</div>
               <div style={{ fontSize: 12, marginTop: 4, wordBreak: 'break-word' }}>
                 {result.unmatched.slice(0, 30).join('، ')}{result.unmatched.length > 30 ? ' …' : ''}
               </div>
