@@ -12,9 +12,11 @@ const norm = (s) => toLatin(s).replace(/\s+/g, ' ').trim();
 const toISO = (v) => {
   if (v == null || v === '') return '';
   if (v instanceof Date && !isNaN(v)) {
-    // Excel dates come as UTC midnight; read them in UTC so the calendar day
-    // is stable regardless of the browser's timezone (avoids off-by-one).
-    const y = v.getUTCFullYear(), m = String(v.getUTCMonth() + 1).padStart(2, '0'), d = String(v.getUTCDate()).padStart(2, '0');
+    // SheetJS (cellDates:true) builds the Excel calendar day at LOCAL midnight,
+    // so read LOCAL components to keep the stored day equal to the file's date.
+    // (Reading UTC here shifted uploaders in UTC+ zones — e.g. Riyadh/Cairo —
+    // back by a day, which collided dates and dropped whole days on import.)
+    const y = v.getFullYear(), m = String(v.getMonth() + 1).padStart(2, '0'), d = String(v.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
   }
   const s = toLatin(String(v)).trim();
